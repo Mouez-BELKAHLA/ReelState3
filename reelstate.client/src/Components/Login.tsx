@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import authService from '../Services/AuthService';
+import { useAuth } from '../Hooks/useAuth';
+import GoogleSignInButton from '../Components/GoogleSignInButton';
 
-const Login = () => {
-
-    const [username, setUsername] = useState('');
+const Login: React.FC = () => {
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const { login } = useAuth();
     const navigate = useNavigate();
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -16,10 +17,16 @@ const Login = () => {
         setError('');
 
         try {
-            await authService.login({ email: username, password: password });
+            // Pass credentials as an object with proper property names
+            await login({
+                Email: email,
+                Password: password
+            });
             navigate('/dashboard');
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Invalid username or password');
+        } catch (err: unknown) {
+            // Simplified error handling
+            const errorMessage = err instanceof Error ? err.message : 'Invalid email or password';
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -46,16 +53,16 @@ const Login = () => {
 
                 <form className="mt-8 space-y-6" onSubmit={handleLogin}>
                     <div>
-                        <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                         <input
-                            id="username"
-                            name="username"
-                            type="text"
+                            id="email"
+                            name="email"
+                            type="email"
                             required
                             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-700"
-                            placeholder="Username"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
+                            placeholder="Email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
                         />
                     </div>
                     <div>
@@ -78,8 +85,18 @@ const Login = () => {
                             disabled={loading}
                             className="w-full px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-800 transition-colors flex justify-center"
                         >
-                            {loading ? "Signing in..." : "Sign in"}
+                            {loading ? "Signing in..." : "Sign in with Email"}
                         </button>
+                    </div>
+
+                    <div className="relative flex items-center my-4">
+                        <div className="flex-grow border-t border-gray-300"></div>
+                        <span className="flex-shrink mx-4 text-gray-600">or</span>
+                        <div className="flex-grow border-t border-gray-300"></div>
+                    </div>
+
+                    <div>
+                        <GoogleSignInButton />
                     </div>
                 </form>
             </div>

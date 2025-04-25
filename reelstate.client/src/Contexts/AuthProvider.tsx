@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useReducer } from 'react';
+import React, {  useEffect, useReducer } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authService from '../Services/AuthService';
 import { LoginCredentials, RegisterCredentials, User } from '../Types/Auth';

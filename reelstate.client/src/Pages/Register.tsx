@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../Hooks/useAuth';
 import GoogleSignInButton from '../Components/GoogleSignInButton';
 
@@ -12,6 +12,7 @@ const Register: React.FC = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const { register } = useAuth();
+    const navigate = useNavigate(); // Keep navigate
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -35,6 +36,7 @@ const Register: React.FC = () => {
 
         try {
             await register({ FirstName: firstName, LastName: lastName, Email: email, Password: password });
+            // Navigation will be handled in the register function
         } catch (err: any) {
             setError(err.message || 'Registration failed');
         } finally {

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../Hooks/useAuth';
 import GoogleSignInButton from '../Components/GoogleSignInButton';
+import { LoginCredentials } from '../Types/Auth';
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -9,6 +10,7 @@ const Login: React.FC = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const { login } = useAuth();
+    const navigate = useNavigate();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -16,9 +18,17 @@ const Login: React.FC = () => {
         setError('');
 
         try {
-            await login({ email, password });
-        } catch (err: any) {
-            setError(err.message || 'Invalid email or password');
+            // Create credentials object with PascalCase property names to match .NET backend
+            const credentials: LoginCredentials = {
+                Email: email,     // PascalCase - matches .NET naming convention
+                Password: password  // PascalCase - matches .NET naming convention
+            };
+
+            await login(credentials);
+            navigate('/dashboard');
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Invalid email or password';
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
