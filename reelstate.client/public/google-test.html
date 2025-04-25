@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Google Sign-In Test</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+    <h2>Google Sign-In Test</h2>
+    <p>Current origin: <span id="origin-display"></span></p>
+
+    <!-- Google Sign-In Button -->
+    <div id="g_id_onload"
+         data-client_id="986406329195-i4h0o82p645m48bd7cv9jooh6pinjked.apps.googleusercontent.com"
+         data-callback="handleCredentialResponse">
+    </div>
+    <div class="g_id_signin"
+         data-type="standard"
+         data-size="large"
+         data-theme="outline"
+         data-text="sign_in_with"
+         data-shape="rectangular"
+         data-logo_alignment="left">
+    </div>
+
+    <script>
+    // Display current origin
+    document.getElementById('origin-display').textContent = window.location.origin;
+    console.log("Current origin:", window.location.origin);
+
+    function handleCredentialResponse(response) {
+      console.log("Authentication successful!");
+      console.log("ID token:", response.credential);
+    }
+    </script>
+</body>
+</html>

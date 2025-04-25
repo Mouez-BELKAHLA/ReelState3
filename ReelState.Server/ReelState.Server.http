@@ -1,0 +1,6 @@
+@ReelState.Server_HostAddress = http://localhost:5034
+
+GET {{ReelState.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
