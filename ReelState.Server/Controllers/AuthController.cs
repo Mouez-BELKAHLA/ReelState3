@@ -31,6 +31,138 @@ namespace ReelState.Server.Controllers
             _googleAuthService = googleAuthService;
         }
 
+        // ======================================================
+        // TEMPORARY TEST METHODS - REMOVE IN PRODUCTION
+        // ======================================================
+
+        /*
+        // Test endpoint for forcing token refresh - REMOVE IN PRODUCTION
+        [HttpPost("refreshTokenForce")]
+        public async Task<IActionResult> RefreshTokenForce([FromBody] TokenRequestDto model, [FromQuery] bool force = true)
+        {
+            if (model == null)
+                return BadRequest("Invalid client request");
+
+            var principal = _jwtService.GetPrincipalFromExpiredToken(model.Token);
+            if (principal == null)
+                return BadRequest("Invalid jwt token");
+
+            var email = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (email == null)
+                return BadRequest("Invalid token claim");
+
+            var user = await _userManager.FindByEmailAsync(email);
+
+            // Only check refresh token validity, not token expiration
+            if (user == null || user.RefreshToken != model.RefreshToken)
+                return BadRequest("Invalid refresh token");
+
+            // Skip the expiration check that exists in the original method
+            if (!force && user.RefreshTokenExpiryTime <= DateTime.Now)
+                return BadRequest("Refresh token expired");
+
+            var newToken = await _jwtService.GenerateJwtToken(user);
+            var newRefreshToken = _jwtService.GenerateRefreshToken();
+
+            user.RefreshToken = newRefreshToken;
+            await _userManager.UpdateAsync(user);
+
+            return Ok(new AuthResponseDto
+            {
+                IsSuccess = true,
+                Token = newToken,
+                RefreshToken = newRefreshToken,
+                Expiration = DateTime.Now.AddMinutes(120),
+                UserId = user.Id,
+                Email = user.Email ?? string.Empty,
+                FirstName = user.FirstName,
+                LastName = user.LastName
+            });
+        }
+
+        // Debug endpoint for token inspection - REMOVE IN PRODUCTION
+        [HttpGet("debug-token")]
+        public async Task<IActionResult> DebugToken(string email)
+        {
+            if (string.IsNullOrEmpty(email))
+                return BadRequest("Email is required");
+
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+                return NotFound("User not found");
+
+            return Ok(new
+            {
+                email = user.Email,
+                refreshToken = user.RefreshToken?.Substring(0, 10) + "..." // Show first 10 chars for safety
+            });
+        }
+
+        // Debug endpoint for full token inspection - REMOVE IN PRODUCTION
+        [HttpGet("debug-token-full")]
+        public async Task<IActionResult> DebugTokenFull(string email)
+        {
+            if (string.IsNullOrEmpty(email))
+                return BadRequest("Email is required");
+
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+                return NotFound("User not found");
+
+            return Ok(new
+            {
+                email = user.Email,
+                refreshTokenFull = user.RefreshToken,
+                tokenLength = user.RefreshToken?.Length
+            });
+        }
+
+        // Test endpoint for token refresh bypassing validation - REMOVE IN PRODUCTION
+        [HttpPost("refreshTokenFull")]
+        public async Task<IActionResult> RefreshTokenFull([FromBody] TokenRequestDto model)
+        {
+            if (model == null)
+                return BadRequest("Invalid client request");
+
+            var principal = _jwtService.GetPrincipalFromExpiredToken(model.Token);
+            if (principal == null)
+                return BadRequest("Invalid jwt token");
+
+            var email = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (email == null)
+                return BadRequest("Invalid token claim");
+
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+                return BadRequest($"User not found with email: {email}");
+
+            // Generate new tokens regardless of current token values
+            var newToken = await _jwtService.GenerateJwtToken(user);
+            var newRefreshToken = _jwtService.GenerateRefreshToken();
+
+            // Store the new refresh token
+            user.RefreshToken = newRefreshToken;
+            await _userManager.UpdateAsync(user);
+
+            // Return new tokens
+            return Ok(new AuthResponseDto
+            {
+                IsSuccess = true,
+                Token = newToken,
+                RefreshToken = newRefreshToken,
+                Expiration = DateTime.Now.AddMinutes(120),
+                UserId = user.Id,
+                Email = user.Email ?? string.Empty,
+                FirstName = user.FirstName,
+                LastName = user.LastName
+            });
+        }
+        */
+
+        // ======================================================
+        // CORE AUTHENTICATION ENDPOINTS
+        // ======================================================
+
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto model)
         {
@@ -262,6 +394,7 @@ namespace ReelState.Server.Controllers
 
             return Ok(new AuthResponseDto { IsSuccess = true, Message = "Logged out successfully" });
         }
+
         [Authorize]
         [HttpGet("profile")]
         public async Task<IActionResult> GetProfile()

@@ -17,7 +17,7 @@ export interface AuthState {
 
 export interface LoginCredentials {
     Email: string;    // PascalCase to match .NET backend
-    Password: string; // PascalCase to match .NET backend
+    Password: string; // PascalCase to match .NET backenda
 }
 
 export interface RegisterCredentials {
