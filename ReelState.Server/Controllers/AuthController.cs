@@ -399,13 +399,16 @@ namespace ReelState.Server.Controllers
         [HttpGet("profile")]
         public async Task<IActionResult> GetProfile()
         {
-            var userEmail = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userEmail))
-                return BadRequest(new { IsSuccess = false, Message = "User not found" });
+            // Option 1: Get email directly from the Name claim
+            var userEmail = User.FindFirst(ClaimTypes.Name)?.Value;
 
+            if (string.IsNullOrEmpty(userEmail))
+                return BadRequest(new { IsSuccess = false, Message = "User not found in token" });
+
+            // Find user by email
             var user = await _userManager.FindByEmailAsync(userEmail);
             if (user == null)
-                return NotFound(new { IsSuccess = false, Message = "User not found" });
+                return NotFound(new { IsSuccess = false, Message = "User not found in database" });
 
             return Ok(new
             {
