@@ -1,44 +1,29 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../Hooks/useAuth';
-
-type PropertyFormData = {
-    title: string;
-    caption: string;
-    rooms: number;
-    propertyType: string;
-    space: number;
-    address: string;
-    city: string;
-    lat: number;
-    lng: number;
-    video: File | null;
-    photos: File[];
-}
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { API_URL } from '../Services/config';
 
 const CreateVideoCard: React.FC = () => {
     const { authState, logout } = useAuth();
+    const navigate = useNavigate();
 
-    // Debug logs matching Dashboard pattern
     console.log("CreateVideoCard rendering, authState:", authState);
-
-    // Extract user from authState using the same pattern as Dashboard
     const { user } = authState;
-
-    // Add more debugging
     console.log("user from authState:", user);
 
-    const [formData, setFormData] = useState<PropertyFormData>({
+    const [formData, setFormData] = useState({
         title: '',
         caption: '',
         rooms: 2,
-        propertyType: 'appartement',
+        propertyType: 'apartment',
         space: 75,
         address: '',
         city: '',
         lat: 0,
         lng: 0,
-        video: null,
-        photos: []
+        video: null as File | null,
+        photos: [] as File[]
     });
 
     const [videoPreview, setVideoPreview] = useState<string | null>(null);
@@ -46,16 +31,19 @@ const CreateVideoCard: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     const videoInputRef = useRef<HTMLInputElement>(null);
     const photoInputRef = useRef<HTMLInputElement>(null);
 
-    const propertyTypes = ["appartement", "villa", "studio", "maison", "loft", "terrain"];
+    const propertyTypes = ["apartment", "house", "studio", "villa", "loft", "land"];
 
-    // If user is not loaded yet, show loading state
-    if (!user) {
-        return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
-    }
+    // Move the loading check to useEffect
+    useEffect(() => {
+        if (user) {
+            setIsLoading(false);
+        }
+    }, [user]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -71,14 +59,13 @@ const CreateVideoCard: React.FC = () => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Validate file type and size
         if (!file.type.includes('video/')) {
-            setError('Le fichier doit être un format vidéo.');
+            setError('File must be a video format.');
             return;
         }
 
-        if (file.size > 100 * 1024 * 1024) { // 100MB max
-            setError('La taille de la vidéo ne doit pas dépasser 100MB.');
+        if (file.size > 50 * 1024 * 1024) {
+            setError('Video size must not exceed 50MB.');
             return;
         }
 
@@ -91,36 +78,36 @@ const CreateVideoCard: React.FC = () => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
 
-        // Convert FileList to array
         const filesArray = Array.from(files);
 
-        // Validate file types and sizes
         const invalidFiles = filesArray.filter(file => !file.type.includes('image/'));
         if (invalidFiles.length > 0) {
-            setError('Tous les fichiers doivent être des images.');
+            setError('All files must be images.');
             return;
         }
 
-        const tooLargeFiles = filesArray.filter(file => file.size > 5 * 1024 * 1024); // 5MB max per image
+        const tooLargeFiles = filesArray.filter(file => file.size > 3 * 1024 * 1024);
         if (tooLargeFiles.length > 0) {
-            setError('Chaque image ne doit pas dépasser 5MB.');
+            setError('Each image must not exceed 3MB.');
             return;
         }
 
-        // Update form data with new photos
+        if (formData.photos.length + filesArray.length > 5) {
+            setError('Maximum 5 photos allowed.');
+            return;
+        }
+
         setFormData(prev => ({
             ...prev,
             photos: [...prev.photos, ...filesArray]
         }));
 
-        // Create and store preview URLs
         const newUrls = filesArray.map(file => URL.createObjectURL(file));
         setPhotoPreviewUrls(prev => [...prev, ...newUrls]);
         setError(null);
     };
 
     const removePhoto = (index: number) => {
-        // Create new arrays without the item at the specified index
         const newPhotos = formData.photos.filter((_, i) => i !== index);
         const newPreviews = photoPreviewUrls.filter((_, i) => i !== index);
 
@@ -134,88 +121,121 @@ const CreateVideoCard: React.FC = () => {
         setError(null);
         setSuccess(null);
 
-        // Validate form
         if (!formData.title || !formData.caption || !formData.video) {
-            setError('Veuillez remplir tous les champs obligatoires et télécharger une vidéo.');
+            setError('Please fill in all required fields and upload a video.');
             setIsSubmitting(false);
             return;
         }
 
         try {
-            // In a real application, you would upload the files and submit the form data to your API
-            // For this example, we'll just simulate a successful submission
-
-            // Create a FormData object to send files and data
             const submitData = new FormData();
-            submitData.append('title', formData.title);
-            submitData.append('caption', formData.caption);
-            submitData.append('rooms', formData.rooms.toString());
-            submitData.append('propertyType', formData.propertyType);
-            submitData.append('space', formData.space.toString());
-            submitData.append('address', formData.address);
-            submitData.append('city', formData.city);
-            submitData.append('lat', formData.lat.toString());
-            submitData.append('lng', formData.lng.toString());
 
-            // Add user information from authState
+            // Use the property names that match the C# model (PascalCase)
+            submitData.append('Title', formData.title);
+            submitData.append('Caption', formData.caption);
+            submitData.append('Rooms', formData.rooms.toString());
+            submitData.append('PropertyType', formData.propertyType);
+            submitData.append('Space', formData.space.toString());
+            submitData.append('Address', formData.address);
+            submitData.append('City', formData.city);
+            submitData.append('Latitude', formData.lat.toString());
+            submitData.append('Longitude', formData.lng.toString());
+
             if (user && user.id) {
-                submitData.append('userId', user.id);
+                submitData.append('UserId', user.id);
             }
 
             if (formData.video) {
-                submitData.append('video', formData.video);
+                submitData.append('VideoFile', formData.video);
             }
 
-            formData.photos.forEach((photo) => {
-                submitData.append('photos', photo);
+            formData.photos.forEach(photo => {
+                submitData.append('PhotoFiles', photo);
             });
 
-            // Here you would make an API call to your backend
-            // const response = await api.post('/api/properties', submitData);
-
-            // Simulate API call delay
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-            // Success
-            setSuccess('Votre annonce immobilière a été créée avec succès!');
-
-            // Reset form
-            setFormData({
-                title: '',
-                caption: '',
-                rooms: 2,
-                propertyType: 'appartement',
-                space: 75,
-                address: '',
-                city: '',
-                lat: 0,
-                lng: 0,
-                video: null,
-                photos: []
+            console.log("Submitting property with data:", {
+                title: formData.title,
+                caption: formData.caption,
+                videoSize: formData.video?.size || 0,
+                photosCount: formData.photos.length
             });
-            setVideoPreview(null);
-            setPhotoPreviewUrls([]);
 
-            // Reset file inputs
-            if (videoInputRef.current) videoInputRef.current.value = '';
-            if (photoInputRef.current) photoInputRef.current.value = '';
+            const token = localStorage.getItem('token');
 
-        } catch (err) {
-            setError('Une erreur est survenue lors de la création de l\'annonce. Veuillez réessayer.');
+            const response = await axios.post(`${API_URL}/api/Property/create`, submitData, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'multipart/form-data',
+                },
+                timeout: 60000, // 60 second timeout
+                onUploadProgress: (progressEvent) => {
+                    const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
+                    console.log(`Upload progress: ${percentCompleted}%`);
+                }
+            });
+
+            console.log('Property creation response:', response.data);
+
+            if (response.data.isSuccess) {
+                setSuccess('Your property listing was created successfully!');
+
+                setFormData({
+                    title: '',
+                    caption: '',
+                    rooms: 2,
+                    propertyType: 'apartment',
+                    space: 75,
+                    address: '',
+                    city: '',
+                    lat: 0,
+                    lng: 0,
+                    video: null,
+                    photos: []
+                });
+
+                setVideoPreview(null);
+                setPhotoPreviewUrls([]);
+
+                if (videoInputRef.current) videoInputRef.current.value = '';
+                if (photoInputRef.current) photoInputRef.current.value = '';
+
+                setTimeout(() => {
+                    navigate('/feed');
+                }, 2000);
+            } else {
+                setError(response.data.message || 'An error occurred while creating the listing.');
+            }
+
+        } catch (err: any) {
             console.error('Error submitting property:', err);
+
+            let errorMessage = 'An error occurred while creating the listing. Please try again.';
+
+            if (err.code === 'ERR_NETWORK') {
+                errorMessage = 'Network error. The server may be down or the request might be too large.';
+            } else if (err.response?.data?.message) {
+                errorMessage = err.response.data.message;
+            }
+
+            setError(errorMessage);
         } finally {
             setIsSubmitting(false);
         }
     };
 
+    // Show loading indicator while waiting for user data
+    if (isLoading) {
+        return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+    }
+
+    // Main render - notice we've moved this outside the condition
     return (
-        <div className="bg-gray-100 min-h-screen py-8">
-            {/* Header - similar to Dashboard */}
+        <div className="bg-gray-100 min-h-screen">
             <header className="bg-white shadow mb-8">
                 <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                    <h1 className="text-3xl font-bold text-gray-900">Créer une annonce</h1>
+                    <h1 className="text-3xl font-bold text-gray-900">Create Listing</h1>
                     <div className="flex items-center gap-4">
-                        {user.profilePictureUrl && (
+                        {user?.profilePictureUrl && (
                             <img
                                 src={user.profilePictureUrl}
                                 alt="Profile"
@@ -224,9 +244,9 @@ const CreateVideoCard: React.FC = () => {
                         )}
                         <div className="text-right">
                             <p className="text-sm font-medium text-gray-900">
-                                {user.firstName.toUpperCase()} {user.lastName.toUpperCase()}
+                                {user?.firstName?.toUpperCase() || ''} {user?.lastName?.toUpperCase() || ''}
                             </p>
-                            <p className="text-xs text-gray-500">{user.email}</p>
+                            <p className="text-xs text-gray-500">{user?.email}</p>
                         </div>
                         <button
                             onClick={() => logout()}
@@ -238,7 +258,7 @@ const CreateVideoCard: React.FC = () => {
                 </div>
             </header>
 
-            <div className="container mx-auto px-4">
+            <div className="container mx-auto px-4 pb-12">
                 <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 max-w-4xl mx-auto">
                     {error && (
                         <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-6">
@@ -258,7 +278,7 @@ const CreateVideoCard: React.FC = () => {
                             <div className="space-y-6">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Titre*
+                                        Title*
                                     </label>
                                     <input
                                         type="text"
@@ -266,7 +286,7 @@ const CreateVideoCard: React.FC = () => {
                                         value={formData.title}
                                         onChange={handleInputChange}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Ex: Magnifique appartement lumineux au cœur de Lyon"
+                                        placeholder="Ex: Beautiful bright apartment in downtown"
                                         required
                                     />
                                 </div>
@@ -281,17 +301,15 @@ const CreateVideoCard: React.FC = () => {
                                         onChange={handleInputChange}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         rows={3}
-                                        placeholder="Décrivez votre bien immobilier en quelques phrases"
+                                        placeholder="Describe your property in a few sentences"
                                         required
                                     />
                                 </div>
 
-                                {/* Rest of the form fields */}
-                                {/* ... */}
                                 <div className="grid grid-cols-3 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Pièces
+                                            Rooms
                                         </label>
                                         <input
                                             type="number"
@@ -324,7 +342,7 @@ const CreateVideoCard: React.FC = () => {
 
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Surface (m²)
+                                            Area (m²)
                                         </label>
                                         <input
                                             type="number"
@@ -340,7 +358,7 @@ const CreateVideoCard: React.FC = () => {
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Adresse
+                                        Address
                                     </label>
                                     <input
                                         type="text"
@@ -348,14 +366,14 @@ const CreateVideoCard: React.FC = () => {
                                         value={formData.address}
                                         onChange={handleInputChange}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Ex: 123 Rue de la République"
+                                        placeholder="Ex: 123 Main Street"
                                     />
                                 </div>
 
                                 <div className="grid grid-cols-3 gap-4">
                                     <div className="col-span-1">
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Ville
+                                            City
                                         </label>
                                         <input
                                             type="text"
@@ -403,7 +421,7 @@ const CreateVideoCard: React.FC = () => {
                             <div className="space-y-6">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Vidéo du bien* <span className="text-gray-500 text-xs">(max 100MB)</span>
+                                        Property Video* <span className="text-gray-500 text-xs">(max 50MB)</span>
                                     </label>
                                     <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
                                         {videoPreview ? (
@@ -422,7 +440,7 @@ const CreateVideoCard: React.FC = () => {
                                                     }}
                                                     className="w-full py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
                                                 >
-                                                    Supprimer
+                                                    Remove
                                                 </button>
                                             </div>
                                         ) : (
@@ -452,7 +470,7 @@ const CreateVideoCard: React.FC = () => {
                                                         htmlFor="video-upload"
                                                         className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none"
                                                     >
-                                                        <span>Télécharger une vidéo</span>
+                                                        <span>Upload a video</span>
                                                         <input
                                                             id="video-upload"
                                                             ref={videoInputRef}
@@ -463,9 +481,9 @@ const CreateVideoCard: React.FC = () => {
                                                             onChange={handleVideoUpload}
                                                         />
                                                     </label>
-                                                    <p className="pl-1">ou glisser-déposer</p>
+                                                    <p className="pl-1">or drag and drop</p>
                                                 </div>
-                                                <p className="text-xs text-gray-500">MP4, MOV, AVI ou autres formats vidéo</p>
+                                                <p className="text-xs text-gray-500">MP4, MOV, AVI or other video formats</p>
                                             </div>
                                         )}
                                     </div>
@@ -473,7 +491,7 @@ const CreateVideoCard: React.FC = () => {
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Photos du bien <span className="text-gray-500 text-xs">(max 5MB chacune)</span>
+                                        Property Photos <span className="text-gray-500 text-xs">(max 3MB each, 5 photos max)</span>
                                     </label>
 
                                     <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
@@ -497,7 +515,7 @@ const CreateVideoCard: React.FC = () => {
                                                     htmlFor="photo-upload"
                                                     className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none"
                                                 >
-                                                    <span>Télécharger des photos</span>
+                                                    <span>Upload photos</span>
                                                     <input
                                                         id="photo-upload"
                                                         ref={photoInputRef}
@@ -509,9 +527,9 @@ const CreateVideoCard: React.FC = () => {
                                                         onChange={handlePhotoUpload}
                                                     />
                                                 </label>
-                                                <p className="pl-1">ou glisser-déposer</p>
+                                                <p className="pl-1">or drag and drop</p>
                                             </div>
-                                            <p className="text-xs text-gray-500">PNG, JPG, GIF jusqu'à 5MB</p>
+                                            <p className="text-xs text-gray-500">PNG, JPG, GIF up to 3MB</p>
                                         </div>
                                     </div>
 
@@ -551,7 +569,7 @@ const CreateVideoCard: React.FC = () => {
                                         : 'bg-blue-600 hover:bg-blue-700'
                                     }`}
                             >
-                                {isSubmitting ? 'Création en cours...' : 'Créer l\'annonce'}
+                                {isSubmitting ? 'Creating...' : 'Create Listing'}
                             </button>
                         </div>
                     </form>

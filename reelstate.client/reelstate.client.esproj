@@ -11,6 +11,7 @@
   <ItemGroup>
     <Folder Include="src\Hooks\" />
     <Folder Include="src\Constants\" />
+    <Folder Include="src\Models\" />
     <Folder Include="src\Types\" />
   </ItemGroup>
 </Project>

@@ -7,15 +7,49 @@ using ReelState.Data;
 using ReelState.Services;
 using System.Text;
 using ReelState.Server.Models;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Encodings.Web;
+using Microsoft.AspNetCore.Mvc.Formatters;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.FileProviders;
+using System.Text.Json.Serialization.Metadata;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Configure Kestrel to handle large file uploads
+builder.Services.Configure<KestrelServerOptions>(options =>
+{
+    options.Limits.MaxRequestBodySize = 104857600; // 100MB
+});
+
+// Configure IIS Server options for large file uploads
+builder.Services.Configure<IISServerOptions>(options =>
+{
+    options.MaxRequestBodySize = 104857600; // 100MB
+});
+
+// Configure request form options
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.ValueLengthLimit = 104857600; // 100MB
+    options.MultipartBodyLengthLimit = 104857600; // 100MB
+    options.MultipartHeadersLengthLimit = 32768; // 32KB
+});
+
+// FIXED: Add controllers with correctly configured JSON serialization
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        options.JsonSerializerOptions.PropertyNamingPolicy =
-            System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+        options.JsonSerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
+        // Need to set TypeInfoResolver for .NET 9
+        options.JsonSerializerOptions.TypeInfoResolver = JsonSerializer.IsReflectionEnabledByDefault
+            ? new DefaultJsonTypeInfoResolver()
+            : JsonTypeInfoResolver.Combine(new DefaultJsonTypeInfoResolver());
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     });
 
 builder.Services.AddEndpointsApiExplorer();
@@ -128,6 +162,9 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IGoogleAuthService, GoogleAuthService>();
 
+// Configure static files to serve uploaded files
+builder.Services.AddDirectoryBrowser();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -138,9 +175,58 @@ if (app.Environment.IsDevelopment())
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "ReelState API v1");
     });
+
+    // In development, detailed errors are helpful
+    app.UseDeveloperExceptionPage();
+}
+else
+{
+    // In production, use the error handler middleware
+    app.UseExceptionHandler("/error");
+    app.UseHsts();
 }
 
+// Create uploads directory in the content root path instead of web root
+var contentRootPath = app.Environment.ContentRootPath;
+var uploadsPath = Path.Combine(contentRootPath, "uploads");
+
+// Ensure the uploads directory exists
+if (!Directory.Exists(uploadsPath))
+{
+    Directory.CreateDirectory(uploadsPath);
+}
+
+// Create subdirectories for different file types
+var videosPath = Path.Combine(uploadsPath, "videos");
+var photosPath = Path.Combine(uploadsPath, "photos");
+
+if (!Directory.Exists(videosPath))
+{
+    Directory.CreateDirectory(videosPath);
+}
+
+if (!Directory.Exists(photosPath))
+{
+    Directory.CreateDirectory(photosPath);
+}
+
+// Log the upload paths for debugging
+Console.WriteLine($"Content Root Path: {contentRootPath}");
+Console.WriteLine($"Uploads Path: {uploadsPath}");
+Console.WriteLine($"Videos Path: {videosPath}");
+Console.WriteLine($"Photos Path: {photosPath}");
+
 app.UseHttpsRedirection();
+
+// Configure the static file middleware to serve files from the uploads folder
+app.UseStaticFiles(); // Serve files from wwwroot folder
+
+// Serve files from our custom uploads folder
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadsPath),
+    RequestPath = "/uploads"
+});
 
 // Apply CORS policy before authentication
 app.UseCors("CorsPolicy");
