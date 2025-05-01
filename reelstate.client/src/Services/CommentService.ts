@@ -1,22 +1,12 @@
 import axios from 'axios';
-import { API_URL } from '../Services/config';
+import { API_URL } from './config';
 import { Comment } from '../Components/CommentOverlay';
 
 class CommentService {
     // Get comments for a property
     async getPropertyComments(propertyId: string): Promise<Comment[]> {
         try {
-            const token = localStorage.getItem('token');
-            const headers: Record<string, string> = {};
-
-            if (token) {
-                headers.Authorization = `Bearer ${token}`;
-            }
-
-            const response = await axios.get(`${API_URL}/api/Comments/property/${propertyId}`, {
-                headers
-            });
-
+            const response = await axios.get(`${API_URL}/api/Comments/property/${propertyId}`);
             return response.data;
         } catch (error) {
             console.error('Error fetching comments:', error);
@@ -32,20 +22,14 @@ class CommentService {
                 throw new Error('Authentication required');
             }
 
-            console.log("Sending comment to API:", { propertyId, text });
-
             const response = await axios.post(
                 `${API_URL}/api/Comments`,
                 { propertyId, text },
                 {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
+                    headers: { Authorization: `Bearer ${token}` }
                 }
             );
 
-            console.log("API response for adding comment:", response.data);
             return response.data;
         } catch (error) {
             console.error('Error adding comment:', error);

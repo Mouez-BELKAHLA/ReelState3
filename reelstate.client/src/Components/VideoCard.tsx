@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useContext } from 'react';
 import AuthContext from '../Contexts/AuthContext';
 import LikeService from '../Services/LikeService';
+import CommentOverlay from './CommentOverlay';
 
 type VideoCardProps = {
     id: string;
@@ -54,7 +55,11 @@ export default function VideoCard({
     const [isPlaying, setIsPlaying] = useState(false);
     const [isAnimating, setIsAnimating] = useState(false);
 
-    // NEW: Add state for like functionality
+    // NEW: Comments state
+    const [showComments, setShowComments] = useState(false);
+    const [commentsCount, setCommentsCount] = useState(comments);
+
+    // Like state
     const [likeCount, setLikeCount] = useState(likes);
     const [isLiked, setIsLiked] = useState(false);
     const [isLikeLoading, setIsLikeLoading] = useState(false);
@@ -78,7 +83,7 @@ export default function VideoCard({
     const totalItems = 1 + photos.length + 1;
     const locationIndex = 1 + photos.length;
 
-    // NEW: Check like status when component mounts
+    // Check like status when component mounts
     useEffect(() => {
         const checkLikeStatus = async () => {
             if (auth?.authState.isAuthenticated) {
@@ -97,7 +102,20 @@ export default function VideoCard({
         checkLikeStatus();
     }, [id, auth?.authState.isAuthenticated]);
 
-    // NEW: Handle like toggle
+    // Handle comments toggling
+    const toggleComments = (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent triggering other click events
+
+        // If opening comments, pause the video
+        if (!showComments && videoRef.current && !videoRef.current.paused) {
+            videoRef.current.pause();
+            setIsPlaying(false);
+        }
+
+        setShowComments(!showComments);
+    };
+
+    // Handle like toggle
     const handleLikeToggle = async (e: React.MouseEvent) => {
         e.stopPropagation(); // Prevent triggering other click events
 
@@ -210,6 +228,8 @@ export default function VideoCard({
 
     // Mouse drag handling
     const handleMouseDown = (e: React.MouseEvent) => {
+        if (showComments) return; // Don't handle drags when comments are shown
+
         e.preventDefault();
         setIsDragging(true);
         setDragStartX(e.clientX);
@@ -312,6 +332,11 @@ export default function VideoCard({
         if (isVideoMode) return 'VIDEO';
         if (isLocationMode) return 'LOCALISATION';
         return `PHOTO ${activeIndex}/${photos.length}`;
+    };
+
+    // Update comment count callback
+    const updateCommentCount = (count: number) => {
+        setCommentsCount(count);
     };
 
     return (
@@ -493,7 +518,7 @@ export default function VideoCard({
                     </div>
                 </div>
 
-                {/* UPDATED: Like button with exact dimensions and MORE SPACE for the counter text */}
+                {/* Like button with exact dimensions */}
                 <div className="flex flex-col items-center" style={{ height: '48px', width: '34px' }}>
                     <button
                         onClick={handleLikeToggle}
@@ -523,17 +548,22 @@ export default function VideoCard({
                     </span>
                 </div>
 
-                {/* Comment button with exact dimensions and MORE SPACE for the counter text */}
+                {/* Comment button with exact dimensions */}
                 <div className="flex flex-col items-center" style={{ height: '48px', width: '34px' }}>
-                    <div className="backdrop-blur-lg bg-transparent rounded-full p-1.5 hover:bg-blue-500/30 transition-all border border-white/20 flex items-center justify-center" style={{ width: '34px', height: '34px' }}>
+                    <button
+                        onClick={toggleComments}
+                        className={`backdrop-blur-lg rounded-full p-1.5 transition-all border border-white/20 flex items-center justify-center
+                            ${showComments ? 'bg-blue-500/30 border-blue-400' : 'bg-transparent hover:bg-blue-500/30'}`}
+                        style={{ width: '34px', height: '34px' }}
+                    >
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
-                    </div>
-                    <span className="text-white text-xs font-medium mt-2">{comments.toLocaleString()}</span>
+                    </button>
+                    <span className="text-white text-xs font-medium mt-2">{commentsCount.toLocaleString()}</span>
                 </div>
 
-                {/* Share button with exact dimensions and MORE SPACE for the text */}
+                {/* Share button with exact dimensions */}
                 <div className="flex flex-col items-center" style={{ height: '48px', width: '34px' }}>
                     <div className="backdrop-blur-lg bg-transparent rounded-full p-1.5 hover:bg-green-500/30 transition-all border border-white/20 flex items-center justify-center" style={{ width: '34px', height: '34px' }}>
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -548,25 +578,25 @@ export default function VideoCard({
             <div className="absolute top-6 left-4 z-20">
                 <div
                     className={`
-            backdrop-blur-lg
-            bg-transparent
-            py-1 px-3
-            rounded-md
-            border border-white/30
-            transition-all duration-150
-            overflow-hidden
-            relative
-            ${isAnimating ? 'scale-105' : ''}
-          `}
+                        backdrop-blur-lg
+                        bg-transparent
+                        py-1 px-3
+                        rounded-md
+                        border border-white/30
+                        transition-all duration-150
+                        overflow-hidden
+                        relative
+                        ${isAnimating ? 'scale-105' : ''}
+                    `}
                 >
                     {/* Background animated gradient when changing */}
                     <div
                         className={`
-              absolute inset-0 
-              bg-gradient-to-r ${getIndicatorColor()}
-              ${isAnimating ? 'opacity-100' : 'opacity-0'}
-              transition-opacity duration-300
-            `}
+                            absolute inset-0 
+                            bg-gradient-to-r ${getIndicatorColor()}
+                            ${isAnimating ? 'opacity-100' : 'opacity-0'}
+                            transition-opacity duration-300
+                        `}
                         style={{
                             animation: isAnimating ? 'pulseGradient 0.4s ease-out' : 'none'
                         }}
@@ -619,6 +649,14 @@ export default function VideoCard({
             <div className="absolute bottom-2 left-4 right-12 z-10">
                 <p className="text-white text-sm font-medium">Magnifique appartement lumineux au cœur de Lyon</p>
             </div>
+
+            {/* Render the separate Comment component */}
+            <CommentOverlay
+                propertyId={id}
+                isVisible={showComments}
+                onClose={() => setShowComments(false)}
+                onCommentCountUpdate={(count) => setCommentsCount(count)}
+            />
         </div>
     );
 }

@@ -30,7 +30,7 @@ interface VideoCardProperty {
 
 export default function Feed() {
     const { authState } = useAuth();
-    const { token } = authState;
+    const { token, isAuthenticated } = authState;
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -45,15 +45,20 @@ export default function Feed() {
         videoRefs.current = videoRefs.current.slice(0, properties.length);
     }, [properties]);
 
-    // Fetch properties from the API
+    // Fetch properties from the API - supports both authenticated and non-authenticated
     useEffect(() => {
         const fetchProperties = async () => {
-            if (!token) return;
-
             try {
                 setIsLoading(true);
+
+                // Configure headers based on authentication
+                const headers: Record<string, string> = {};
+                if (token) {
+                    headers.Authorization = `Bearer ${token}`;
+                }
+
                 const response = await axios.get<Property[]>(`${API_URL}/api/Property`, {
-                    headers: { Authorization: `Bearer ${token}` }
+                    headers: headers
                 });
 
                 console.log("API response:", response.data);
@@ -64,7 +69,6 @@ export default function Feed() {
                     username: property.user?.firstName || 'Unknown User',
                     caption: property.caption,
                     videoUrl: `${API_URL}${property.videoUrl}`,
-                    // Use likesCount property if it exists, otherwise default to 0
                     likes: property.likesCount || 0,
                     comments: property.commentsCount || 0,
                     avatarUrl: property.user?.profilePictureUrl || 'https://randomuser.me/api/portraits/lego/1.jpg',
@@ -100,9 +104,9 @@ export default function Feed() {
         if (properties.length === 0) return;
 
         const options = {
-            root: null, // use the viewport
+            root: null,
             rootMargin: "0px",
-            threshold: 0.6, // 60% visibility triggers the callback
+            threshold: 0.6,
         };
 
         const observer = new IntersectionObserver((entries) => {
@@ -116,7 +120,6 @@ export default function Feed() {
             });
         }, options);
 
-        // Observe all video elements
         videoRefs.current.forEach((ref) => {
             if (ref) observer.observe(ref);
         });
@@ -198,12 +201,21 @@ export default function Feed() {
             <div className="sticky top-0 left-0 right-0 bg-white z-50 shadow-sm">
                 <div className="container mx-auto px-4 py-3 flex justify-between items-center">
                     <h2 className="text-xl font-bold">Découvrir</h2>
-                    <a
-                        href="/create"
-                        className="px-4 py-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors text-sm"
-                    >
-                        + Add Listing
-                    </a>
+                    {isAuthenticated ? (
+                        <a
+                            href="/create"
+                            className="px-4 py-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors text-sm"
+                        >
+                            + Add Listing
+                        </a>
+                    ) : (
+                        <a
+                            href="/login"
+                            className="px-4 py-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors text-sm"
+                        >
+                            Log In
+                        </a>
+                    )}
                 </div>
             </div>
 
