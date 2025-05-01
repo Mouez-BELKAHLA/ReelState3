@@ -1,4 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useContext } from 'react';
+import AuthContext from '../Contexts/AuthContext';
+import LikeService from '../Services/LikeService';
 
 type VideoCardProps = {
     id: string;
@@ -10,11 +12,9 @@ type VideoCardProps = {
     avatarUrl: string;
     // Adding real estate specific properties
     rooms?: number;
-    propertyType?: string; // "appartement", "villa", "studio", etc.
-    space?: number; // in m²
-    // Adding photo URLs for the carousel
+    propertyType?: string;
+    space?: number;
     photos?: string[];
-    // Adding location information
     location?: {
         address: string;
         city: string;
@@ -50,9 +50,17 @@ export default function VideoCard({
         }
     }
 }: VideoCardProps) {
-    const [activeIndex, setActiveIndex] = useState(0); // 0 is video, 1+ are photos, last+1 is location
+    const [activeIndex, setActiveIndex] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isAnimating, setIsAnimating] = useState(false);
+
+    // NEW: Add state for like functionality
+    const [likeCount, setLikeCount] = useState(likes);
+    const [isLiked, setIsLiked] = useState(false);
+    const [isLikeLoading, setIsLikeLoading] = useState(false);
+
+    // Get auth context to check if user is logged in
+    const auth = useContext(AuthContext);
 
     // Touch handling
     const [touchStart, setTouchStart] = useState(0);
@@ -61,15 +69,62 @@ export default function VideoCard({
     // Mouse drag handling
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartX, setDragStartX] = useState(0);
-    const dragThreshold = 100; // How many pixels to trigger a swipe
+    const dragThreshold = 100;
 
     const carouselRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const rightArrowRef = useRef<HTMLButtonElement>(null);
 
-    // Total number of items (video + photos + location)
-    const totalItems = 1 + photos.length + 1; // +1 for location
-    const locationIndex = 1 + photos.length; // Index of the location slide
+    const totalItems = 1 + photos.length + 1;
+    const locationIndex = 1 + photos.length;
+
+    // NEW: Check like status when component mounts
+    useEffect(() => {
+        const checkLikeStatus = async () => {
+            if (auth?.authState.isAuthenticated) {
+                try {
+                    const response = await LikeService.checkLikeStatus(id);
+                    if (response.isSuccess) {
+                        setIsLiked(response.isLiked);
+                        setLikeCount(response.likesCount);
+                    }
+                } catch (error) {
+                    console.error("Error checking like status:", error);
+                }
+            }
+        };
+
+        checkLikeStatus();
+    }, [id, auth?.authState.isAuthenticated]);
+
+    // NEW: Handle like toggle
+    const handleLikeToggle = async (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent triggering other click events
+
+        // Check if user is authenticated
+        if (!auth?.authState.isAuthenticated) {
+            // Redirect to login or show a modal
+            alert("Please log in to like this property");
+            return;
+        }
+
+        setIsLikeLoading(true);
+
+        try {
+            const response = await LikeService.toggleLike(id);
+
+            if (response.isSuccess) {
+                setIsLiked(response.isLiked);
+                setLikeCount(response.likesCount);
+            } else {
+                console.error("Failed to toggle like:", response.message);
+            }
+        } catch (error) {
+            console.error("Error toggling like:", error);
+        } finally {
+            setIsLikeLoading(false);
+        }
+    };
 
     // Function to determine the content type based on index
     const getContentType = (index: number): 'video' | 'photo' | 'location' => {
@@ -438,14 +493,34 @@ export default function VideoCard({
                     </div>
                 </div>
 
-                {/* Like button with exact dimensions and MORE SPACE for the counter text */}
+                {/* UPDATED: Like button with exact dimensions and MORE SPACE for the counter text */}
                 <div className="flex flex-col items-center" style={{ height: '48px', width: '34px' }}>
-                    <div className="backdrop-blur-lg bg-transparent rounded-full p-1.5 hover:bg-red-500/30 transition-all border border-white/20 flex items-center justify-center" style={{ width: '34px', height: '34px' }}>
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    <button
+                        onClick={handleLikeToggle}
+                        disabled={isLikeLoading}
+                        className={`backdrop-blur-lg rounded-full p-1.5 transition-all border flex items-center justify-center
+                            ${isLiked
+                                ? 'bg-red-500/30 border-red-400 hover:bg-red-600/40'
+                                : 'bg-transparent border-white/20 hover:bg-red-500/30'}`}
+                        style={{ width: '34px', height: '34px' }}
+                    >
+                        <svg
+                            className={`w-5 h-5 ${isLiked ? 'text-red-400 fill-current' : 'text-white'}`}
+                            fill={isLiked ? "currentColor" : "none"}
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                            />
                         </svg>
-                    </div>
-                    <span className="text-white text-xs font-medium mt-2">{likes.toLocaleString()}</span>
+                    </button>
+                    <span className="text-white text-xs font-medium mt-2">
+                        {isLikeLoading ? '...' : likeCount.toLocaleString()}
+                    </span>
                 </div>
 
                 {/* Comment button with exact dimensions and MORE SPACE for the counter text */}

@@ -64,8 +64,9 @@ export default function Feed() {
                     username: property.user?.firstName || 'Unknown User',
                     caption: property.caption,
                     videoUrl: `${API_URL}${property.videoUrl}`,
-                    likes: 0, // Default values since we don't have this data yet
-                    comments: 0,
+                    // Use likesCount property if it exists, otherwise default to 0
+                    likes: property.likesCount || 0,
+                    comments: property.commentsCount || 0,
                     avatarUrl: property.user?.profilePictureUrl || 'https://randomuser.me/api/portraits/lego/1.jpg',
                     rooms: property.rooms,
                     propertyType: property.propertyType,
