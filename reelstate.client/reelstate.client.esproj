@@ -10,6 +10,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Folder Include="src\Components\Common\" />
+    <Folder Include="src\Components\Dashboard\" />
+    <Folder Include="src\Components\Feed\" />
+    <Folder Include="src\Components\CreateForm\" />
     <Folder Include="src\Hooks\" />
     <Folder Include="src\Constants\" />
     <Folder Include="src\Models\" />
