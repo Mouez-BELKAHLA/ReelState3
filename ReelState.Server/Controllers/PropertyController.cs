@@ -37,6 +37,8 @@ namespace ReelState.Server.Controllers
             _logger = logger;
         }
         [HttpGet]
+        [AllowAnonymous] // Add this attribute to allow anonymous access
+
         public async Task<IActionResult> GetProperties()
         {
             try

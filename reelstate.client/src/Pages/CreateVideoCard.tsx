@@ -5,12 +5,9 @@ import axios from 'axios';
 import { API_URL } from '../Services/config';
 
 const CreateVideoCard: React.FC = () => {
-    const { authState, logout } = useAuth();
+    const { authState } = useAuth();
     const navigate = useNavigate();
-
-    console.log("CreateVideoCard rendering, authState:", authState);
     const { user } = authState;
-    console.log("user from authState:", user);
 
     const [formData, setFormData] = useState({
         title: '',
@@ -228,37 +225,12 @@ const CreateVideoCard: React.FC = () => {
         return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
     }
 
-    // Main render - notice we've moved this outside the condition
+    // Main render
     return (
         <div className="bg-gray-100 min-h-screen">
-            <header className="bg-white shadow mb-8">
-                <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                    <h1 className="text-3xl font-bold text-gray-900">Create Listing</h1>
-                    <div className="flex items-center gap-4">
-                        {user?.profilePictureUrl && (
-                            <img
-                                src={user.profilePictureUrl}
-                                alt="Profile"
-                                className="w-10 h-10 rounded-full object-cover"
-                            />
-                        )}
-                        <div className="text-right">
-                            <p className="text-sm font-medium text-gray-900">
-                                {user?.firstName?.toUpperCase() || ''} {user?.lastName?.toUpperCase() || ''}
-                            </p>
-                            <p className="text-xs text-gray-500">{user?.email}</p>
-                        </div>
-                        <button
-                            onClick={() => logout()}
-                            className="ml-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-                        >
-                            LOGOUT
-                        </button>
-                    </div>
-                </div>
-            </header>
+            <div className="container mx-auto px-4 py-8 pb-12">
+                <h1 className="text-3xl font-bold text-gray-900 mb-8">Create Listing</h1>
 
-            <div className="container mx-auto px-4 pb-12">
                 <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 max-w-4xl mx-auto">
                     {error && (
                         <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-6">
@@ -565,8 +537,8 @@ const CreateVideoCard: React.FC = () => {
                                 type="submit"
                                 disabled={isSubmitting}
                                 className={`w-full py-3 px-4 rounded-md text-white font-medium transition-colors ${isSubmitting
-                                        ? 'bg-blue-400 cursor-not-allowed'
-                                        : 'bg-blue-600 hover:bg-blue-700'
+                                    ? 'bg-blue-400 cursor-not-allowed'
+                                    : 'bg-blue-600 hover:bg-blue-700'
                                     }`}
                             >
                                 {isSubmitting ? 'Creating...' : 'Create Listing'}

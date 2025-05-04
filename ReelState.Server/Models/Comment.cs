@@ -11,6 +11,10 @@ namespace ReelState.Server.Models
             // Initialize the ID property in the constructor
             Id = Guid.NewGuid().ToString();
             CreatedAt = DateTime.UtcNow;
+            // Default values to satisfy non-null requirements
+            PropertyId = string.Empty;
+            UserId = string.Empty;
+            Text = string.Empty;
         }
 
         [Key]
@@ -29,9 +33,9 @@ namespace ReelState.Server.Models
         public DateTime CreatedAt { get; set; }
 
         [ForeignKey("PropertyId")]
-        public virtual Property Property { get; set; }
+        public virtual Property? Property { get; set; }
 
         [ForeignKey("UserId")]
-        public virtual ApplicationUser User { get; set; }
+        public virtual ApplicationUser? User { get; set; }
     }
 }

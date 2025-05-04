@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useContext } from 'react';
 import AuthContext from '../Contexts/AuthContext';
 import LikeService from '../Services/LikeService';
-import CommentOverlay from './CommentOverlay';
+import ShareButton from '../Components/Common/ShareButton'; // Import the ShareButton component
 
 type VideoCardProps = {
     id: string;
@@ -24,6 +24,9 @@ type VideoCardProps = {
             lng: number;
         };
     };
+    onCommentClick?: () => void;
+    externalButtons?: boolean; // Whether buttons are rendered externally
+    onLikeToggle?: (isLiked: boolean, likesCount: number) => void;
 };
 
 export default function VideoCard({
@@ -49,14 +52,16 @@ export default function VideoCard({
             lat: 48.8566,
             lng: 2.3522
         }
-    }
+    },
+    onCommentClick,
+    externalButtons = false,
+    onLikeToggle
 }: VideoCardProps) {
     const [activeIndex, setActiveIndex] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isAnimating, setIsAnimating] = useState(false);
 
-    // NEW: Comments state
-    const [showComments, setShowComments] = useState(false);
+    // Comment count from props
     const [commentsCount, setCommentsCount] = useState(comments);
 
     // Like state
@@ -79,6 +84,7 @@ export default function VideoCard({
     const carouselRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const rightArrowRef = useRef<HTMLButtonElement>(null);
+    const leftArrowRef = useRef<HTMLButtonElement>(null);
 
     const totalItems = 1 + photos.length + 1;
     const locationIndex = 1 + photos.length;
@@ -102,19 +108,6 @@ export default function VideoCard({
         checkLikeStatus();
     }, [id, auth?.authState.isAuthenticated]);
 
-    // Handle comments toggling
-    const toggleComments = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent triggering other click events
-
-        // If opening comments, pause the video
-        if (!showComments && videoRef.current && !videoRef.current.paused) {
-            videoRef.current.pause();
-            setIsPlaying(false);
-        }
-
-        setShowComments(!showComments);
-    };
-
     // Handle like toggle
     const handleLikeToggle = async (e: React.MouseEvent) => {
         e.stopPropagation(); // Prevent triggering other click events
@@ -134,6 +127,11 @@ export default function VideoCard({
             if (response.isSuccess) {
                 setIsLiked(response.isLiked);
                 setLikeCount(response.likesCount);
+
+                // Call the callback if provided
+                if (onLikeToggle) {
+                    onLikeToggle(response.isLiked, response.likesCount);
+                }
             } else {
                 console.error("Failed to toggle like:", response.message);
             }
@@ -228,8 +226,6 @@ export default function VideoCard({
 
     // Mouse drag handling
     const handleMouseDown = (e: React.MouseEvent) => {
-        if (showComments) return; // Don't handle drags when comments are shown
-
         e.preventDefault();
         setIsDragging(true);
         setDragStartX(e.clientX);
@@ -332,11 +328,6 @@ export default function VideoCard({
         if (isVideoMode) return 'VIDEO';
         if (isLocationMode) return 'LOCALISATION';
         return `PHOTO ${activeIndex}/${photos.length}`;
-    };
-
-    // Update comment count callback
-    const updateCommentCount = (count: number) => {
-        setCommentsCount(count);
     };
 
     return (
@@ -448,17 +439,59 @@ export default function VideoCard({
                 ))}
             </div>
 
-            {/* Left side action buttons - these are invisible "dummy" buttons that maintain alignment */}
-            <div className="absolute left-4 bottom-24 flex flex-col items-center space-y-4 z-10 pointer-events-none">
-                {/* Left arrow - only visible placeholder when needed */}
-                <div className="flex items-center justify-center" style={{ height: '34px' }}>
+            {/* Mid-screen navigation arrows - ONLY for external button mode */}
+            {externalButtons && (
+                <>
+                    <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-20">
+                        <div className="h-10 w-10 flex items-center justify-center">
+                            {(isPhotoMode || isLocationMode) && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        isLocationMode ? goToPhotos() : goToVideo();
+                                    }}
+                                    className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center w-10 h-10"
+                                >
+                                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20">
+                        <div className="h-10 w-10 flex items-center justify-center">
+                            {(isVideoMode || isPhotoMode) && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        isVideoMode ? goToPhotos() : goToLocation();
+                                    }}
+                                    className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center w-10 h-10"
+                                >
+                                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Left side action buttons with proper left arrow */}
+            <div className="absolute left-4 bottom-24 flex flex-col items-center space-y-4 z-10">
+                {/* Left arrow - properly positioned, not just a placeholder */}
+                <div className="flex items-center justify-center pointer-events-auto" style={{ height: '34px' }}>
                     {(isPhotoMode || isLocationMode) && (
                         <button
+                            ref={leftArrowRef}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 isLocationMode ? goToPhotos() : goToVideo();
                             }}
-                            className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center pointer-events-auto"
+                            className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center"
                             style={{ width: '34px', height: '34px' }}
                             aria-label={isLocationMode ? "View photos" : "View video"}
                         >
@@ -473,106 +506,116 @@ export default function VideoCard({
                     )}
                 </div>
 
-                {/* Four invisible placeholders that exactly match the right side elements */}
-                {/* These are "dummy" buttons to maintain alignment with the right side */}
-                <div className="opacity-0" style={{ width: '40px', height: '40px' }}></div>
-                <div className="opacity-0" style={{ width: '34px', height: '48px' }}></div> {/* Extra height for text */}
-                <div className="opacity-0" style={{ width: '34px', height: '48px' }}></div> {/* Extra height for text */}
-                <div className="opacity-0" style={{ width: '34px', height: '48px' }}></div> {/* Extra height for text */}
+                {/* Four invisible placeholders that exactly match the right side elements - ALWAYS rendered */}
+                <div className="opacity-0 pointer-events-none" style={{ width: '40px', height: '40px' }}></div>
+                <div className="opacity-0 pointer-events-none" style={{ width: '34px', height: '48px' }}></div>
+                <div className="opacity-0 pointer-events-none" style={{ width: '34px', height: '48px' }}></div>
+                <div className="opacity-0 pointer-events-none" style={{ width: '34px', height: '48px' }}></div>
             </div>
 
-            {/* Right side action buttons */}
-            <div className="absolute right-4 bottom-24 flex flex-col items-center space-y-4 z-10">
-                {/* Right navigation arrow with exact specified dimensions */}
-                <div className="flex items-center justify-center" style={{ height: '34px' }}>
-                    {(isVideoMode || isPhotoMode) && (
+            {/* Right side action buttons - only shown if not using external buttons */}
+            {!externalButtons && (
+                <div className="absolute right-4 bottom-24 flex flex-col items-center space-y-4 z-10">
+                    {/* Right navigation arrow with exact specified dimensions - BOTTOM positioning */}
+                    <div className="flex items-center justify-center" style={{ height: '34px' }}>
+                        {(isVideoMode || isPhotoMode) && (
+                            <button
+                                ref={rightArrowRef}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    isVideoMode ? goToPhotos() : goToLocation();
+                                }}
+                                className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center"
+                                style={{ width: '34px', height: '34px' }}
+                                aria-label={isVideoMode ? "View photos" : "View location"}
+                            >
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        )}
+                        {/* Invisible placeholder to maintain layout when right arrow isn't visible */}
+                        {!(isVideoMode || isPhotoMode) && (
+                            <div style={{ width: '34px', height: '34px' }} className="opacity-0"></div>
+                        )}
+                    </div>
+
+                    {/* User icon */}
+                    <div className="flex flex-col items-center justify-center" style={{ height: '40px', width: '40px' }}>
+                        <div className="w-10 h-10 rounded-full border-2 border-white overflow-hidden bg-gray-200">
+                            <img
+                                src={avatarUrl}
+                                alt={username}
+                                className="w-full h-full object-cover"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Like button */}
+                    <div className="flex flex-col items-center" style={{ height: '48px', width: '34px' }}>
                         <button
-                            ref={rightArrowRef}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                isVideoMode ? goToPhotos() : goToLocation();
-                            }}
-                            className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center"
+                            onClick={handleLikeToggle}
+                            disabled={isLikeLoading}
+                            className={`backdrop-blur-lg rounded-full p-1.5 transition-all border flex items-center justify-center
+                                ${isLiked
+                                    ? 'bg-red-500/30 border-red-400 hover:bg-red-600/40'
+                                    : 'bg-transparent border-white/20 hover:bg-red-500/30'}`}
                             style={{ width: '34px', height: '34px' }}
-                            aria-label={isVideoMode ? "View photos" : "View location"}
                         >
-                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            <svg
+                                className={`w-5 h-5 ${isLiked ? 'text-red-400 fill-current' : 'text-white'}`}
+                                fill={isLiked ? "currentColor" : "none"}
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                                />
                             </svg>
                         </button>
-                    )}
-                    {/* Invisible placeholder to maintain layout when right arrow isn't visible */}
-                    {!(isVideoMode || isPhotoMode) && (
-                        <div style={{ width: '34px', height: '34px' }} className="opacity-0"></div>
-                    )}
-                </div>
-
-                {/* User icon with exact dimensions */}
-                <div className="flex flex-col items-center justify-center" style={{ height: '40px', width: '40px' }}>
-                    <div className="w-10 h-10 rounded-full border-2 border-white overflow-hidden bg-gray-200">
-                        <img
-                            src={avatarUrl}
-                            alt={username}
-                            className="w-full h-full object-cover"
-                        />
+                        <span className="text-white text-xs font-medium mt-2">
+                            {isLikeLoading ? '...' : likeCount.toLocaleString()}
+                        </span>
                     </div>
-                </div>
 
-                {/* Like button with exact dimensions */}
-                <div className="flex flex-col items-center" style={{ height: '48px', width: '34px' }}>
-                    <button
-                        onClick={handleLikeToggle}
-                        disabled={isLikeLoading}
-                        className={`backdrop-blur-lg rounded-full p-1.5 transition-all border flex items-center justify-center
-                            ${isLiked
-                                ? 'bg-red-500/30 border-red-400 hover:bg-red-600/40'
-                                : 'bg-transparent border-white/20 hover:bg-red-500/30'}`}
-                        style={{ width: '34px', height: '34px' }}
-                    >
-                        <svg
-                            className={`w-5 h-5 ${isLiked ? 'text-red-400 fill-current' : 'text-white'}`}
-                            fill={isLiked ? "currentColor" : "none"}
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                    {/* Comment button */}
+                    <div className="flex flex-col items-center" style={{ height: '48px', width: '34px' }}>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onCommentClick) {
+                                    // Pause video if opening comments
+                                    if (videoRef.current && !videoRef.current.paused) {
+                                        videoRef.current.pause();
+                                        setIsPlaying(false);
+                                    }
+                                    onCommentClick();
+                                }
+                            }}
+                            className="backdrop-blur-lg rounded-full p-1.5 transition-all border border-white/20 flex items-center justify-center bg-transparent hover:bg-blue-500/30"
+                            style={{ width: '34px', height: '34px' }}
                         >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                            />
-                        </svg>
-                    </button>
-                    <span className="text-white text-xs font-medium mt-2">
-                        {isLikeLoading ? '...' : likeCount.toLocaleString()}
-                    </span>
-                </div>
-
-                {/* Comment button with exact dimensions */}
-                <div className="flex flex-col items-center" style={{ height: '48px', width: '34px' }}>
-                    <button
-                        onClick={toggleComments}
-                        className={`backdrop-blur-lg rounded-full p-1.5 transition-all border border-white/20 flex items-center justify-center
-                            ${showComments ? 'bg-blue-500/30 border-blue-400' : 'bg-transparent hover:bg-blue-500/30'}`}
-                        style={{ width: '34px', height: '34px' }}
-                    >
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                        </svg>
-                    </button>
-                    <span className="text-white text-xs font-medium mt-2">{commentsCount.toLocaleString()}</span>
-                </div>
-
-                {/* Share button with exact dimensions */}
-                <div className="flex flex-col items-center" style={{ height: '48px', width: '34px' }}>
-                    <div className="backdrop-blur-lg bg-transparent rounded-full p-1.5 hover:bg-green-500/30 transition-all border border-white/20 flex items-center justify-center" style={{ width: '34px', height: '34px' }}>
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                        </svg>
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                        </button>
+                        <span className="text-white text-xs font-medium mt-2">{commentsCount.toLocaleString()}</span>
                     </div>
-                    <span className="text-white text-xs font-medium mt-2">Share</span>
+
+                    {/* Share button - Using the separate ShareButton component */}
+                    <ShareButton
+                        id={id}
+                        title="Check out this property!"
+                        text={`${caption.substring(0, 50)}${caption.length > 50 ? '...' : ''}`}
+                        className="backdrop-blur-lg bg-transparent rounded-full p-1.5 hover:bg-green-500/30 transition-all border border-white/20 flex items-center justify-center"
+                        iconClassName="w-5 h-5 text-white"
+                        textClassName="text-white text-xs font-medium mt-2"
+                    />
                 </div>
-            </div>
+            )}
 
             {/* Media type indicator with animation */}
             <div className="absolute top-6 left-4 z-20">
@@ -649,14 +692,6 @@ export default function VideoCard({
             <div className="absolute bottom-2 left-4 right-12 z-10">
                 <p className="text-white text-sm font-medium">Magnifique appartement lumineux au cœur de Lyon</p>
             </div>
-
-            {/* Render the separate Comment component */}
-            <CommentOverlay
-                propertyId={id}
-                isVisible={showComments}
-                onClose={() => setShowComments(false)}
-                onCommentCountUpdate={(count) => setCommentsCount(count)}
-            />
         </div>
     );
 }

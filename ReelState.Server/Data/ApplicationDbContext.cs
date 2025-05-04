@@ -13,8 +13,9 @@ namespace ReelState.Data
 
         public DbSet<Property> Properties { get; set; }
         public DbSet<PropertyPhoto> PropertyPhotos { get; set; }
-        // Add this to your existing ApplicationDbContext
+        public DbSet<Comment> Comments { get; set; }
         public DbSet<Like> Likes { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -49,6 +50,29 @@ namespace ReelState.Data
                 entity.Property(e => e.PhotoUrl).IsRequired();
                 entity.Property(e => e.PropertyId).IsRequired();
             });
+
+            // Configure Comment entity
+            builder.Entity<Comment>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.PropertyId).IsRequired();
+                entity.Property(e => e.UserId).IsRequired();
+                entity.Property(e => e.Text).IsRequired().HasMaxLength(1000);
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                // Configure relationship with Property
+                entity.HasOne(e => e.Property)
+                      .WithMany()
+                      .HasForeignKey(e => e.PropertyId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                // Configure relationship with User
+                entity.HasOne(e => e.User)
+                      .WithMany()
+                      .HasForeignKey(e => e.UserId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
             // Configure Like entity
             builder.Entity<Like>(entity =>
             {
@@ -72,7 +96,6 @@ namespace ReelState.Data
                       .HasForeignKey(e => e.UserId)
                       .OnDelete(DeleteBehavior.Restrict);
             });
-
         }
     }
 }
