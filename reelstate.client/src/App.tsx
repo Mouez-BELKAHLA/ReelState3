@@ -1,15 +1,21 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import AuthProvider from './Contexts/AuthProvider';
-import ProtectedRoute from './Components/ProtectedRoute';
-import Login from './Pages/Login';
-import Register from './Pages/Register';
-import Dashboard from './Pages/Dashboard';
-import NotFound from './Pages/NotFound';
-import Feed from './Pages/Feed';
-import CreateVideoCard from './Pages/CreateVideoCard';
-import Layout from './Components/Layout/Layout';
 
+// Consolidated auth imports
+import {
+    AuthProvider,
+    ProtectedRoute,
+    Login,
+    Register
+} from './Features/auth';
+
+// Feature imports
+import { Dashboard } from './Features/dashboard';
+import { NotFound } from './Features/core';
+import { Feed, CreateVideoCard } from './Features/property';
+
+// Shared component imports
+import { Layout } from './shared';
 const App: React.FC = () => {
     useEffect(() => {
         console.log("Current origin:", window.location.origin);

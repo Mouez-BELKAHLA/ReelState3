@@ -9,13 +9,13 @@
     <BuildOutputFolder>$(MSBuildProjectDirectory)\dist</BuildOutputFolder>
   </PropertyGroup>
   <ItemGroup>
-    <Folder Include="src\Components\Common\" />
-    <Folder Include="src\Components\Dashboard\" />
+    <Folder Include="src\Features\property\constants\" />
+    <Folder Include="src\shared\components\Common\" />
     <Folder Include="src\Components\Feed\" />
     <Folder Include="src\Components\CreateForm\" />
-    <Folder Include="src\Hooks\" />
-    <Folder Include="src\Constants\" />
-    <Folder Include="src\Models\" />
-    <Folder Include="src\Types\" />
+    <Folder Include="src\Components\Layout\" />
+    <Folder Include="src\Features\auth\contexts\" />
+    <Folder Include="src\Features\auth\hooks\" />
+    <Folder Include="src\Features\auth\Constants\" />
   </ItemGroup>
 </Project>
