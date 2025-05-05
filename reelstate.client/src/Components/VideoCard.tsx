@@ -1,29 +1,22 @@
 import { useState, useRef, useEffect, useContext } from 'react';
 import AuthContext from '../Contexts/AuthContext';
 import LikeService from '../Services/LikeService';
-import ShareButton from '../Components/Common/ShareButton'; // Import the ShareButton component
+import ShareButton from '../Components/Common/ShareButton';
 
-type VideoCardProps = {
-    id: string;
-    username: string;
-    caption: string;
-    videoUrl: string;
-    likes: number;
-    comments: number;
-    avatarUrl: string;
-    // Adding real estate specific properties
-    rooms?: number;
-    propertyType?: string;
-    space?: number;
-    photos?: string[];
-    location?: {
-        address: string;
-        city: string;
-        coordinates?: {
-            lat: number;
-            lng: number;
-        };
-    };
+// Import extracted components
+import ArrowButton from './VideoCard/ArrowButton';
+import CarouselIndicators from './VideoCard/CarouselIndicators';
+import CommentButton from './VideoCard/CommentButton';
+import ContentTypeIndicator from './VideoCard/ContentTypeIndicator';
+import LikeButton from './VideoCard/LikeButton';
+import PropertyInfoTags from './VideoCard/PropertyInfoTags';
+import UserProfile from './VideoCard/UserProfile';
+
+// Import the VideoCardProperty type from our new types file
+import { VideoCardProperty } from '../Types/ComponentTypes';
+
+// Additional props specific to the VideoCard component
+type VideoCardProps = VideoCardProperty & {
     onCommentClick?: () => void;
     externalButtons?: boolean; // Whether buttons are rendered externally
     onLikeToggle?: (isLiked: boolean, likesCount: number) => void;
@@ -315,19 +308,17 @@ export default function VideoCard({
     const isLocationMode = activeIndex === locationIndex;
     const isPhotoMode = activeIndex > 0 && activeIndex < locationIndex;
 
-    // Get the appropriate color based on the active mode
-    const getIndicatorColor = () => {
-        if (isVideoMode) return 'from-purple-500 to-blue-500';
-        if (isPhotoMode) return 'from-amber-500 to-rose-500';
-        if (isLocationMode) return 'from-emerald-500 to-teal-500';
-        return 'from-white to-white';
-    };
-
-    // Get the appropriate text for the indicator
-    const getIndicatorText = () => {
-        if (isVideoMode) return 'VIDEO';
-        if (isLocationMode) return 'LOCALISATION';
-        return `PHOTO ${activeIndex}/${photos.length}`;
+    // Handle comment click
+    const handleCommentClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onCommentClick) {
+            // Pause video if opening comments
+            if (videoRef.current && !videoRef.current.paused) {
+                videoRef.current.pause();
+                setIsPlaying(false);
+            }
+            onCommentClick();
+        }
     };
 
     return (
@@ -424,20 +415,12 @@ export default function VideoCard({
                 </div>
             </div>
 
-            {/* Navigation indicators */}
-            <div className="absolute top-4 left-0 right-0 flex justify-center gap-2 z-20">
-                {[...Array(totalItems)].map((_, index) => (
-                    <button
-                        key={index}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            goToItem(index);
-                        }}
-                        className={`w-2 h-2 rounded-full transition-all ${activeIndex === index ? 'bg-white w-4' : 'bg-white/40'}`}
-                        aria-label={index === 0 ? "View video" : index === locationIndex ? "View location" : `View photo ${index}`}
-                    />
-                ))}
-            </div>
+            {/* Navigation indicators - using CarouselIndicators component */}
+            <CarouselIndicators
+                totalItems={totalItems}
+                activeIndex={activeIndex}
+                onClick={goToItem}
+            />
 
             {/* Mid-screen navigation arrows - ONLY for external button mode */}
             {externalButtons && (
@@ -445,17 +428,16 @@ export default function VideoCard({
                     <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-20">
                         <div className="h-10 w-10 flex items-center justify-center">
                             {(isPhotoMode || isLocationMode) && (
-                                <button
+                                <ArrowButton
+                                    direction="left"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         isLocationMode ? goToPhotos() : goToVideo();
                                     }}
+                                    visible={isPhotoMode || isLocationMode}
                                     className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center w-10 h-10"
-                                >
-                                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                    </svg>
-                                </button>
+                                    ariaLabel={isLocationMode ? "View photos" : "View video"}
+                                />
                             )}
                         </div>
                     </div>
@@ -463,17 +445,16 @@ export default function VideoCard({
                     <div className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20">
                         <div className="h-10 w-10 flex items-center justify-center">
                             {(isVideoMode || isPhotoMode) && (
-                                <button
+                                <ArrowButton
+                                    direction="right"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         isVideoMode ? goToPhotos() : goToLocation();
                                     }}
+                                    visible={isVideoMode || isPhotoMode}
                                     className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center w-10 h-10"
-                                >
-                                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </button>
+                                    ariaLabel={isVideoMode ? "View photos" : "View location"}
+                                />
                             )}
                         </div>
                     </div>
@@ -484,26 +465,16 @@ export default function VideoCard({
             <div className="absolute left-4 bottom-24 flex flex-col items-center space-y-4 z-10">
                 {/* Left arrow - properly positioned, not just a placeholder */}
                 <div className="flex items-center justify-center pointer-events-auto" style={{ height: '34px' }}>
-                    {(isPhotoMode || isLocationMode) && (
-                        <button
-                            ref={leftArrowRef}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                isLocationMode ? goToPhotos() : goToVideo();
-                            }}
-                            className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center"
-                            style={{ width: '34px', height: '34px' }}
-                            aria-label={isLocationMode ? "View photos" : "View video"}
-                        >
-                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                            </svg>
-                        </button>
-                    )}
-                    {/* Invisible placeholder when left arrow isn't needed */}
-                    {!(isPhotoMode || isLocationMode) && (
-                        <div style={{ width: '34px', height: '34px' }} className="opacity-0"></div>
-                    )}
+                    <ArrowButton
+                        direction="left"
+                        ref={leftArrowRef}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            isLocationMode ? goToPhotos() : goToVideo();
+                        }}
+                        visible={isPhotoMode || isLocationMode}
+                        ariaLabel={isLocationMode ? "View photos" : "View video"}
+                    />
                 </div>
 
                 {/* Four invisible placeholders that exactly match the right side elements - ALWAYS rendered */}
@@ -516,96 +487,41 @@ export default function VideoCard({
             {/* Right side action buttons - only shown if not using external buttons */}
             {!externalButtons && (
                 <div className="absolute right-4 bottom-24 flex flex-col items-center space-y-4 z-10">
-                    {/* Right navigation arrow with exact specified dimensions - BOTTOM positioning */}
+                    {/* Right navigation arrow */}
                     <div className="flex items-center justify-center" style={{ height: '34px' }}>
-                        {(isVideoMode || isPhotoMode) && (
-                            <button
-                                ref={rightArrowRef}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    isVideoMode ? goToPhotos() : goToLocation();
-                                }}
-                                className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center"
-                                style={{ width: '34px', height: '34px' }}
-                                aria-label={isVideoMode ? "View photos" : "View location"}
-                            >
-                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
-                            </button>
-                        )}
-                        {/* Invisible placeholder to maintain layout when right arrow isn't visible */}
-                        {!(isVideoMode || isPhotoMode) && (
-                            <div style={{ width: '34px', height: '34px' }} className="opacity-0"></div>
-                        )}
+                        <ArrowButton
+                            direction="right"
+                            ref={rightArrowRef}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                isVideoMode ? goToPhotos() : goToLocation();
+                            }}
+                            visible={isVideoMode || isPhotoMode}
+                            ariaLabel={isVideoMode ? "View photos" : "View location"}
+                        />
                     </div>
 
                     {/* User icon */}
-                    <div className="flex flex-col items-center justify-center" style={{ height: '40px', width: '40px' }}>
-                        <div className="w-10 h-10 rounded-full border-2 border-white overflow-hidden bg-gray-200">
-                            <img
-                                src={avatarUrl}
-                                alt={username}
-                                className="w-full h-full object-cover"
-                            />
-                        </div>
-                    </div>
+                    <UserProfile
+                        avatarUrl={avatarUrl}
+                        username={username}
+                    />
 
                     {/* Like button */}
-                    <div className="flex flex-col items-center" style={{ height: '48px', width: '34px' }}>
-                        <button
-                            onClick={handleLikeToggle}
-                            disabled={isLikeLoading}
-                            className={`backdrop-blur-lg rounded-full p-1.5 transition-all border flex items-center justify-center
-                                ${isLiked
-                                    ? 'bg-red-500/30 border-red-400 hover:bg-red-600/40'
-                                    : 'bg-transparent border-white/20 hover:bg-red-500/30'}`}
-                            style={{ width: '34px', height: '34px' }}
-                        >
-                            <svg
-                                className={`w-5 h-5 ${isLiked ? 'text-red-400 fill-current' : 'text-white'}`}
-                                fill={isLiked ? "currentColor" : "none"}
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                                />
-                            </svg>
-                        </button>
-                        <span className="text-white text-xs font-medium mt-2">
-                            {isLikeLoading ? '...' : likeCount.toLocaleString()}
-                        </span>
-                    </div>
+                    <LikeButton
+                        isLiked={isLiked}
+                        isLoading={isLikeLoading}
+                        count={likeCount}
+                        onToggle={handleLikeToggle}
+                    />
 
                     {/* Comment button */}
-                    <div className="flex flex-col items-center" style={{ height: '48px', width: '34px' }}>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (onCommentClick) {
-                                    // Pause video if opening comments
-                                    if (videoRef.current && !videoRef.current.paused) {
-                                        videoRef.current.pause();
-                                        setIsPlaying(false);
-                                    }
-                                    onCommentClick();
-                                }
-                            }}
-                            className="backdrop-blur-lg rounded-full p-1.5 transition-all border border-white/20 flex items-center justify-center bg-transparent hover:bg-blue-500/30"
-                            style={{ width: '34px', height: '34px' }}
-                        >
-                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                            </svg>
-                        </button>
-                        <span className="text-white text-xs font-medium mt-2">{commentsCount.toLocaleString()}</span>
-                    </div>
+                    <CommentButton
+                        count={commentsCount}
+                        onClick={handleCommentClick}
+                    />
 
-                    {/* Share button - Using the separate ShareButton component */}
+                    {/* Share button */}
                     <ShareButton
                         id={id}
                         title="Check out this property!"
@@ -618,70 +534,24 @@ export default function VideoCard({
             )}
 
             {/* Media type indicator with animation */}
-            <div className="absolute top-6 left-4 z-20">
-                <div
-                    className={`
-                        backdrop-blur-lg
-                        bg-transparent
-                        py-1 px-3
-                        rounded-md
-                        border border-white/30
-                        transition-all duration-150
-                        overflow-hidden
-                        relative
-                        ${isAnimating ? 'scale-105' : ''}
-                    `}
-                >
-                    {/* Background animated gradient when changing */}
-                    <div
-                        className={`
-                            absolute inset-0 
-                            bg-gradient-to-r ${getIndicatorColor()}
-                            ${isAnimating ? 'opacity-100' : 'opacity-0'}
-                            transition-opacity duration-300
-                        `}
-                        style={{
-                            animation: isAnimating ? 'pulseGradient 0.4s ease-out' : 'none'
-                        }}
-                    />
-
-                    {/* Text content */}
-                    <span className="text-white text-xs font-medium relative z-10">
-                        {getIndicatorText()}
-                    </span>
-                </div>
-            </div>
+            <ContentTypeIndicator
+                isVideoMode={isVideoMode}
+                isPhotoMode={isPhotoMode}
+                isLocationMode={isLocationMode}
+                activeIndex={activeIndex}
+                photosLength={photos.length}
+                isAnimating={isAnimating}
+            />
 
             {/* Gradient overlay at the bottom for better text visibility */}
             <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/70 to-transparent pointer-events-none"></div>
 
-            {/* Real estate tags at bottom with pure blur effect - no background color */}
-            <div className="absolute bottom-6 left-4 flex flex-wrap gap-2 z-10">
-                <span className="backdrop-blur-lg bg-transparent text-white text-sm font-medium py-1 px-3 rounded-full flex items-center border border-white/30">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path d="M3 21V7L12 3L21 7V21" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M9 14V17" strokeWidth="2" strokeLinecap="round" />
-                        <path d="M15 14V17" strokeWidth="2" strokeLinecap="round" />
-                        <path d="M21 21H3" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                    {rooms} pièces
-                </span>
-                <span className="backdrop-blur-lg bg-transparent text-white text-sm font-medium py-1 px-3 rounded-full flex items-center border border-white/30">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path d="M2 22H22" strokeWidth="2" strokeLinecap="round" />
-                        <path d="M3 8V18C3 18.5523 3.44772 19 4 19H20C20.5523 19 21 18.5523 21 18V8" strokeWidth="2" strokeLinecap="round" />
-                        <path d="M6 8V4C6 3.44772 6.44772 3 7 3H17C17.5523 3 18 3.44772 18 4V8" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                    {propertyType}
-                </span>
-                <span className="backdrop-blur-lg bg-transparent text-white text-sm font-medium py-1 px-3 rounded-full flex items-center border border-white/30">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path d="M4 4H20V20H4V4Z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M4 9H20" strokeWidth="2" />
-                    </svg>
-                    {space} m²
-                </span>
-            </div>
+            {/* Real estate tags at bottom with pure blur effect */}
+            <PropertyInfoTags
+                rooms={rooms}
+                propertyType={propertyType}
+                space={space}
+            />
 
             {/* Caption below tags */}
             <div className="absolute bottom-20 left-4 right-12 z-10">

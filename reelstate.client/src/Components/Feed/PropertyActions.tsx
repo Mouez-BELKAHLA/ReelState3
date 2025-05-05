@@ -1,12 +1,12 @@
-// src/Components/Feed/PropertyActions.tsx
 import React from 'react';
+import { VideoCardProperty } from '../../Types/ComponentTypes';
 
 interface PropertyActionsProps {
     property: VideoCardProperty;
     isLiked: boolean;
     isLoading: boolean;
-    onLikeToggle: (propertyId: string) => void;
-    onCommentClick: (propertyId: string) => void;
+    onLikeToggle: () => void;
+    onCommentClick: () => void;
 }
 
 const PropertyActions: React.FC<PropertyActionsProps> = ({
@@ -48,7 +48,7 @@ const PropertyActions: React.FC<PropertyActionsProps> = ({
             {/* Like button */}
             <div className="flex flex-col items-center">
                 <button
-                    onClick={() => onLikeToggle(property.id)}
+                    onClick={onLikeToggle}
                     disabled={isLoading}
                     className={`w-11 h-11 ${isLiked ? 'bg-red-50' : 'bg-white'} rounded-full shadow-md flex items-center justify-center transition-all hover:shadow-lg ${isLoading ? 'opacity-70' : ''}`}
                 >
@@ -73,7 +73,7 @@ const PropertyActions: React.FC<PropertyActionsProps> = ({
             {/* Comment button */}
             <div className="flex flex-col items-center">
                 <button
-                    onClick={() => onCommentClick(property.id)}
+                    onClick={onCommentClick}
                     className="w-11 h-11 bg-white rounded-full shadow-md flex items-center justify-center transition-all hover:bg-blue-50 hover:shadow-lg"
                 >
                     <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -2,33 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import axios from 'axios';
 import { API_URL } from "../Services/config";
 import { useAuth } from "../Hooks/useAuth";
-import VideoCard from "../Components/VideoCard";
 import CommentPanel from "../Components/Layout/CommentPanel";
-import { Property } from "../Models/Property";
 import LikeService from "../Services/LikeService";
+import PropertyList from "../Components/Feed/PropertyList";
 
-// Interface for mapped property format needed by VideoCard
-interface VideoCardProperty {
-    id: string;
-    username: string;
-    caption: string;
-    videoUrl: string;
-    likes: number;
-    comments: number;
-    avatarUrl: string;
-    rooms?: number;
-    propertyType?: string;
-    space?: number;
-    photos?: string[];
-    location?: {
-        address: string;
-        city: string;
-        coordinates?: {
-            lat: number;
-            lng: number;
-        };
-    };
-}
+// Import the new type definitions
+import { Property } from "../Types/ApiTypes";
+import { VideoCardProperty, PropertyLikeState, PropertyLoadingState } from "../Types/ComponentTypes";
+import { toVideoCardProperties } from "../Utils/TypeTransformers";
 
 export default function Feed() {
     const { authState } = useAuth();
@@ -45,12 +26,11 @@ export default function Feed() {
     const [hasLargeLayout, setHasLargeLayout] = useState(false);
     const [windowWidth, setWindowWidth] = useState(0);
 
-    // State for likes to manage from parent
-    const [propertyLikes, setPropertyLikes] = useState<{ [key: string]: { count: number, isLiked: boolean } }>({});
-    const [isLikeLoading, setIsLikeLoading] = useState<{ [key: string]: boolean }>({});
+    // State for likes to manage from parent - using our new type
+    const [propertyLikes, setPropertyLikes] = useState<PropertyLikeState>({});
+    const [isLikeLoading, setIsLikeLoading] = useState<PropertyLoadingState>({});
 
     const containerRef = useRef<HTMLDivElement>(null);
-    const videoRefs = useRef<(HTMLDivElement | null)[]>([]);
 
     // Comment panel width and animation offset
     const commentPanelWidth = 400;
@@ -77,11 +57,6 @@ export default function Feed() {
             document.head.removeChild(style);
         };
     }, []);
-
-    // Initialize videoRefs with the correct length
-    useEffect(() => {
-        videoRefs.current = videoRefs.current.slice(0, properties.length);
-    }, [properties]);
 
     // Check window size for responsive layout
     useEffect(() => {
@@ -113,31 +88,11 @@ export default function Feed() {
                     headers: headers
                 });
 
-                // Map API response to the format VideoCard expects
-                const mappedProperties: VideoCardProperty[] = response.data.map(property => ({
-                    id: property.id,
-                    username: property.user?.firstName || 'Unknown User',
-                    caption: property.caption,
-                    videoUrl: `${API_URL}${property.videoUrl}`,
-                    likes: property.likesCount || 0,
-                    comments: property.commentsCount || 0,
-                    avatarUrl: property.user?.profilePictureUrl || 'https://randomuser.me/api/portraits/lego/1.jpg',
-                    rooms: property.rooms,
-                    propertyType: property.propertyType,
-                    space: property.space,
-                    photos: property.photos?.map(p => `${API_URL}${p.photoUrl}`) || [],
-                    location: {
-                        address: property.address,
-                        city: property.city,
-                        coordinates: {
-                            lat: property.latitude,
-                            lng: property.longitude
-                        }
-                    }
-                }));
+                // Use our new transformer to convert API data to UI components
+                const mappedProperties = toVideoCardProperties(response.data, API_URL);
 
                 // Initialize like state for all properties
-                const likesState: { [key: string]: { count: number, isLiked: boolean } } = {};
+                const likesState: PropertyLikeState = {};
                 mappedProperties.forEach(prop => {
                     likesState[prop.id] = {
                         count: prop.likes,
@@ -161,7 +116,7 @@ export default function Feed() {
         };
 
         fetchProperties();
-    }, [token]);
+    }, [token, isAuthenticated]);
 
     // Function to check like status for all properties
     const checkAllLikeStatus = async (props: VideoCardProperty[]) => {
@@ -191,38 +146,6 @@ export default function Feed() {
             console.error("Error checking like statuses:", error);
         }
     };
-
-    // Set up intersection observer to detect which video is in view
-    useEffect(() => {
-        if (properties.length === 0) return;
-
-        const options = {
-            root: null,
-            rootMargin: "0px",
-            threshold: 0.6,
-        };
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach((entry) => {
-                if (entry.isIntersecting) {
-                    const index = videoRefs.current.findIndex((ref) => ref === entry.target);
-                    if (index !== -1) {
-                        setActiveVideoIndex(index);
-                    }
-                }
-            });
-        }, options);
-
-        videoRefs.current.forEach((ref) => {
-            if (ref) observer.observe(ref);
-        });
-
-        return () => {
-            videoRefs.current.forEach((ref) => {
-                if (ref) observer.unobserve(ref);
-            });
-        };
-    }, [properties]);
 
     // Handle comment toggle
     const handleToggleComments = (propertyId: string) => {
@@ -283,95 +206,9 @@ export default function Feed() {
         return windowWidth >= 1600 ? '760px' : '680px';
     };
 
-    // Action buttons for desktop layout
-    const ActionButtons = ({ property }: { property: VideoCardProperty }) => {
-        const isLiked = propertyLikes[property.id]?.isLiked || false;
-        const likeCount = propertyLikes[property.id]?.count || property.likes;
-        const isLoading = isLikeLoading[property.id] || false;
-
-        return (
-            <div className="flex flex-col items-center space-y-6 z-30">
-                {/* User icon */}
-                <div className="flex flex-col items-center">
-                    <div className="w-12 h-12 rounded-full border-2 border-white overflow-hidden bg-gray-200 shadow-md">
-                        <img
-                            src={property.avatarUrl}
-                            alt={property.username}
-                            className="w-full h-full object-cover"
-                        />
-                    </div>
-                    <span className="text-black text-xs mt-2 font-medium bg-white px-2 py-0.5 rounded-full shadow-sm">
-                        {property.username}
-                    </span>
-                </div>
-
-                {/* Like button */}
-                <div className="flex flex-col items-center">
-                    <button
-                        onClick={() => handleLikeToggle(property.id)}
-                        disabled={isLoading}
-                        className={`w-11 h-11 ${isLiked ? 'bg-red-50' : 'bg-white'} rounded-full shadow-md flex items-center justify-center transition-all hover:shadow-lg ${isLoading ? 'opacity-70' : ''}`}
-                    >
-                        {isLoading ? (
-                            <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                        ) : (
-                            <svg
-                                className={`w-5 h-5 ${isLiked ? 'text-red-500' : 'text-gray-700'}`}
-                                fill={isLiked ? "currentColor" : "none"}
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                            </svg>
-                        )}
-                    </button>
-                    <span className="text-black text-xs mt-2 font-medium bg-white px-2 py-0.5 rounded-full shadow-sm">
-                        {likeCount}
-                    </span>
-                </div>
-
-                {/* Comment button */}
-                <div className="flex flex-col items-center">
-                    <button
-                        onClick={() => handleToggleComments(property.id)}
-                        className="w-11 h-11 bg-white rounded-full shadow-md flex items-center justify-center transition-all hover:bg-blue-50 hover:shadow-lg"
-                    >
-                        <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                        </svg>
-                    </button>
-                    <span className="text-black text-xs mt-2 font-medium bg-white px-2 py-0.5 rounded-full shadow-sm">
-                        {property.comments}
-                    </span>
-                </div>
-
-                {/* Share button - Using inline share functionality */}
-                <div className="flex flex-col items-center">
-                    <button
-                        onClick={() => {
-                            const url = window.location.href;
-                            if (navigator.share) {
-                                navigator.share({
-                                    title: 'Check out this property!',
-                                    text: `${property.caption.substring(0, 50)}${property.caption.length > 50 ? '...' : ''}`,
-                                    url: `${url}?property=${property.id}`
-                                }).catch(error => console.error('Error sharing:', error));
-                            } else {
-                                prompt('Copy this link to share:', `${url}?property=${property.id}`);
-                            }
-                        }}
-                        className="w-11 h-11 bg-white rounded-full shadow-md flex items-center justify-center transition-all hover:bg-green-50 hover:shadow-lg"
-                    >
-                        <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                        </svg>
-                    </button>
-                    <span className="text-black text-xs mt-2 font-medium bg-white px-2 py-0.5 rounded-full shadow-sm">
-                        Share
-                    </span>
-                </div>
-            </div>
-        );
+    // Set active video index when video is in view
+    const handleVideoInView = (index: number) => {
+        setActiveVideoIndex(index);
     };
 
     if (isLoading) {
@@ -430,58 +267,21 @@ export default function Feed() {
     return (
         <div className="bg-gray-100 min-h-screen overflow-hidden">
             {/* Main container */}
-            <div className="relative h-[calc(100vh-55px)]">
-                {/* Feed content - No scrollbar */}
-                <div
-                    ref={containerRef}
-                    className="snap-y snap-mandatory overflow-y-auto h-full bg-gray-100"
-                >
-                    {properties.map((property, index) => {
-                        // Get like state for this property
-                        const propertyLikeState = propertyLikes[property.id] || { count: property.likes, isLiked: false };
-
-                        return (
-                            <div
-                                key={property.id}
-                                ref={(el) => { videoRefs.current[index] = el }}
-                                className="snap-start snap-always w-full py-1.5 flex justify-center"
-                                style={{ height: 'calc(100vh - 105px)' }}
-                            >
-                                {/* Content wrapper with shared animation */}
-                                <div
-                                    className="relative flex justify-center transition-transform duration-500 ease-in-out"
-                                    style={{
-                                        transform: hasLargeLayout && showComments ? `translateX(-${slideOffset}px)` : 'translateX(0)'
-                                    }}
-                                >
-                                    {/* Video Card Component */}
-                                    <div
-                                        className="h-full rounded-lg overflow-hidden"
-                                        style={{ width: getVideoWidth() }}
-                                    >
-                                        <VideoCard
-                                            {...property}
-                                            likes={propertyLikeState.count}
-                                            onCommentClick={() => handleToggleComments(property.id)}
-                                            externalButtons={hasLargeLayout}
-                                            onLikeToggle={(isLiked, count) => handleVideoCardLikeToggle(property.id, isLiked, count)}
-                                        />
-                                    </div>
-
-                                    {/* External Action Buttons - Inside the shared container */}
-                                    {hasLargeLayout && (
-                                        <div className="absolute right-[-70px] top-1/2 transform -translate-y-1/2 z-30">
-                                            <ActionButtons property={{
-                                                ...property,
-                                                likes: propertyLikeState.count
-                                            }} />
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
+            <div className="relative h-[calc(100vh-55px)]" ref={containerRef}>
+                {/* Use the PropertyList component */}
+                <PropertyList
+                    properties={properties}
+                    propertyLikes={propertyLikes}
+                    isLikeLoading={isLikeLoading}
+                    showComments={showComments}
+                    hasLargeLayout={hasLargeLayout}
+                    slideOffset={slideOffset}
+                    getVideoWidth={getVideoWidth}
+                    onVideoInView={handleVideoInView}
+                    onLikeToggle={handleVideoCardLikeToggle}
+                    onToggleComments={handleToggleComments}
+                    handleLikeToggle={handleLikeToggle} // Pass the function to PropertyList
+                />
 
                 {/* Comments Panel */}
                 {activePropertyId && (

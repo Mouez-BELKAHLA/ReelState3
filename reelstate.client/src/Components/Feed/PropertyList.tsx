@@ -1,12 +1,12 @@
-// src/Components/Feed/PropertyList.tsx
 import React, { useRef } from 'react';
 import VideoCard from '../VideoCard';
 import PropertyActions from './PropertyActions';
+import { VideoCardProperty, PropertyLikeState, PropertyLoadingState } from '../../Types/ComponentTypes';
 
 interface PropertyListProps {
     properties: VideoCardProperty[];
-    propertyLikes: { [key: string]: { count: number, isLiked: boolean } };
-    isLikeLoading: { [key: string]: boolean };
+    propertyLikes: PropertyLikeState;
+    isLikeLoading: PropertyLoadingState;
     showComments: boolean;
     hasLargeLayout: boolean;
     slideOffset: number;
@@ -14,6 +14,7 @@ interface PropertyListProps {
     onVideoInView: (index: number) => void;
     onLikeToggle: (propertyId: string, isLiked: boolean, count: number) => void;
     onToggleComments: (propertyId: string) => void;
+    handleLikeToggle: (propertyId: string) => Promise<void>;
 }
 
 const PropertyList: React.FC<PropertyListProps> = ({
@@ -26,7 +27,8 @@ const PropertyList: React.FC<PropertyListProps> = ({
     getVideoWidth,
     onVideoInView,
     onLikeToggle,
-    onToggleComments
+    onToggleComments,
+    handleLikeToggle
 }) => {
     const videoRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -75,8 +77,8 @@ const PropertyList: React.FC<PropertyListProps> = ({
                                         property={{ ...property, likes: propertyLikeState.count }}
                                         isLiked={propertyLikeState.isLiked}
                                         isLoading={isLikeLoading[property.id] || false}
-                                        onLikeToggle={onToggleComments}
-                                        onCommentClick={onToggleComments}
+                                        onLikeToggle={() => handleLikeToggle(property.id)}
+                                        onCommentClick={() => onToggleComments(property.id)}
                                     />
                                 </div>
                             )}

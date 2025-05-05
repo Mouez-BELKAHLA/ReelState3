@@ -23,6 +23,9 @@ const App: React.FC = () => {
                     <Route element={<Layout />}>
                         <Route path="/feed" element={<Feed />} />
 
+                        {/* NotFound page - moved here to include navbar */}
+                        <Route path="*" element={<NotFound />} />
+
                         {/* Protected routes with navbar */}
                         <Route element={<ProtectedRoute />}>
                             <Route path="/dashboard" element={<Dashboard />} />
@@ -35,7 +38,6 @@ const App: React.FC = () => {
                     <Route element={<Layout hideNavbar />}>
                         <Route path="/login" element={<Login />} />
                         <Route path="/register" element={<Register />} />
-                        <Route path="*" element={<NotFound />} />
                     </Route>
 
                     {/* Redirect root to feed as a public page */}

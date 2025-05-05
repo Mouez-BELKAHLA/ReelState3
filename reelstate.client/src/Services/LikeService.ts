@@ -1,14 +1,10 @@
 import axios from 'axios';
 import { API_URL } from './config';
+import { LikeResponseDto, LikeStatusDto } from '../Types/ApiTypes';
 
 class LikeService {
     // Toggle like for a property (like if not liked, unlike if liked)
-    async toggleLike(propertyId: string): Promise<{
-        isSuccess: boolean;
-        isLiked: boolean;
-        likesCount: number;
-        message?: string;
-    }> {
+    async toggleLike(propertyId: string): Promise<LikeResponseDto> {
         try {
             // Include token as Bearer in header
             const token = localStorage.getItem('token');
@@ -42,11 +38,7 @@ class LikeService {
     }
 
     // Check if user has liked a property
-    async checkLikeStatus(propertyId: string): Promise<{
-        isSuccess: boolean;
-        isLiked: boolean;
-        likesCount: number;
-    }> {
+    async checkLikeStatus(propertyId: string): Promise<LikeStatusDto> {
         try {
             // Include token as Bearer in header
             const token = localStorage.getItem('token');
