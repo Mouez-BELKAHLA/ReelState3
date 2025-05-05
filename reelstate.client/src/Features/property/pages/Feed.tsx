@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import axios from 'axios';
-import { API_URL } from "../../../shared"; // Use shared barrel
-import { useAuth } from "../../../Features/auth"; // Already using feature barrel
-import { CommentPanel } from "../../../shared"; // Use shared barrel
-import { LikeService, PropertyList } from ".."; // Import from property feature barrel
+import { API_URL } from "../../../shared";
+import { useAuth } from "../../../Features/auth";
+import { CommentPanel } from "../../../shared";
+import { LikeService, PropertyList } from "..";
 import { toVideoCardProperties } from "../../../shared/Utils/TypeTransformers";
 
-// Import the new type definitions
-// Import types from property feature instead of unused folder
-import { Property } from "../types/Property";
+// Import the VideoCardProperty type
+import { Property, VideoCardProperty } from "../types/Property";
 import { PropertyLikeState, PropertyLoadingState } from "../types/Property";
+
 export default function Feed() {
     const { authState } = useAuth();
     const { token, isAuthenticated } = authState;
@@ -25,15 +25,15 @@ export default function Feed() {
     const [hasLargeLayout, setHasLargeLayout] = useState(false);
     const [windowWidth, setWindowWidth] = useState(0);
 
-    // State for likes to manage from parent - using our new type
+    // State for likes to manage from parent
     const [propertyLikes, setPropertyLikes] = useState<PropertyLikeState>({});
     const [isLikeLoading, setIsLikeLoading] = useState<PropertyLoadingState>({});
 
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Comment panel width and animation offset
-    const commentPanelWidth = 400;
-    const slideOffset = 75; // Consistent sliding distance
+    const commentPanelWidth = windowWidth < 1400 ? 350 : 400; // Make panel smaller on medium screens
+    const slideOffset = 75;
 
     // Breakpoint for large layout
     const LARGE_LAYOUT_BREAKPOINT = 1280;
@@ -201,6 +201,11 @@ export default function Feed() {
 
     // Calculate video width based on screen size
     const getVideoWidth = () => {
+        // If comments are open and we have a large layout, make videos narrower
+        if (showComments && hasLargeLayout) {
+            return windowWidth >= 1600 ? '680px' : '600px';
+        }
+
         if (!hasLargeLayout) return 'min(100%, 600px)';
         return windowWidth >= 1600 ? '760px' : '680px';
     };
@@ -267,20 +272,22 @@ export default function Feed() {
         <div className="bg-gray-100 min-h-screen overflow-hidden">
             {/* Main container */}
             <div className="relative h-[calc(100vh-55px)]" ref={containerRef}>
-                {/* Use the PropertyList component */}
-                <PropertyList
-                    properties={properties}
-                    propertyLikes={propertyLikes}
-                    isLikeLoading={isLikeLoading}
-                    showComments={showComments}
-                    hasLargeLayout={hasLargeLayout}
-                    slideOffset={slideOffset}
-                    getVideoWidth={getVideoWidth}
-                    onVideoInView={handleVideoInView}
-                    onLikeToggle={handleVideoCardLikeToggle}
-                    onToggleComments={handleToggleComments}
-                    handleLikeToggle={handleLikeToggle} // Pass the function to PropertyList
-                />
+                {/* Add a container with margin when comments are open */}
+                <div className={`transition-all duration-500 ${hasLargeLayout && showComments ? `mr-[${commentPanelWidth}px]` : ''}`}>
+                    <PropertyList
+                        properties={properties}
+                        propertyLikes={propertyLikes}
+                        isLikeLoading={isLikeLoading}
+                        showComments={showComments}
+                        hasLargeLayout={hasLargeLayout}
+                        slideOffset={slideOffset}
+                        getVideoWidth={getVideoWidth}
+                        onVideoInView={handleVideoInView}
+                        onLikeToggle={handleVideoCardLikeToggle}
+                        onToggleComments={handleToggleComments}
+                        handleLikeToggle={handleLikeToggle} // Pass the function to PropertyList
+                    />
+                </div>
 
                 {/* Comments Panel */}
                 {activePropertyId && (
@@ -297,7 +304,6 @@ export default function Feed() {
                                 <CommentPanel
                                     propertyId={activePropertyId}
                                     onClose={() => setShowComments(false)}
-                                    isMobile={false}
                                     displayMode="sidebar"
                                 />
                             </div>
@@ -310,7 +316,6 @@ export default function Feed() {
                                     <CommentPanel
                                         propertyId={activePropertyId}
                                         onClose={() => setShowComments(false)}
-                                        isMobile={false}
                                         displayMode="modal"
                                     />
                                 </div>
