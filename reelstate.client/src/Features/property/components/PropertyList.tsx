@@ -1,7 +1,8 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import VideoCard from './VideoCard/VideoCard';
 import PropertyActions from './PropertyActions';
 import { VideoCardProperty, PropertyLikeState, PropertyLoadingState } from '..';
+
 interface PropertyListProps {
     properties: VideoCardProperty[];
     propertyLikes: PropertyLikeState;
@@ -31,8 +32,16 @@ const PropertyList: React.FC<PropertyListProps> = ({
 }) => {
     const videoRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+    // Store the video width in state to ensure it's consistent across renders
+    const [videoWidth, setVideoWidth] = useState(() => getVideoWidth());
+
+    // Update video width on layout change
+    useEffect(() => {
+        setVideoWidth(getVideoWidth());
+    }, [hasLargeLayout, getVideoWidth]);
+
     // Initialize refs
-    React.useEffect(() => {
+    useEffect(() => {
         videoRefs.current = videoRefs.current.slice(0, properties.length);
     }, [properties]);
 
@@ -48,17 +57,21 @@ const PropertyList: React.FC<PropertyListProps> = ({
                         className="snap-start snap-always w-full py-1.5 flex justify-center"
                         style={{ height: 'calc(100vh - 105px)' }}
                     >
-                        {/* Content wrapper with improved smooth animation */}
+                        {/* Content wrapper with fixed width */}
                         <div
-                            className="relative flex justify-center video-shift"
+                            className="relative flex justify-center transition-transform duration-500 ease-in-out"
                             style={{
                                 transform: hasLargeLayout && showComments ? `translateX(-${slideOffset}px)` : 'translateX(0)'
                             }}
                         >
-                            {/* Video Card Component */}
+                            {/* Video Card Component - using fixed width across all cards */}
                             <div
                                 className="h-full rounded-lg overflow-hidden"
-                                style={{ width: getVideoWidth() }}
+                                style={{
+                                    width: videoWidth,
+                                    minWidth: videoWidth,
+                                    maxWidth: videoWidth
+                                }}
                             >
                                 <VideoCard
                                     {...property}
@@ -69,7 +82,7 @@ const PropertyList: React.FC<PropertyListProps> = ({
                                 />
                             </div>
 
-                            {/* External Action Buttons - Inside the shared container */}
+                            {/* External Action Buttons */}
                             {hasLargeLayout && (
                                 <div className="absolute right-[-70px] top-1/2 transform -translate-y-1/2 z-30">
                                     <PropertyActions

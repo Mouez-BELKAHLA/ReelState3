@@ -1,4 +1,4 @@
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-05-07 15:45:45
+// Current Date and Time (UTC): 2025-05-09 02:30:00
 // Current User's Login: Mouez-BELKAHLA
 
 import React, { useEffect, useReducer } from 'react';
@@ -15,6 +15,9 @@ import { authReducer, initialState } from './AuthContext';
 
 // Import the AuthService with correct casing
 import AuthService from '../services/AuthService';
+
+// Import error helpers from shared
+import { getErrorMessage, handleAuthError } from '../../../shared/helpers';
 
 // Provider Component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -98,8 +101,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             refreshToken: refreshResponse.refreshToken
                         }
                     });
-                } catch (refreshError) {
-                    console.error("Error during token refresh:", refreshError);
+                } catch (error) {
+                    console.error("Error during token refresh:", error);
                     dispatch({ type: 'AUTH_LOGOUT' });
                 }
             } catch (error) {
@@ -163,11 +166,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             // Navigate to dashboard on successful login
             navigate('/dashboard');
-        } catch (error: any) {
+        } catch (error) {
             console.error("Login error:", error);
             dispatch({
                 type: 'AUTH_ERROR',
-                payload: error.message || 'Login failed'
+                payload: handleAuthError(error, 'login')
             });
             throw error;
         }
@@ -218,11 +221,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             // Navigate to dashboard on successful registration
             navigate('/dashboard');
-        } catch (error: any) {
+        } catch (error) {
             console.error("Registration error:", error);
             dispatch({
                 type: 'AUTH_ERROR',
-                payload: error.message || 'Registration failed'
+                payload: handleAuthError(error, 'registration')
             });
             throw error;
         }
@@ -278,17 +281,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 console.log("Navigating to dashboard now!");
                 navigate('/dashboard');
             }, 100);
-        } catch (error: any) {
+        } catch (error) {
             console.error("Google login error:", error);
             dispatch({
                 type: 'AUTH_ERROR',
-                payload: error.message || 'Google authentication failed'
+                payload: handleAuthError(error, 'google')
             });
             throw error;
         }
     };
 
-    // Logout function - FIXED! Now using AuthService with proper casing
+    // Logout function
     const logout = async () => {
         console.log("Logout attempt");
         try {
@@ -305,7 +308,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await AuthService.logout();
             console.log("Logout successful");
         } catch (error) {
-            console.error("Error during logout:", error);
+            console.error("Error during logout:", getErrorMessage(error, "Logout failed locally but you've been logged out"));
             // Continue with local logout even if API fails
         } finally {
             dispatch({ type: 'AUTH_LOGOUT' });

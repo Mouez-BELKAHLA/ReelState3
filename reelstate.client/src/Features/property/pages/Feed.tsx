@@ -228,9 +228,11 @@ export default function Feed() {
     };
 
     // Calculate video width based on screen size
+    // Make this function more stable by using fixed values
     const getVideoWidth = () => {
-        // Don't change size based on comments being open or closed
-        if (!hasLargeLayout) return 'min(100%, 600px)';
+        // Always return the same width for the same screen size
+        // regardless of comment panel state
+        if (!hasLargeLayout) return '600px';
         return windowWidth >= 1600 ? '760px' : '680px';
     };
 
@@ -298,7 +300,7 @@ export default function Feed() {
             <div className="h-[calc(100vh-55px)] overflow-hidden" ref={containerRef}>
                 {/* Container with width adjustment for comment panel - now with video-shift class */}
                 <div
-                    className="h-full video-shift"
+                    className="h-full video-shift" 
                     style={{
                         width: hasLargeLayout && showComments ? `calc(100% - ${commentPanelWidth}px)` : '100%',
                     }}
