@@ -1,4 +1,17 @@
-﻿@keyframes fadeIn {
+﻿/* Add these to your existing CSS file */
+
+/* Smooth animation for video shifting */
+.video-shift {
+    transition: transform 400ms cubic-bezier(0.33, 1, 0.68, 1), width 400ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+/* Smooth animation for comment panel sliding */
+.comment-panel-slide {
+    transition: transform 400ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+/* This is already in your code, just keeping it here for reference */
+@keyframes fadeIn {
     from {
         opacity: 0;
     }

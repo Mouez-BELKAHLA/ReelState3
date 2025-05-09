@@ -1,4 +1,4 @@
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-05-05 20:57:00
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-05-07 15:45:45
 // Current User's Login: Mouez-BELKAHLA
 
 import React, { useEffect, useReducer } from 'react';
@@ -13,10 +13,8 @@ import {
 // Import these directly
 import { authReducer, initialState } from './AuthContext';
 
-// Add this import - THIS IS CRITICAL
+// Import the AuthService with correct casing
 import AuthService from '../services/AuthService';
-
-// Rest of your AuthProvider code
 
 // Provider Component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -71,7 +69,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 console.log("No stored user data, attempting to refresh token");
 
                 try {
-                    const refreshResponse = await authService.refreshToken();
+                    // Use AuthService with uppercase A
+                    const refreshResponse = await AuthService.refreshToken();
                     console.log("Refresh response:", refreshResponse);
 
                     if (!refreshResponse || !refreshResponse.isSuccess) {
@@ -125,7 +124,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log("Login attempt with:", credentials.Email);
 
         try {
-            const response = await authService.login(credentials);
+            // Use AuthService with uppercase A
+            const response = await AuthService.login(credentials);
             console.log("Login response:", response);
 
             if (!response.isSuccess) {
@@ -139,6 +139,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.setItem('firstName', response.firstName || '');
             localStorage.setItem('lastName', response.lastName || '');
             localStorage.setItem('profilePictureUrl', response.profilePictureUrl || '');
+            localStorage.setItem('token', response.token);
+            localStorage.setItem('refreshToken', response.refreshToken);
 
             const user: User = {
                 id: response.userId,
@@ -177,7 +179,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log("Register attempt with:", credentials.Email);
 
         try {
-            const response = await authService.register(credentials);
+            // Use AuthService with uppercase A
+            const response = await AuthService.register(credentials);
             console.log("Register response:", response);
 
             if (!response.isSuccess) {
@@ -191,6 +194,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.setItem('firstName', response.firstName || '');
             localStorage.setItem('lastName', response.lastName || '');
             localStorage.setItem('profilePictureUrl', response.profilePictureUrl || '');
+            localStorage.setItem('token', response.token);
+            localStorage.setItem('refreshToken', response.refreshToken);
 
             const user: User = {
                 id: response.userId,
@@ -237,6 +242,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 throw new Error(response.message || 'Google authentication failed');
             }
 
+            // Store tokens in localStorage
+            localStorage.setItem('userId', response.userId);
+            localStorage.setItem('email', response.email);
+            localStorage.setItem('firstName', response.firstName || '');
+            localStorage.setItem('lastName', response.lastName || '');
+            localStorage.setItem('profilePictureUrl', response.profilePictureUrl || '');
+            localStorage.setItem('token', response.token);
+            localStorage.setItem('refreshToken', response.refreshToken);
+
             const user = {
                 id: response.userId,
                 email: response.email,
@@ -274,12 +288,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    // Logout function
+    // Logout function - FIXED! Now using AuthService with proper casing
     const logout = async () => {
         console.log("Logout attempt");
         try {
-            await authService.logout();
+            // Clear localStorage first to ensure local logout even if API call fails
+            localStorage.removeItem('token');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('email');
+            localStorage.removeItem('firstName');
+            localStorage.removeItem('lastName');
+            localStorage.removeItem('profilePictureUrl');
+
+            // Now attempt the API call
+            await AuthService.logout();
             console.log("Logout successful");
+        } catch (error) {
+            console.error("Error during logout:", error);
+            // Continue with local logout even if API fails
         } finally {
             dispatch({ type: 'AUTH_LOGOUT' });
             navigate('/login');

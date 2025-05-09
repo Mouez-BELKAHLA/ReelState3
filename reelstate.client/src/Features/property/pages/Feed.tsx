@@ -1,3 +1,6 @@
+// Current Date and Time (UTC): 2025-05-09 01:25:13
+// Current User's Login: Mouez-BELKAHLA
+
 import { useEffect, useRef, useState } from "react";
 import axios from 'axios';
 import { API_URL } from "../../../shared";
@@ -32,13 +35,13 @@ export default function Feed() {
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Comment panel width and animation offset
-    const commentPanelWidth = windowWidth < 1400 ? 350 : 400; // Make panel smaller on medium screens
+    const commentPanelWidth = windowWidth < 1400 ? 500 : 580; // Moderately wider comment panel
     const slideOffset = 75;
 
     // Breakpoint for large layout
     const LARGE_LAYOUT_BREAKPOINT = 1280;
 
-    // Add global style to remove scrollbars
+    // Add global style to remove scrollbars and fix TikTok-style scrolling
     useEffect(() => {
         const style = document.createElement('style');
         style.textContent = `
@@ -48,6 +51,31 @@ export default function Feed() {
             }
             *::-webkit-scrollbar {
                 display: none;
+            }
+            /* Ensure strict scroll containment */
+            .snap-y.snap-mandatory {
+                scroll-snap-type: y mandatory;
+            }
+            .snap-y.snap-mandatory > * {
+                scroll-snap-align: start;
+                scroll-snap-stop: always;
+            }
+            /* Hide any overflow beyond the current item */
+            .property-container {
+                height: calc(100vh - 55px);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: relative;
+                overflow: hidden;
+            }
+            /* Smooth animation for comment panel */
+            .comment-panel-slide {
+                transition: transform 400ms cubic-bezier(0.33, 1, 0.68, 1);
+            }
+            /* Smooth animation for video shift */
+            .video-shift {
+                transition: transform 400ms cubic-bezier(0.33, 1, 0.68, 1), width 400ms cubic-bezier(0.33, 1, 0.68, 1);
             }
         `;
         document.head.appendChild(style);
@@ -201,11 +229,7 @@ export default function Feed() {
 
     // Calculate video width based on screen size
     const getVideoWidth = () => {
-        // If comments are open and we have a large layout, make videos narrower
-        if (showComments && hasLargeLayout) {
-            return windowWidth >= 1600 ? '680px' : '600px';
-        }
-
+        // Don't change size based on comments being open or closed
         if (!hasLargeLayout) return 'min(100%, 600px)';
         return windowWidth >= 1600 ? '760px' : '680px';
     };
@@ -269,11 +293,16 @@ export default function Feed() {
     }
 
     return (
-        <div className="bg-gray-100 min-h-screen overflow-hidden">
-            {/* Main container */}
-            <div className="relative h-[calc(100vh-55px)]" ref={containerRef}>
-                {/* Add a container with margin when comments are open */}
-                <div className={`transition-all duration-500 ${hasLargeLayout && showComments ? `mr-[${commentPanelWidth}px]` : ''}`}>
+        <div className="bg-gray-100 h-screen overflow-hidden">
+            {/* Main container with fixed height and overflow control */}
+            <div className="h-[calc(100vh-55px)] overflow-hidden" ref={containerRef}>
+                {/* Container with width adjustment for comment panel - now with video-shift class */}
+                <div
+                    className="h-full video-shift"
+                    style={{
+                        width: hasLargeLayout && showComments ? `calc(100% - ${commentPanelWidth}px)` : '100%',
+                    }}
+                >
                     <PropertyList
                         properties={properties}
                         propertyLikes={propertyLikes}
@@ -285,17 +314,17 @@ export default function Feed() {
                         onVideoInView={handleVideoInView}
                         onLikeToggle={handleVideoCardLikeToggle}
                         onToggleComments={handleToggleComments}
-                        handleLikeToggle={handleLikeToggle} // Pass the function to PropertyList
+                        handleLikeToggle={handleLikeToggle}
                     />
                 </div>
 
-                {/* Comments Panel */}
+                {/* Comments Panel with improved animation */}
                 {activePropertyId && (
                     <>
-                        {/* On large screens: Side panel WITH animation */}
+                        {/* On large screens: Side panel WITH animation - now with comment-panel-slide class */}
                         {hasLargeLayout && (
                             <div
-                                className="fixed top-[55px] right-0 bottom-0 z-40 shadow-xl border-l border-gray-200 transition-all duration-500 ease-in-out"
+                                className="fixed top-[55px] right-0 bottom-0 z-40 shadow-xl border-l border-gray-200 bg-white comment-panel-slide"
                                 style={{
                                     width: `${commentPanelWidth}px`,
                                     transform: showComments ? 'translateX(0)' : 'translateX(100%)'
@@ -309,10 +338,21 @@ export default function Feed() {
                             </div>
                         )}
 
-                        {/* On smaller screens: Modal dialog in center */}
+                        {/* On smaller screens: Modal dialog with full overlay */}
                         {!hasLargeLayout && showComments && (
-                            <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50">
-                                <div className="max-h-[90%] w-[90%] max-w-lg bg-white rounded-xl shadow-2xl overflow-hidden animate-fadeIn flex flex-col">
+                            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center animate-fadeIn">
+                                <div
+                                    className="fixed bg-white rounded-xl shadow-2xl overflow-hidden animate-fadeIn"
+                                    style={{
+                                        maxHeight: '90vh',
+                                        width: '90%',
+                                        maxWidth: '480px',
+                                        // Ensure the modal doesn't introduce unexpected scrolling
+                                        top: '50%',
+                                        left: '50%',
+                                        transform: 'translate(-50%, -50%)'
+                                    }}
+                                >
                                     <CommentPanel
                                         propertyId={activePropertyId}
                                         onClose={() => setShowComments(false)}

@@ -48,9 +48,9 @@ const PropertyList: React.FC<PropertyListProps> = ({
                         className="snap-start snap-always w-full py-1.5 flex justify-center"
                         style={{ height: 'calc(100vh - 105px)' }}
                     >
-                        {/* Content wrapper with shared animation */}
+                        {/* Content wrapper with improved smooth animation */}
                         <div
-                            className="relative flex justify-center transition-transform duration-500 ease-in-out"
+                            className="relative flex justify-center video-shift"
                             style={{
                                 transform: hasLargeLayout && showComments ? `translateX(-${slideOffset}px)` : 'translateX(0)'
                             }}

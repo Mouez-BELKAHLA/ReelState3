@@ -26,7 +26,7 @@ const CommentPanel: React.FC<CommentPanelProps> = ({
     onCommentCountUpdate,
     displayMode = 'sidebar',
 }) => {
-    const { authState } = useAuth();
+    const { authState, loginWithRedirect } = useAuth();
     const [commentsList, setCommentsList] = useState<Comment[]>([]);
     const [isCommentsLoading, setIsCommentsLoading] = useState(false);
     const [commentText, setCommentText] = useState('');
@@ -107,6 +107,17 @@ const CommentPanel: React.FC<CommentPanelProps> = ({
             return `${(commentsList.length / 1000).toFixed(1)} k`;
         }
         return commentsList.length.toString();
+    };
+
+    // Handle login button click
+    const handleLogin = () => {
+        // Check if loginWithRedirect is available in your auth context
+        if (loginWithRedirect) {
+            loginWithRedirect();
+        } else {
+            // Fallback to redirect to login page
+            window.location.href = '/login';
+        }
     };
 
     return (
@@ -215,8 +226,8 @@ const CommentPanel: React.FC<CommentPanelProps> = ({
                                 type="submit"
                                 disabled={!commentText.trim() || isSubmittingComment}
                                 className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-full ${!commentText.trim() || isSubmittingComment
-                                        ? 'text-gray-400 cursor-not-allowed'
-                                        : 'text-blue-500 hover:text-blue-600 hover:bg-gray-200'
+                                    ? 'text-gray-400 cursor-not-allowed'
+                                    : 'text-blue-500 hover:text-blue-600 hover:bg-gray-200'
                                     }`}
                             >
                                 <span>Submit</span>
@@ -224,7 +235,15 @@ const CommentPanel: React.FC<CommentPanelProps> = ({
                         </form>
                     </div>
                 ) : (
-                    <div className="text-center py-2 px-4">Please log in to comment.</div>
+                    <div className="text-center py-3 px-4 flex flex-col items-center">
+                        <p className="text-gray-600 mb-3">Connectez-vous pour commenter</p>
+                        <button
+                            onClick={handleLogin}
+                            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+                        >
+                            Se connecter
+                        </button>
+                    </div>
                 )}
             </div>
         </div>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 
 interface ArrowButtonProps {
     direction: 'left' | 'right';
@@ -7,18 +7,17 @@ interface ArrowButtonProps {
     className?: string;
     style?: React.CSSProperties;
     ariaLabel?: string;
-    ref?: React.RefObject<HTMLButtonElement>;
 }
 
-const ArrowButton: React.FC<ArrowButtonProps> = ({
+// Use forwardRef to properly pass refs to the button element
+const ArrowButton = forwardRef<HTMLButtonElement, ArrowButtonProps>(({
     direction,
     onClick,
     visible = true,
     className = "backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center",
     style = { width: '34px', height: '34px' },
-    ariaLabel,
-    ref
-}) => {
+    ariaLabel
+}, ref) => {
     if (!visible) {
         return <div style={style} className="opacity-0"></div>;
     }
@@ -44,6 +43,9 @@ const ArrowButton: React.FC<ArrowButtonProps> = ({
             </svg>
         </button>
     );
-};
+});
+
+// Add display name for debugging
+ArrowButton.displayName = 'ArrowButton';
 
 export default ArrowButton;

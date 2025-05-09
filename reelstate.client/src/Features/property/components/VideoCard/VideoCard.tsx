@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { AuthContext } from "../../../../Features/auth"; // This one is correct
+import { AuthContext } from "../../../../Features/auth";
 
-// Import from the property feature barrel file
+// Import components but NOT ArrowButton
 import {
-    ArrowButton,
     CarouselIndicators,
     CommentButton,
     ContentTypeIndicator,
@@ -11,23 +10,18 @@ import {
     PropertyInfoTags,
     UserProfile,
     LikeService,
-    // Remove VideoCardProperty import since it's used within the component
-} from '../..'; // Go up two levels to the property feature root
+} from '../..';
 
 // Import from shared
-import { ShareButton } from "../../../../shared"; // Use shared barrel file if available
+import { ShareButton } from "../../../../shared";
 
-// Or keep direct import if no barrel file exists in shared
-// import { ShareButton } from "../../../../shared/components/Common";
-
-// Import types from your feature's types folder
+// Import types
 import { VideoCardProperty } from '../../types/Property';
 
-// Rest of your component code...
 // Additional props specific to the VideoCard component
 type VideoCardProps = VideoCardProperty & {
     onCommentClick?: () => void;
-    externalButtons?: boolean; // Whether buttons are rendered externally
+    externalButtons?: boolean;
     onLikeToggle?: (isLiked: boolean, likesCount: number) => void;
 };
 
@@ -62,31 +56,22 @@ export default function VideoCard({
     const [activeIndex, setActiveIndex] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isAnimating, setIsAnimating] = useState(false);
-
-    // Comment count from props
     const [commentsCount, setCommentsCount] = useState(comments);
-
-    // Like state
     const [likeCount, setLikeCount] = useState(likes);
     const [isLiked, setIsLiked] = useState(false);
     const [isLikeLoading, setIsLikeLoading] = useState(false);
 
-    // Get auth context to check if user is logged in
     const auth = useContext(AuthContext);
 
     // Touch handling
     const [touchStart, setTouchStart] = useState(0);
     const [touchEnd, setTouchEnd] = useState(0);
-
-    // Mouse drag handling
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartX, setDragStartX] = useState(0);
     const dragThreshold = 100;
 
     const carouselRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
-    const rightArrowRef = useRef<HTMLButtonElement>(null);
-    const leftArrowRef = useRef<HTMLButtonElement>(null);
 
     const totalItems = 1 + photos.length + 1;
     const locationIndex = 1 + photos.length;
@@ -112,30 +97,21 @@ export default function VideoCard({
 
     // Handle like toggle
     const handleLikeToggle = async (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent triggering other click events
-
-        // Check if user is authenticated
+        e.stopPropagation();
         if (!auth?.authState.isAuthenticated) {
-            // Redirect to login or show a modal
             alert("Please log in to like this property");
             return;
         }
 
         setIsLikeLoading(true);
-
         try {
             const response = await LikeService.toggleLike(id);
-
             if (response.isSuccess) {
                 setIsLiked(response.isLiked);
                 setLikeCount(response.likesCount);
-
-                // Call the callback if provided
                 if (onLikeToggle) {
                     onLikeToggle(response.isLiked, response.likesCount);
                 }
-            } else {
-                console.error("Failed to toggle like:", response.message);
             }
         } catch (error) {
             console.error("Error toggling like:", error);
@@ -154,7 +130,6 @@ export default function VideoCard({
     // Handle video play/pause
     const togglePlay = () => {
         if (!videoRef.current) return;
-
         if (videoRef.current.paused) {
             videoRef.current.play();
             setIsPlaying(true);
@@ -175,29 +150,24 @@ export default function VideoCard({
 
     // Handle navigation with content type checking and immediate scrolling
     const navigateTo = (newIndex: number) => {
-        // First, update the actual index for immediate carousel scrolling
         setActiveIndex(newIndex);
-
-        // Then check if we need to animate
         const currentType = getContentType(activeIndex);
         const newType = getContentType(newIndex);
 
         if (currentType !== newType) {
             setIsAnimating(true);
-            // Reset animation after a short delay
             setTimeout(() => {
                 setIsAnimating(false);
             }, 400);
         }
 
-        // Pause video if navigating away from it
         if (newIndex !== 0 && videoRef.current && !videoRef.current.paused) {
             videoRef.current.pause();
             setIsPlaying(false);
         }
     };
 
-    // Handle swipe on touch devices
+    // Touch handling
     const handleTouchStart = (e: React.TouchEvent) => {
         setTouchStart(e.targetTouches[0].clientX);
     };
@@ -208,7 +178,6 @@ export default function VideoCard({
 
     const handleTouchEnd = () => {
         if (!touchStart || !touchEnd) return;
-
         const distance = touchStart - touchEnd;
         const isLeftSwipe = distance > 50;
         const isRightSwipe = distance < -50;
@@ -216,12 +185,10 @@ export default function VideoCard({
         if (isLeftSwipe && activeIndex < totalItems - 1) {
             navigateTo(activeIndex + 1);
         }
-
         if (isRightSwipe && activeIndex > 0) {
             navigateTo(activeIndex - 1);
         }
 
-        // Reset
         setTouchStart(0);
         setTouchEnd(0);
     };
@@ -235,27 +202,20 @@ export default function VideoCard({
 
     const handleMouseMove = (e: React.MouseEvent) => {
         if (!isDragging) return;
-        // We're just tracking movement, not doing anything with it yet
     };
 
     const handleMouseUp = (e: React.MouseEvent) => {
         if (!isDragging) return;
-
         const dragEndX = e.clientX;
         const dragDistance = dragStartX - dragEndX;
 
-        // Determine if we should navigate
         if (Math.abs(dragDistance) > dragThreshold) {
             if (dragDistance > 0 && activeIndex < totalItems - 1) {
-                // Dragged left - go to next
                 navigateTo(activeIndex + 1);
             } else if (dragDistance < 0 && activeIndex > 0) {
-                // Dragged right - go to previous
                 navigateTo(activeIndex - 1);
             }
         }
-
-        // Reset drag state
         setIsDragging(false);
     };
 
@@ -263,7 +223,7 @@ export default function VideoCard({
         setIsDragging(false);
     };
 
-    // Shorthand navigation functions using navigateTo
+    // Navigation shortcuts
     const goToVideo = () => navigateTo(0);
     const goToPhotos = () => navigateTo(1);
     const goToLocation = () => navigateTo(locationIndex);
@@ -282,29 +242,23 @@ export default function VideoCard({
 
     // Add keyframe animation to document head
     useEffect(() => {
-        // Add the animation to the document head
         const styleElement = document.createElement('style');
         styleElement.textContent = pulseGradientKeyframes;
         document.head.appendChild(styleElement);
-
-        // Clean up on unmount
         return () => {
             document.head.removeChild(styleElement);
         };
     }, []);
 
-    // Prevent default behavior for mouse events to avoid text selection during drag
+    // Prevent default behavior for mouse events
     useEffect(() => {
         const carousel = carouselRef.current;
-
         const preventDefaultDrag = (e: DragEvent) => {
             e.preventDefault();
         };
-
         if (carousel) {
             carousel.addEventListener('dragstart', preventDefaultDrag);
         }
-
         return () => {
             if (carousel) {
                 carousel.removeEventListener('dragstart', preventDefaultDrag);
@@ -321,7 +275,6 @@ export default function VideoCard({
     const handleCommentClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (onCommentClick) {
-            // Pause video if opening comments
             if (videoRef.current && !videoRef.current.paused) {
                 videoRef.current.pause();
                 setIsPlaying(false);
@@ -360,12 +313,11 @@ export default function VideoCard({
                         preload="metadata"
                         onClick={togglePlay}
                     />
-
                     {/* Play/Pause overlay button */}
                     <div
                         className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${isPlaying ? 'opacity-0' : 'opacity-100'}`}
                         onClick={e => {
-                            e.stopPropagation(); // Prevent triggering the drag
+                            e.stopPropagation();
                             togglePlay();
                         }}
                     >
@@ -393,7 +345,6 @@ export default function VideoCard({
 
                 {/* Location section */}
                 <div className="min-w-full w-full h-full flex-shrink-0 snap-center relative bg-black">
-                    {/* Map background image (in a real app you'd use a map component) */}
                     <div className="w-full h-full bg-gray-800">
                         <img
                             src={`https://api.mapbox.com/styles/v1/mapbox/dark-v10/static/pin-l+fa0(${location.coordinates?.lng},${location.coordinates?.lat})/${location.coordinates?.lng},${location.coordinates?.lat},13,0/800x1000?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4M29iazA2Z2gycXA4N2pmbDZmangifQ.-g_vE53SD2WrJ6tFX7QHmA`}
@@ -424,7 +375,7 @@ export default function VideoCard({
                 </div>
             </div>
 
-            {/* Navigation indicators - using CarouselIndicators component */}
+            {/* Navigation indicators */}
             <CarouselIndicators
                 totalItems={totalItems}
                 activeIndex={activeIndex}
@@ -435,58 +386,44 @@ export default function VideoCard({
             {externalButtons && (
                 <>
                     <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-20">
-                        <div className="h-10 w-10 flex items-center justify-center">
-                            {(isPhotoMode || isLocationMode) && (
-                                <ArrowButton
-                                    direction="left"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        isLocationMode ? goToPhotos() : goToVideo();
-                                    }}
-                                    visible={isPhotoMode || isLocationMode}
-                                    className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center w-10 h-10"
-                                    ariaLabel={isLocationMode ? "View photos" : "View video"}
-                                />
-                            )}
-                        </div>
+                        {(isPhotoMode || isLocationMode) && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    isLocationMode ? goToPhotos() : goToVideo();
+                                }}
+                                className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center w-10 h-10"
+                                aria-label={isLocationMode ? "View photos" : "View video"}
+                            >
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                        )}
                     </div>
 
                     <div className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20">
-                        <div className="h-10 w-10 flex items-center justify-center">
-                            {(isVideoMode || isPhotoMode) && (
-                                <ArrowButton
-                                    direction="right"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        isVideoMode ? goToPhotos() : goToLocation();
-                                    }}
-                                    visible={isVideoMode || isPhotoMode}
-                                    className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center w-10 h-10"
-                                    ariaLabel={isVideoMode ? "View photos" : "View location"}
-                                />
-                            )}
-                        </div>
+                        {(isVideoMode || isPhotoMode) && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    isVideoMode ? goToPhotos() : goToLocation();
+                                }}
+                                className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center w-10 h-10"
+                                aria-label={isVideoMode ? "View photos" : "View location"}
+                            >
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        )}
                     </div>
                 </>
             )}
 
-            {/* Left side action buttons with proper left arrow */}
+            {/* Left side - ONLY PLACEHOLDER, NO ARROWS */}
             <div className="absolute left-4 bottom-24 flex flex-col items-center space-y-4 z-10">
-                {/* Left arrow - properly positioned, not just a placeholder */}
-                <div className="flex items-center justify-center pointer-events-auto" style={{ height: '34px' }}>
-                    <ArrowButton
-                        direction="left"
-                        ref={leftArrowRef}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            isLocationMode ? goToPhotos() : goToVideo();
-                        }}
-                        visible={isPhotoMode || isLocationMode}
-                        ariaLabel={isLocationMode ? "View photos" : "View video"}
-                    />
-                </div>
-
-                {/* Four invisible placeholders that exactly match the right side elements - ALWAYS rendered */}
+                <div className="opacity-0 pointer-events-none" style={{ width: '34px', height: '34px' }}></div>
                 <div className="opacity-0 pointer-events-none" style={{ width: '40px', height: '40px' }}></div>
                 <div className="opacity-0 pointer-events-none" style={{ width: '34px', height: '48px' }}></div>
                 <div className="opacity-0 pointer-events-none" style={{ width: '34px', height: '48px' }}></div>
@@ -496,18 +433,46 @@ export default function VideoCard({
             {/* Right side action buttons - only shown if not using external buttons */}
             {!externalButtons && (
                 <div className="absolute right-4 bottom-24 flex flex-col items-center space-y-4 z-10">
-                    {/* Right navigation arrow */}
-                    <div className="flex items-center justify-center" style={{ height: '34px' }}>
-                        <ArrowButton
-                            direction="right"
-                            ref={rightArrowRef}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                isVideoMode ? goToPhotos() : goToLocation();
-                            }}
-                            visible={isVideoMode || isPhotoMode}
-                            ariaLabel={isVideoMode ? "View photos" : "View location"}
-                        />
+                    {/* RIGHT SIDE: Only place for navigation arrows */}
+                    <div className="relative flex items-center justify-center" style={{ height: '34px', width: '34px' }}>
+                        {/* Left arrow - absolutely positioned to the left */}
+                        {(isPhotoMode || isLocationMode) && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    isLocationMode ? goToPhotos() : goToVideo();
+                                }}
+                                className="absolute right-20 backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center"
+                                style={{ width: '34px', height: '34px' }}
+                                aria-label={isLocationMode ? "View photos" : "View video"}
+                            >
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                        )}
+
+                        {/* Right arrow - in the normal position */}
+                        {(isVideoMode || isPhotoMode) && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    isVideoMode ? goToPhotos() : goToLocation();
+                                }}
+                                className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center"
+                                style={{ width: '34px', height: '34px' }}
+                                aria-label={isVideoMode ? "View photos" : "View location"}
+                            >
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        )}
+
+                        {/* Invisible placeholder when neither arrow is visible */}
+                        {!(isVideoMode || isPhotoMode || isLocationMode) && (
+                            <div style={{ width: '34px', height: '34px' }} className="opacity-0"></div>
+                        )}
                     </div>
 
                     {/* User icon */}
@@ -552,22 +517,22 @@ export default function VideoCard({
                 isAnimating={isAnimating}
             />
 
-            {/* Gradient overlay at the bottom for better text visibility */}
+            {/* Gradient overlay */}
             <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/70 to-transparent pointer-events-none"></div>
 
-            {/* Real estate tags at bottom with pure blur effect */}
+            {/* Property info tags */}
             <PropertyInfoTags
                 rooms={rooms}
                 propertyType={propertyType}
                 space={space}
             />
 
-            {/* Caption below tags */}
+            {/* Caption */}
             <div className="absolute bottom-20 left-4 right-12 z-10">
                 <p className="text-white text-sm line-clamp-1">{caption}</p>
             </div>
 
-            {/* Property title at bottom */}
+            {/* Property title */}
             <div className="absolute bottom-2 left-4 right-12 z-10">
                 <p className="text-white text-sm font-medium">Magnifique appartement lumineux au cœur de Lyon</p>
             </div>
