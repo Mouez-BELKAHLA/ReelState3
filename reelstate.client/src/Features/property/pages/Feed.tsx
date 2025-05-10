@@ -1,6 +1,3 @@
-// Current Date and Time (UTC): 2025-05-09 01:25:13
-// Current User's Login: Mouez-BELKAHLA
-
 import { useEffect, useRef, useState } from "react";
 import axios from 'axios';
 import { API_URL } from "../../../shared";
@@ -8,6 +5,7 @@ import { useAuth } from "../../../Features/auth";
 import { CommentPanel } from "../../../shared";
 import { LikeService, PropertyList } from "..";
 import { toVideoCardProperties } from "../../../shared/Utils/TypeTransformers";
+import { getErrorMessage } from "../../../shared";
 
 // Import the VideoCardProperty type
 import { Property, VideoCardProperty } from "../types/Property";
@@ -134,9 +132,9 @@ export default function Feed() {
                 if (isAuthenticated) {
                     checkAllLikeStatus(mappedProperties);
                 }
-            } catch (err: any) {
+            } catch (err: unknown) { // Changed from any to unknown
                 console.error('Error fetching properties:', err);
-                setError(err.message || 'Failed to load properties');
+                setError(getErrorMessage(err, 'Failed to load properties'));
             } finally {
                 setIsLoading(false);
             }
@@ -228,7 +226,6 @@ export default function Feed() {
     };
 
     // Calculate video width based on screen size
-    // Make this function more stable by using fixed values
     const getVideoWidth = () => {
         // Always return the same width for the same screen size
         // regardless of comment panel state
@@ -240,6 +237,29 @@ export default function Feed() {
     const handleVideoInView = (index: number) => {
         setActiveVideoIndex(index);
     };
+
+    // *** NEW EFFECT: Update UI based on active video ***
+    useEffect(() => {
+        if (properties.length > 0 && activeVideoIndex >= 0 && activeVideoIndex < properties.length) {
+            const activeProperty = properties[activeVideoIndex];
+
+            // 1. Update document title with current property
+            document.title = `Reelstate - ${activeProperty.caption.substring(0, 30)}${activeProperty.caption.length > 30 ? '...' : ''}`;
+
+            // 2. Update URL without page reload (for sharing)
+            // Update URL without page reload (for sharing)
+            if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
+                const newUrl = `/feed?property=${activeProperty.id}`;
+                window.history.replaceState({ path: newUrl }, '', newUrl);
+            }
+
+            // 3. Update active property ID for potential comment display
+            setActivePropertyId(activeProperty.id);
+
+            // 4. Could add analytics tracking here
+            console.log(`Viewing property: ${activeProperty.id}`);
+        }
+    }, [activeVideoIndex, properties]);
 
     if (isLoading) {
         return (
@@ -300,7 +320,7 @@ export default function Feed() {
             <div className="h-[calc(100vh-55px)] overflow-hidden" ref={containerRef}>
                 {/* Container with width adjustment for comment panel - now with video-shift class */}
                 <div
-                    className="h-full video-shift" 
+                    className="h-full video-shift"
                     style={{
                         width: hasLargeLayout && showComments ? `calc(100% - ${commentPanelWidth}px)` : '100%',
                     }}
@@ -317,6 +337,7 @@ export default function Feed() {
                         onLikeToggle={handleVideoCardLikeToggle}
                         onToggleComments={handleToggleComments}
                         handleLikeToggle={handleLikeToggle}
+                        activeVideoIndex={activeVideoIndex} /* Pass active index to PropertyList */
                     />
                 </div>
 

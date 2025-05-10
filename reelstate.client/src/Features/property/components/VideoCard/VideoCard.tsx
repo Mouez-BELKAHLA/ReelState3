@@ -23,6 +23,9 @@ type VideoCardProps = VideoCardProperty & {
     onCommentClick?: () => void;
     externalButtons?: boolean;
     onLikeToggle?: (isLiked: boolean, likesCount: number) => void;
+    title?: string;
+    videoRef?: React.Ref<HTMLVideoElement>; // Accept video ref from parent
+    isActive?: boolean; // Mark if this card is active
 };
 
 export default function VideoCard({
@@ -51,12 +54,15 @@ export default function VideoCard({
     },
     onCommentClick,
     externalButtons = false,
-    onLikeToggle
+    onLikeToggle,
+    title = "Magnifique appartement lumineux au cœur de Lyon",
+    videoRef, // External ref for video element
+    isActive = false // Whether this video is the active one
 }: VideoCardProps) {
     const [activeIndex, setActiveIndex] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isAnimating, setIsAnimating] = useState(false);
-    const [commentsCount, setCommentsCount] = useState(comments);
+    const [commentsCount] = useState(comments);
     const [likeCount, setLikeCount] = useState(likes);
     const [isLiked, setIsLiked] = useState(false);
     const [isLikeLoading, setIsLikeLoading] = useState(false);
@@ -71,7 +77,7 @@ export default function VideoCard({
     const dragThreshold = 100;
 
     const carouselRef = useRef<HTMLDivElement>(null);
-    const videoRef = useRef<HTMLVideoElement>(null);
+    const internalVideoRef = useRef<HTMLVideoElement>(null);
 
     const totalItems = 1 + photos.length + 1;
     const locationIndex = 1 + photos.length;
@@ -94,6 +100,49 @@ export default function VideoCard({
 
         checkLikeStatus();
     }, [id, auth?.authState.isAuthenticated]);
+
+    // FIX: Ensure proper video state when active status changes
+    useEffect(() => {
+        if (!internalVideoRef.current) return;
+
+        if (isActive) {
+            // When this card becomes active
+            if (activeIndex === 0) { // Only auto-play if in video mode
+                // Try to play video when active
+                const playPromise = internalVideoRef.current.play();
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => {
+                            setIsPlaying(true);
+                        })
+                        .catch(() => {
+                            setIsPlaying(false);
+                        });
+                }
+            }
+        } else {
+            // When this card becomes inactive, FORCE pause and update state
+            internalVideoRef.current.pause();
+            internalVideoRef.current.muted = true; // Ensure muted when inactive
+            setIsPlaying(false);
+        }
+    }, [isActive, activeIndex]);
+
+    // FIX: Make sure video is paused when the carousel is not showing the video
+    useEffect(() => {
+        if (!internalVideoRef.current) return;
+
+        if (activeIndex === 0) {
+            // In video mode, we can play if active
+            if (isActive && isPlaying) {
+                internalVideoRef.current.play();
+            }
+        } else {
+            // Not in video mode, always pause
+            internalVideoRef.current.pause();
+            setIsPlaying(false);
+        }
+    }, [activeIndex, isActive, isPlaying]);
 
     // Handle like toggle
     const handleLikeToggle = async (e: React.MouseEvent) => {
@@ -127,14 +176,26 @@ export default function VideoCard({
         return 'photo';
     };
 
-    // Handle video play/pause
+    // FIX: Improved video play/pause control with proper state synchronization
     const togglePlay = () => {
-        if (!videoRef.current) return;
-        if (videoRef.current.paused) {
-            videoRef.current.play();
-            setIsPlaying(true);
+        if (!internalVideoRef.current) return;
+
+        if (internalVideoRef.current.paused) {
+            // Try to play the video
+            const playPromise = internalVideoRef.current.play();
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        setIsPlaying(true);
+                    })
+                    .catch(error => {
+                        console.error("Failed to play video:", error);
+                        setIsPlaying(false);
+                    });
+            }
         } else {
-            videoRef.current.pause();
+            // Pause the video
+            internalVideoRef.current.pause();
             setIsPlaying(false);
         }
     };
@@ -161,8 +222,9 @@ export default function VideoCard({
             }, 400);
         }
 
-        if (newIndex !== 0 && videoRef.current && !videoRef.current.paused) {
-            videoRef.current.pause();
+        // FIX: Always ensure video is paused when navigating away from video
+        if (newIndex !== 0 && internalVideoRef.current) {
+            internalVideoRef.current.pause();
             setIsPlaying(false);
         }
     };
@@ -200,7 +262,7 @@ export default function VideoCard({
         setDragStartX(e.clientX);
     };
 
-    const handleMouseMove = (e: React.MouseEvent) => {
+    const handleMouseMove = () => {
         if (!isDragging) return;
     };
 
@@ -275,16 +337,34 @@ export default function VideoCard({
     const handleCommentClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (onCommentClick) {
-            if (videoRef.current && !videoRef.current.paused) {
-                videoRef.current.pause();
+            if (internalVideoRef.current) {
+                internalVideoRef.current.pause();
                 setIsPlaying(false);
             }
             onCommentClick();
         }
     };
 
+    // FIX: Handle direct video events to ensure state synchronization
+    const handleVideoPlay = () => {
+        setIsPlaying(true);
+    };
+
+    const handleVideoPause = () => {
+        setIsPlaying(false);
+    };
+
+    const handleVideoEnded = () => {
+        // Video reached the end, restart it (since loop is enabled)
+        if (internalVideoRef.current && isActive) {
+            internalVideoRef.current.play().catch(() => {
+                setIsPlaying(false);
+            });
+        }
+    };
+
     return (
-        <div className="relative h-full rounded-xl overflow-hidden bg-black shadow-lg">
+        <div className={`relative h-full rounded-xl overflow-hidden bg-black shadow-lg ${isActive ? 'ring-1 ring-blue-500' : ''}`}>
             {/* Carousel container */}
             <div
                 ref={carouselRef}
@@ -304,14 +384,29 @@ export default function VideoCard({
                 {/* Video item */}
                 <div className="min-w-full w-full h-full flex-shrink-0 snap-center relative">
                     <video
-                        ref={videoRef}
+                        // Using a callback ref to handle both internal and external refs
+                        ref={(el) => {
+                            // Set internal ref first
+                            internalVideoRef.current = el;
+
+                            // Then handle external ref based on its type
+                            if (typeof videoRef === 'function') {
+                                videoRef(el);  // Function ref
+                            } else if (videoRef) {
+                                // Object ref
+                                (videoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el;
+                            }
+                        }}
                         src={videoUrl}
                         className="w-full h-full object-cover"
                         loop
-                        muted
+                        muted={!isActive} // Only unmute if active
                         playsInline
                         preload="metadata"
                         onClick={togglePlay}
+                        onPlay={handleVideoPlay}
+                        onPause={handleVideoPause}
+                        onEnded={handleVideoEnded}
                     />
                     {/* Play/Pause overlay button */}
                     <div
@@ -375,7 +470,7 @@ export default function VideoCard({
                 </div>
             </div>
 
-            {/* Navigation indicators */}
+            {/* Rest of your component remains the same */}
             <CarouselIndicators
                 totalItems={totalItems}
                 activeIndex={activeIndex}
@@ -390,7 +485,11 @@ export default function VideoCard({
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    isLocationMode ? goToPhotos() : goToVideo();
+                                    if (isLocationMode) {
+                                        goToPhotos();
+                                    } else {
+                                        goToVideo();
+                                    }
                                 }}
                                 className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center w-10 h-10"
                                 aria-label={isLocationMode ? "View photos" : "View video"}
@@ -407,7 +506,11 @@ export default function VideoCard({
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    isVideoMode ? goToPhotos() : goToLocation();
+                                    if (isVideoMode) {
+                                        goToPhotos();
+                                    } else {
+                                        goToLocation();
+                                    }
                                 }}
                                 className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center w-10 h-10"
                                 aria-label={isVideoMode ? "View photos" : "View location"}
@@ -440,7 +543,11 @@ export default function VideoCard({
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    isLocationMode ? goToPhotos() : goToVideo();
+                                    if (isLocationMode) {
+                                        goToPhotos();
+                                    } else {
+                                        goToVideo();
+                                    }
                                 }}
                                 className="absolute right-20 backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center"
                                 style={{ width: '34px', height: '34px' }}
@@ -457,7 +564,11 @@ export default function VideoCard({
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    isVideoMode ? goToPhotos() : goToLocation();
+                                    if (isVideoMode) {
+                                        goToPhotos();
+                                    } else {
+                                        goToLocation();
+                                    }
                                 }}
                                 className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center"
                                 style={{ width: '34px', height: '34px' }}
@@ -534,7 +645,7 @@ export default function VideoCard({
 
             {/* Property title */}
             <div className="absolute bottom-2 left-4 right-12 z-10">
-                <p className="text-white text-sm font-medium">Magnifique appartement lumineux au cœur de Lyon</p>
+                <p className="text-white text-sm font-medium">{title}</p>
             </div>
         </div>
     );

@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from "../../../shared"; // Use shared barrel file
 import { VideoUploader } from ".."; // Import from property feature barrel
+import { getErrorMessage } from "../../../shared/helpers"; // Import error helpers
+
 const CreateVideoCard: React.FC = () => {
     const { authState } = useAuth();
     const navigate = useNavigate();
@@ -189,17 +191,26 @@ const CreateVideoCard: React.FC = () => {
                 setError(response.data.message || 'An error occurred while creating the listing.');
             }
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Error submitting property:', err);
 
-            let errorMessage = 'An error occurred while creating the listing. Please try again.';
+            // Use the error helper to extract a meaningful message
+            let errorMessage = getErrorMessage(
+                err,
+                'An error occurred while creating the listing. Please try again.'
+            );
 
-            if (err.code === 'ERR_NETWORK') {
-                errorMessage = 'Network error. The server may be down or the request might be too large.';
-            } else if (err.response?.data?.message) {
-                errorMessage = err.response.data.message;
+            // Special handling for network errors which might be due to large file uploads
+            if (axios.isAxiosError(err)) {
+                if (err.code === 'ERR_NETWORK') {
+                    errorMessage = 'Network error. The server may be down or the request might be too large.';
+                } else if (err.response?.data?.message) {
+                    // If the API returned a specific error message
+                    errorMessage = err.response.data.message;
+                }
             }
 
+            // Set the error message for display
             setError(errorMessage);
         } finally {
             setIsSubmitting(false);

@@ -1,5 +1,4 @@
-// src/Components/CreateForm/VideoUploader.tsx
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 
 interface VideoUploaderProps {
     videoFile: File | null;
@@ -16,6 +15,28 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
     const [error, setError] = useState<string | null>(null);
     const videoInputRef = useRef<HTMLInputElement>(null);
 
+    // Create preview when videoFile changes from outside the component
+    useEffect(() => {
+        // Clear any previous preview
+        if (videoPreview) {
+            URL.revokeObjectURL(videoPreview);
+        }
+
+        // If there's a new video file, create a preview
+        if (videoFile) {
+            setVideoPreview(URL.createObjectURL(videoFile));
+        } else {
+            setVideoPreview(null);
+        }
+
+        // Clean up the URL object when component unmounts or videoFile changes
+        return () => {
+            if (videoPreview) {
+                URL.revokeObjectURL(videoPreview);
+            }
+        };
+    }, [videoFile]);
+
     const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -30,13 +51,11 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
             return;
         }
 
-        setVideoPreview(URL.createObjectURL(file));
         onVideoChange(file);
         setError(null);
     };
 
     const handleRemoveVideo = () => {
-        setVideoPreview(null);
         onVideoChange(null);
         if (videoInputRef.current) videoInputRef.current.value = '';
     };
