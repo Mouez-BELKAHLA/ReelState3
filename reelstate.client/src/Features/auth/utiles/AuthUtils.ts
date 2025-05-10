@@ -1,5 +1,17 @@
 import { User, AuthResponse } from '..'
 import { NavigateFunction } from 'react-router-dom';
+export interface JwtPayload {
+    sub: string;       // Subject (user ID)
+    email?: string;    // Email
+    given_name?: string; // First name
+    family_name?: string; // Last name
+    picture?: string;  // Profile picture URL
+    exp: number;       // Expiration timestamp
+    iat: number;       // Issued at timestamp
+    iss?: string;      // Issuer
+    aud?: string;      // Audience
+    [key: string]: unknown; // Allow for other properties
+}
 
 export const handleAuthResponse = (response: AuthResponse): User => {
     if (response.isSuccess && response.token) {
@@ -29,7 +41,7 @@ export const navigateToDashboard = (navigate: NavigateFunction): void => {
     navigate('/dashboard');
 };
 
-export const decodeToken = (token: string): any => {
+export const decodeToken = (token: string): JwtPayload | null => {
     try {
         return JSON.parse(atob(token.split('.')[1]));
     } catch (error) {

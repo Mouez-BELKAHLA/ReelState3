@@ -1,6 +1,3 @@
-// Current Date and Time (UTC): 2025-05-09 02:30:00
-// Current User's Login: Mouez-BELKAHLA
-
 import React, { useEffect, useReducer } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -8,7 +5,7 @@ import {
     LoginCredentials,
     RegisterCredentials,
     User
-} from '..'; // Import from barrel file
+} from '..';
 
 // Import these directly
 import { authReducer, initialState } from './AuthContext';
@@ -168,9 +165,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             navigate('/dashboard');
         } catch (error) {
             console.error("Login error:", error);
+            const errorMessage = handleAuthError(error, 'login');
             dispatch({
                 type: 'AUTH_ERROR',
-                payload: handleAuthError(error, 'login')
+                payload: errorMessage
             });
             throw error;
         }
@@ -223,9 +221,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             navigate('/dashboard');
         } catch (error) {
             console.error("Registration error:", error);
+            const errorMessage = handleAuthError(error, 'registration');
             dispatch({
                 type: 'AUTH_ERROR',
-                payload: handleAuthError(error, 'registration')
+                payload: errorMessage
             });
             throw error;
         }
@@ -283,9 +282,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }, 100);
         } catch (error) {
             console.error("Google login error:", error);
+            const errorMessage = handleAuthError(error, 'google');
             dispatch({
                 type: 'AUTH_ERROR',
-                payload: handleAuthError(error, 'google')
+                payload: errorMessage
             });
             throw error;
         }

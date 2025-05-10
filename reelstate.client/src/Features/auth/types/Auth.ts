@@ -1,3 +1,4 @@
+// User and AuthState look good - they follow frontend convention
 export interface User {
     id: string;
     email: string;
@@ -15,19 +16,21 @@ export interface AuthState {
     error: string | null;
 }
 
+// LoginCredentials is correctly using PascalCase for .NET backend
 export interface LoginCredentials {
     Email: string;    // PascalCase to match .NET backend
-    Password: string; // PascalCase to match .NET backenda
+    Password: string; // PascalCase to match .NET backend
 }
 
+// Fix RegisterCredentials to match .NET backend convention
 export interface RegisterCredentials {
-    Email(arg0: string, Email: any): unknown;
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
+    Email: string;       // PascalCase to match .NET backend
+    Password: string;    // PascalCase to match .NET backend
+    FirstName: string;   // PascalCase to match .NET backend
+    LastName: string;    // PascalCase to match .NET backend
 }
 
+// AuthResponse and TokenRequest look good
 export interface AuthResponse {
     isSuccess: boolean;
     message?: string;

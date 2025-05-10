@@ -1,12 +1,14 @@
-﻿import axios from 'axios';
+﻿import axios, { AxiosError } from 'axios';
 import {
     AuthResponse,
     LoginCredentials,
     RegisterCredentials,
     TokenRequest
 } from '..'; // Import from barrel file
+import { getErrorMessage, processAuthError } from '../../../shared';
 
 const API_URL = 'http://localhost:5034/api'; // Update to your actual running server URL
+
 class AuthService {
     private setAuthHeader(token: string | null) {
         if (token) {
@@ -33,8 +35,9 @@ class AuthService {
             }
 
             return data;
-        } catch (error: any) {
-            throw error.response?.data || { isSuccess: false, message: 'Login failed' };
+        } catch (error: unknown) {
+            // Process error with our error helper, then rethrow with consistent format
+            throw processAuthError(error, 'login');
         }
     }
 
@@ -55,8 +58,8 @@ class AuthService {
             }
 
             return data;
-        } catch (error: any) {
-            throw error.response?.data || { isSuccess: false, message: 'Registration failed' };
+        } catch (error: unknown) {
+            throw processAuthError(error, 'registration');
         }
     }
 
@@ -69,7 +72,6 @@ class AuthService {
             const data = response.data;
 
             if (data.isSuccess && data.token) {
-                // MAKE SURE these localStorage calls happen BEFORE anything else
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('refreshToken', data.refreshToken);
                 localStorage.setItem('userId', data.userId);
@@ -79,14 +81,13 @@ class AuthService {
                 localStorage.setItem('profilePictureUrl', data.profilePictureUrl || '');
                 this.setAuthHeader(data.token);
 
-                // Debug log to confirm localStorage was set
                 console.log("Token stored in localStorage:",
                     localStorage.getItem('token') ? "success" : "failed");
             }
 
             return data;
-        } catch (error: any) {
-            throw error.response?.data || { isSuccess: false, message: 'Google authentication failed' };
+        } catch (error: unknown) {
+            throw processAuthError(error, 'google');
         }
     }
 
@@ -123,12 +124,12 @@ class AuthService {
                 }
 
                 return null;
-            } catch (error: any) {
-                console.error("Refresh Token Error Details:", error.response?.data || error.message);
-                throw error;
+            } catch (error: unknown) {
+                console.error("Refresh Token Error Details:", getErrorMessage(error));
+                throw processAuthError(error, 'refresh');
             }
-        } catch (error) {
-            console.error("Error refreshing token:", error);
+        } catch (error: unknown) {
+            console.error("Error refreshing token:", getErrorMessage(error));
             this.logout();
             return null;
         }
@@ -136,7 +137,6 @@ class AuthService {
 
     async logout(): Promise<void> {
         try {
-            // Skip API call to avoid 400 errors
             localStorage.removeItem('token');
             localStorage.removeItem('refreshToken');
             localStorage.removeItem('userId');
@@ -145,8 +145,8 @@ class AuthService {
             localStorage.removeItem('lastName');
             localStorage.removeItem('profilePictureUrl');
             this.setAuthHeader(null);
-        } catch (error) {
-            console.error('Error during logout:', error);
+        } catch (error: unknown) {
+            console.error('Error during logout:', getErrorMessage(error));
         }
     }
 
