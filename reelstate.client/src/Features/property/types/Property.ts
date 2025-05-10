@@ -2,6 +2,8 @@
  * TypeScript interface matching the C# PropertyCreateDto
  * Used for creating new property listings
  */
+import { ApplicationUser } from '../../../shared'
+
 export interface PropertyCreateDto {
     title: string;
     caption: string;

@@ -29,12 +29,12 @@ class LikeService {
             return response.data;
         } catch (error: unknown) { // Changed from 'any' to 'unknown'
             console.error('Like toggle error:', error);
-
+            
             // Use type-safe error handling
-            const errorMessage = axios.isAxiosError(error) && error.response?.data?.message
-                ? error.response.data.message
+            const errorMessage = axios.isAxiosError(error) && error.response?.data?.message 
+                ? error.response.data.message 
                 : getErrorMessage(error, 'Failed to update like status');
-
+                
             return {
                 isSuccess: false,
                 isLiked: false,
