@@ -6,7 +6,7 @@
     "lib": [ "ES2020", "DOM", "DOM.Iterable" ],
     "module": "ESNext",
     "skipLibCheck": true,
-    "moduleResolution": "bundler",
+    "moduleResolution": "bundler", // Change back if needed
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
@@ -18,7 +18,8 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": [ "./src/*" ]
+      "@/*": [ "./src/*" ],
+      "tailwindcss": [ "./node_modules/tailwindcss" ]
     }
   },
   "files": [],

@@ -108,24 +108,20 @@ namespace ReelState.Server.Controllers
             else
             {
                 // Like: Add new like
-                like = new Like
-                {
-                    PropertyId = request.PropertyId,
-                    UserId = userId,
-                    CreatedAt = DateTime.UtcNow
-                };
+               // Like: Add new like - USE THE PUBLIC CONSTRUCTOR HERE
+        like = new Like(request.PropertyId, userId);
+        
+        _context.Likes.Add(like);
+        await _context.SaveChangesAsync();
 
-                _context.Likes.Add(like);
-                await _context.SaveChangesAsync();
+        var likesCount = await _context.Likes.CountAsync(l => l.PropertyId == request.PropertyId);
 
-                var likesCount = await _context.Likes.CountAsync(l => l.PropertyId == request.PropertyId);
-
-                return Ok(new LikeResponseDto
-                {
-                    IsSuccess = true,
-                    IsLiked = true,
-                    LikesCount = likesCount
-                });
+        return Ok(new LikeResponseDto
+        {
+            IsSuccess = true,
+            IsLiked = true,
+            LikesCount = likesCount
+        });
             }
         }
     }

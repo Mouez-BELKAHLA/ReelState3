@@ -6,10 +6,22 @@ namespace ReelState.Server.Models
 {
     public class Like
     {
-        public Like()
+        // Parameterless constructor for EF Core
+        protected Like()
         {
             Id = Guid.NewGuid().ToString();
             CreatedAt = DateTime.UtcNow;
+            PropertyId = string.Empty; // Default value to satisfy compiler
+            UserId = string.Empty;     // Default value to satisfy compiler
+        }
+
+        // Main constructor to use when creating new likes
+        public Like(string propertyId, string userId)
+        {
+            Id = Guid.NewGuid().ToString();
+            CreatedAt = DateTime.UtcNow;
+            PropertyId = propertyId;
+            UserId = userId;
         }
 
         [Key]

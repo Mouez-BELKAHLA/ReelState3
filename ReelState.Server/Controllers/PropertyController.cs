@@ -66,14 +66,14 @@ namespace ReelState.Server.Controllers
                     p.VideoUrl,
                     p.UserId,
                     p.CreatedAt,
-                    User = new
+                    User = p.User != null ? new
                     {
                         p.User.Id,
                         p.User.Email,
                         p.User.FirstName,
                         p.User.LastName,
                         p.User.ProfilePictureUrl
-                    },
+                    } : null,
                     Photos = p.Photos.Select(photo => new {
                         photo.Id,
                         photo.PropertyId,

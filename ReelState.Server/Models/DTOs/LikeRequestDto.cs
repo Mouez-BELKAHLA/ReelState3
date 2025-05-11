@@ -3,7 +3,7 @@
     // For like request
     public class LikeRequestDto
     {
-        public string PropertyId { get; set; }
+        public required string PropertyId { get; set; }
     }
 
     // For like response
@@ -12,7 +12,7 @@
         public bool IsSuccess { get; set; }
         public bool IsLiked { get; set; }
         public int LikesCount { get; set; }
-        public string Message { get; set; }
+        public string Message { get; set; } = string.Empty;
     }
 
     // For like status

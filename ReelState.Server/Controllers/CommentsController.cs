@@ -39,22 +39,25 @@ namespace ReelState.Server.Controllers
                 return NotFound("Property not found");
             }
 
+            // Use Select without null-conditional operators
             var comments = await _context.Comments
                 .Include(c => c.User)
                 .Where(c => c.PropertyId == propertyId)
                 .OrderByDescending(c => c.CreatedAt)
-                .Select(c => new CommentResponseDto
-                {
-                    Id = c.Id,
-                    UserId = c.UserId,
-                    Username = c.User.FirstName + " " + c.User.LastName,
-                    AvatarUrl = c.User.ProfilePictureUrl,
-                    Text = c.Text,
-                    CreatedAt = c.CreatedAt
-                })
                 .ToListAsync();
 
-            return Ok(comments);
+            // Then map to DTOs after EF Core has fetched the data
+            var commentDtos = comments.Select(c => new CommentResponseDto
+            {
+                Id = c.Id,
+                UserId = c.UserId,
+                Username = c.User != null ? $"{c.User.FirstName} {c.User.LastName}" : "Unknown User",
+                AvatarUrl = c.User != null && c.User.ProfilePictureUrl != null ? c.User.ProfilePictureUrl : string.Empty,
+                Text = c.Text,
+                CreatedAt = c.CreatedAt
+            }).ToList();
+
+            return Ok(commentDtos);
         }
 
         // POST: api/Comments
@@ -100,8 +103,8 @@ namespace ReelState.Server.Controllers
             {
                 Id = comment.Id,
                 UserId = comment.UserId,
-                Username = user.FirstName + " " + user.LastName,
-                AvatarUrl = user.ProfilePictureUrl,
+                Username = $"{user.FirstName} {user.LastName}",
+                AvatarUrl = user.ProfilePictureUrl != null ? user.ProfilePictureUrl : string.Empty,
                 Text = comment.Text,
                 CreatedAt = comment.CreatedAt
             };
@@ -127,8 +130,9 @@ namespace ReelState.Server.Controllers
             {
                 Id = comment.Id,
                 UserId = comment.UserId,
-                Username = comment.User.FirstName + " " + comment.User.LastName,
-                AvatarUrl = comment.User.ProfilePictureUrl,
+                Username = comment.User != null ? $"{comment.User.FirstName} {comment.User.LastName}" : "Unknown User",
+                AvatarUrl = comment.User != null && comment.User.ProfilePictureUrl != null ?
+                            comment.User.ProfilePictureUrl : string.Empty,
                 Text = comment.Text,
                 CreatedAt = comment.CreatedAt
             };
