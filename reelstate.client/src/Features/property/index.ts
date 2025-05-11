@@ -18,6 +18,7 @@ export { default as VideoUploader } from './components/VideoUploader';
 // Export services
 export { default as LikeService } from './services/LikeService';
 export { default as CommentService } from './services/CommentService';
+export { default as CommentLikeService } from './services/CommentLikeService'; // Fixed path
 
 // Export pages
 export { default as CreateVideoCard } from './pages/CreateVideoCard';

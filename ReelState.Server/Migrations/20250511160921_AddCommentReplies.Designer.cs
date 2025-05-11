@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ReelState.Data;
 
@@ -11,9 +12,11 @@ using ReelState.Data;
 namespace ReelState.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250511160921_AddCommentReplies")]
+    partial class AddCommentReplies
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -286,32 +289,6 @@ namespace ReelState.Server.Migrations
                     b.ToTable("Comments");
                 });
 
-            modelBuilder.Entity("ReelState.Server.Models.CommentLike", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("CommentId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("CommentId", "UserId")
-                        .IsUnique();
-
-                    b.ToTable("CommentLikes");
-                });
-
             modelBuilder.Entity("ReelState.Server.Models.Like", b =>
                 {
                     b.Property<string>("Id")
@@ -492,25 +469,6 @@ namespace ReelState.Server.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("ReelState.Server.Models.CommentLike", b =>
-                {
-                    b.HasOne("ReelState.Server.Models.Comment", "Comment")
-                        .WithMany("Likes")
-                        .HasForeignKey("CommentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ReelState.Server.Models.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Comment");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("ReelState.Server.Models.Like", b =>
                 {
                     b.HasOne("ReelState.Server.Models.Property", "Property")
@@ -554,8 +512,6 @@ namespace ReelState.Server.Migrations
 
             modelBuilder.Entity("ReelState.Server.Models.Comment", b =>
                 {
-                    b.Navigation("Likes");
-
                     b.Navigation("Replies");
                 });
 

@@ -1,11 +1,23 @@
 import axios from 'axios';
-import { API_URL } from "../../../shared"; // Use shared barrel
-import { Comment } from '..'; // Import from property feature barrel - now this will work!
+import { API_URL } from "../../../shared";
+import { Comment } from '..';
+
 class CommentService {
     // Get comments for a property
     async getPropertyComments(propertyId: string): Promise<Comment[]> {
         try {
-            const response = await axios.get(`${API_URL}/api/Comments/property/${propertyId}`);
+            // Get the authentication token
+            const token = localStorage.getItem('token');
+
+            // Create request headers object with or without token
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+            // Send request with the headers
+            const response = await axios.get(
+                `${API_URL}/api/Comments/property/${propertyId}`,
+                { headers }
+            );
+
             return response.data;
         } catch (error) {
             console.error('Error fetching comments:', error);
@@ -13,8 +25,8 @@ class CommentService {
         }
     }
 
-    // Add a new comment
-    async addComment(propertyId: string, text: string): Promise<Comment | null> {
+    // Add a new comment or reply
+    async addComment(propertyId: string, text: string, parentCommentId?: string): Promise<Comment | null> {
         try {
             const token = localStorage.getItem('token');
             if (!token) {
@@ -23,7 +35,7 @@ class CommentService {
 
             const response = await axios.post(
                 `${API_URL}/api/Comments`,
-                { propertyId, text },
+                { propertyId, text, parentCommentId },
                 {
                     headers: { Authorization: `Bearer ${token}` }
                 }

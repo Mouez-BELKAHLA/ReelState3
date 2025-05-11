@@ -1,13 +1,14 @@
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-05-05 21:40:30
-// Current User's Login: Mouez-BELKAHLA
-
-// This should match CommentResponseDto from your backend
+// Update the Comment interface
 export interface Comment {
     id: string;
     userId: string;
-    username: string; // Required by CommentPanel
-    avatarUrl: string; // Required by CommentPanel
+    username: string;
+    avatarUrl: string;
     text: string;
     createdAt: string;
-    propertyId?: string; // Optional since it's not in the DTO
+    propertyId?: string;
+    parentCommentId?: string | null;
+    replies?: Comment[];
+    isLiked: boolean; // Add this
+    likesCount: number; // Add this
 }

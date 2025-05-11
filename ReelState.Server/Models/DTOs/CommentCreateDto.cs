@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace ReelState.Server.Models.DTOs
@@ -12,6 +13,9 @@ namespace ReelState.Server.Models.DTOs
         [Required]
         [MaxLength(1000)]
         public required string Text { get; set; }
+
+        // New field for reply functionality
+        public string? ParentCommentId { get; set; }
     }
 
     // DTO for comment responses
@@ -23,5 +27,10 @@ namespace ReelState.Server.Models.DTOs
         public string AvatarUrl { get; set; } = string.Empty;
         public string Text { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
+        public string? ParentCommentId { get; set; }
+        public List<CommentResponseDto>? Replies { get; set; }
+        // Add these properties to your existing CommentResponseDto class
+        public bool IsLiked { get; set; } = false;
+        public int LikesCount { get; set; } = 0;
     }
 }

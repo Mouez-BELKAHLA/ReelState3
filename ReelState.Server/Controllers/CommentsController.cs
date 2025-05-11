@@ -28,36 +28,68 @@ namespace ReelState.Server.Controllers
         [AllowAnonymous]
         public async Task<ActionResult<IEnumerable<CommentResponseDto>>> GetPropertyComments(string propertyId)
         {
-            if (string.IsNullOrEmpty(propertyId))
-            {
-                return BadRequest("Property ID is required");
-            }
+            // Existing code...
 
-            var property = await _context.Properties.FindAsync(propertyId);
-            if (property == null)
-            {
-                return NotFound("Property not found");
-            }
+            // Try to get current user ID if authenticated
+            var currentUserId = User.Identity?.IsAuthenticated == true ?
+                User.FindFirst(ClaimTypes.NameIdentifier)?.Value : null;
 
-            // Use Select without null-conditional operators
+            // Get only top-level comments (no parent)
             var comments = await _context.Comments
                 .Include(c => c.User)
-                .Where(c => c.PropertyId == propertyId)
+                .Include(c => c.Replies)
+                    .ThenInclude(r => r.User)
+                .Where(c => c.PropertyId == propertyId && c.ParentCommentId == null)
                 .OrderByDescending(c => c.CreatedAt)
                 .ToListAsync();
 
-            // Then map to DTOs after EF Core has fetched the data
-            var commentDtos = comments.Select(c => new CommentResponseDto
+            // Map to DTOs with replies
+            var commentDtos = new List<CommentResponseDto>();
+            foreach (var comment in comments)
             {
-                Id = c.Id,
-                UserId = c.UserId,
-                Username = c.User != null ? $"{c.User.FirstName} {c.User.LastName}" : "Unknown User",
-                AvatarUrl = c.User != null && c.User.ProfilePictureUrl != null ? c.User.ProfilePictureUrl : string.Empty,
-                Text = c.Text,
-                CreatedAt = c.CreatedAt
-            }).ToList();
+                commentDtos.Add(await MapCommentWithRepliesAsync(comment, currentUserId));
+            }
 
             return Ok(commentDtos);
+        }
+
+        // Helper method to recursively map comments and their replies
+        private async Task<CommentResponseDto> MapCommentWithRepliesAsync(Comment comment, string? currentUserId)
+        {
+            bool isLiked = false;
+            if (!string.IsNullOrEmpty(currentUserId))
+            {
+                isLiked = await _context.CommentLikes
+                    .AnyAsync(l => l.CommentId == comment.Id && l.UserId == currentUserId);
+            }
+
+            var likesCount = await _context.CommentLikes
+                .CountAsync(l => l.CommentId == comment.Id);
+
+            var dto = new CommentResponseDto
+            {
+                Id = comment.Id,
+                UserId = comment.UserId,
+                Username = comment.User != null ? $"{comment.User.FirstName} {comment.User.LastName}" : "Unknown User",
+                AvatarUrl = comment.User != null && comment.User.ProfilePictureUrl != null ? comment.User.ProfilePictureUrl : string.Empty,
+                Text = comment.Text,
+                CreatedAt = comment.CreatedAt,
+                ParentCommentId = comment.ParentCommentId,
+                IsLiked = isLiked,
+                LikesCount = likesCount,
+                Replies = new List<CommentResponseDto>()
+            };
+
+            // Add replies if they exist
+            if (comment.Replies != null && comment.Replies.Any())
+            {
+                foreach (var reply in comment.Replies.OrderBy(r => r.CreatedAt))
+                {
+                    dto.Replies.Add(await MapCommentWithRepliesAsync(reply, currentUserId));
+                }
+            }
+
+            return dto;
         }
 
         // POST: api/Comments
@@ -82,6 +114,22 @@ namespace ReelState.Server.Controllers
                 return NotFound("Property not found");
             }
 
+            // Validate parent comment if it's a reply
+            if (!string.IsNullOrEmpty(commentDto.ParentCommentId))
+            {
+                var parentComment = await _context.Comments.FindAsync(commentDto.ParentCommentId);
+                if (parentComment == null)
+                {
+                    return NotFound("Parent comment not found");
+                }
+
+                // Ensure parent comment belongs to same property
+                if (parentComment.PropertyId != commentDto.PropertyId)
+                {
+                    return BadRequest("Parent comment does not belong to the specified property");
+                }
+            }
+
             var user = await _context.Users.FindAsync(userId);
             if (user == null)
             {
@@ -93,7 +141,8 @@ namespace ReelState.Server.Controllers
                 PropertyId = commentDto.PropertyId,
                 UserId = userId,
                 Text = commentDto.Text,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                ParentCommentId = commentDto.ParentCommentId
             };
 
             _context.Comments.Add(comment);
@@ -106,12 +155,15 @@ namespace ReelState.Server.Controllers
                 Username = $"{user.FirstName} {user.LastName}",
                 AvatarUrl = user.ProfilePictureUrl != null ? user.ProfilePictureUrl : string.Empty,
                 Text = comment.Text,
-                CreatedAt = comment.CreatedAt
+                CreatedAt = comment.CreatedAt,
+                ParentCommentId = comment.ParentCommentId,
+                Replies = new List<CommentResponseDto>()
             };
 
             return CreatedAtAction("GetComment", new { id = comment.Id }, commentResponse);
         }
 
+        // GET: api/Comments/{id}
         // GET: api/Comments/{id}
         [HttpGet("{id}")]
         [AllowAnonymous]
@@ -119,6 +171,8 @@ namespace ReelState.Server.Controllers
         {
             var comment = await _context.Comments
                 .Include(c => c.User)
+                .Include(c => c.Replies)
+                    .ThenInclude(r => r.User)
                 .FirstOrDefaultAsync(c => c.Id == id);
 
             if (comment == null)
@@ -126,18 +180,11 @@ namespace ReelState.Server.Controllers
                 return NotFound();
             }
 
-            var commentDto = new CommentResponseDto
-            {
-                Id = comment.Id,
-                UserId = comment.UserId,
-                Username = comment.User != null ? $"{comment.User.FirstName} {comment.User.LastName}" : "Unknown User",
-                AvatarUrl = comment.User != null && comment.User.ProfilePictureUrl != null ?
-                            comment.User.ProfilePictureUrl : string.Empty,
-                Text = comment.Text,
-                CreatedAt = comment.CreatedAt
-            };
+            // Get current user ID if authenticated
+            var currentUserId = User.Identity?.IsAuthenticated == true ?
+                User.FindFirst(ClaimTypes.NameIdentifier)?.Value : null;
 
-            return commentDto;
+            return await MapCommentWithRepliesAsync(comment, currentUserId);
         }
 
         // DELETE: api/Comments/{id}
@@ -145,7 +192,10 @@ namespace ReelState.Server.Controllers
         [Authorize]
         public async Task<IActionResult> DeleteComment(string id)
         {
-            var comment = await _context.Comments.FindAsync(id);
+            var comment = await _context.Comments
+                .Include(c => c.Replies)
+                .FirstOrDefaultAsync(c => c.Id == id);
+
             if (comment == null)
             {
                 return NotFound();
@@ -157,6 +207,7 @@ namespace ReelState.Server.Controllers
                 return Forbid("You can only delete your own comments");
             }
 
+            // Remove this comment and all its replies
             _context.Comments.Remove(comment);
             await _context.SaveChangesAsync();
 

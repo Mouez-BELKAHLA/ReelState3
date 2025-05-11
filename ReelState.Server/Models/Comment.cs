@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -15,6 +16,10 @@ namespace ReelState.Server.Models
             PropertyId = string.Empty;
             UserId = string.Empty;
             Text = string.Empty;
+
+            // Initialize collections
+            Replies = new List<Comment>();
+            Likes = new List<CommentLike>();
         }
 
         [Key]
@@ -32,10 +37,21 @@ namespace ReelState.Server.Models
 
         public DateTime CreatedAt { get; set; }
 
+        // Field for reply functionality
+        public string? ParentCommentId { get; set; }
+
         [ForeignKey("PropertyId")]
         public virtual Property? Property { get; set; }
 
         [ForeignKey("UserId")]
         public virtual ApplicationUser? User { get; set; }
+
+        [ForeignKey("ParentCommentId")]
+        public virtual Comment? ParentComment { get; set; }
+
+        public virtual ICollection<Comment> Replies { get; set; }
+
+        // Add likes collection
+        public virtual ICollection<CommentLike> Likes { get; set; }
     }
 }
