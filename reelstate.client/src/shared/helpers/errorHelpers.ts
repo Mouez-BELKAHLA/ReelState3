@@ -1,4 +1,4 @@
-import { AppError, ValidationError, AuthenticationError, NetworkError } from '../Types/ErrorTypes';
+import { AppError, ValidationError, AuthenticationError, NetworkError, ApiErrorResponse } from '../Types/ErrorTypes';
 import axios, { AxiosError } from 'axios';
 
 /**

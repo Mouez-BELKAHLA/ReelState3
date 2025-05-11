@@ -31,3 +31,12 @@ export function isAuthenticationError(error: unknown): error is AuthenticationEr
 export function isNetworkError(error: unknown): error is NetworkError {
     return (error as NetworkError)?.type === 'network';
 }
+// Add this interface to your ErrorTypes.ts file
+export interface ApiErrorResponse {
+    message?: string;
+    errors?: Record<string, string[]>;
+    status?: number;
+    error?: string;
+}
+
+// Your existing exports remain the same...

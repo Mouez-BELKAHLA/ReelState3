@@ -1,9 +1,9 @@
-﻿import axios, { AxiosError } from 'axios';
+﻿import axios from 'axios'; // Removed AxiosError since it's not used
 import {
     AuthResponse,
     LoginCredentials,
-    RegisterCredentials,
-    TokenRequest
+    RegisterCredentials
+    // Removed TokenRequest since it's not used
 } from '..'; // Import from barrel file
 import { getErrorMessage, processAuthError } from '../../../shared';
 
