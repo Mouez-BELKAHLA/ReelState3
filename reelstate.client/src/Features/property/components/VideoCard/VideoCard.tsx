@@ -524,9 +524,30 @@ export default function VideoCard({
                 </>
             )}
 
-            {/* Left side - ONLY PLACEHOLDER, NO ARROWS */}
+            {/* Left side - Updated to include the left arrow */}
             <div className="absolute left-4 bottom-24 flex flex-col items-center space-y-4 z-10">
-                <div className="opacity-0 pointer-events-none" style={{ width: '34px', height: '34px' }}></div>
+                {/* Left arrow - Now positioned on the left side */}
+                {!externalButtons && (isPhotoMode || isLocationMode) && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (isLocationMode) {
+                                goToPhotos();
+                            } else {
+                                goToVideo();
+                            }
+                        }}
+                        className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center"
+                        style={{ width: '34px', height: '34px' }}
+                        aria-label={isLocationMode ? "View photos" : "View video"}
+                    >
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+                )}
+
+                {/* Placeholders to maintain spacing */}
                 <div className="opacity-0 pointer-events-none" style={{ width: '40px', height: '40px' }}></div>
                 <div className="opacity-0 pointer-events-none" style={{ width: '34px', height: '48px' }}></div>
                 <div className="opacity-0 pointer-events-none" style={{ width: '34px', height: '48px' }}></div>
@@ -536,29 +557,8 @@ export default function VideoCard({
             {/* Right side action buttons - only shown if not using external buttons */}
             {!externalButtons && (
                 <div className="absolute right-4 bottom-24 flex flex-col items-center space-y-4 z-10">
-                    {/* RIGHT SIDE: Only place for navigation arrows */}
+                    {/* RIGHT SIDE: Right arrow only (left arrow moved to left side) */}
                     <div className="relative flex items-center justify-center" style={{ height: '34px', width: '34px' }}>
-                        {/* Left arrow - absolutely positioned to the left */}
-                        {(isPhotoMode || isLocationMode) && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (isLocationMode) {
-                                        goToPhotos();
-                                    } else {
-                                        goToVideo();
-                                    }
-                                }}
-                                className="absolute right-20 backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center"
-                                style={{ width: '34px', height: '34px' }}
-                                aria-label={isLocationMode ? "View photos" : "View video"}
-                            >
-                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                </svg>
-                            </button>
-                        )}
-
                         {/* Right arrow - in the normal position */}
                         {(isVideoMode || isPhotoMode) && (
                             <button
@@ -580,8 +580,8 @@ export default function VideoCard({
                             </button>
                         )}
 
-                        {/* Invisible placeholder when neither arrow is visible */}
-                        {!(isVideoMode || isPhotoMode || isLocationMode) && (
+                        {/* Invisible placeholder when no right arrow is visible */}
+                        {!(isVideoMode || isPhotoMode) && (
                             <div style={{ width: '34px', height: '34px' }} className="opacity-0"></div>
                         )}
                     </div>
