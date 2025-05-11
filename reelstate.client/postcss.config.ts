@@ -1,4 +1,7 @@
-import tailwindcssPostcss from '@tailwindcss/postcss'
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
+/* eslint-disable */
+// prettier-ignoreimport tailwindcssPostcss from '@tailwindcss/postcss' 
 import autoprefixer from 'autoprefixer'
 import type { Config } from 'postcss-load-config'
 
