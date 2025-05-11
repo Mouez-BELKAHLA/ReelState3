@@ -82,6 +82,15 @@ export default function VideoCard({
     const totalItems = 1 + photos.length + 1;
     const locationIndex = 1 + photos.length;
 
+    // Animation keyframes
+    const pulseGradientKeyframes = `
+    @keyframes pulseGradient {
+      0% { opacity: 0.8; }
+      50% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+  `;
+
     // Check like status when component mounts
     useEffect(() => {
         const checkLikeStatus = async () => {
@@ -200,15 +209,6 @@ export default function VideoCard({
         }
     };
 
-    // Animation keyframes
-    const pulseGradientKeyframes = `
-    @keyframes pulseGradient {
-      0% { opacity: 0.8; }
-      50% { opacity: 1; }
-      100% { opacity: 0; }
-    }
-  `;
-
     // Handle navigation with content type checking and immediate scrolling
     const navigateTo = (newIndex: number) => {
         setActiveIndex(newIndex);
@@ -310,7 +310,7 @@ export default function VideoCard({
         return () => {
             document.head.removeChild(styleElement);
         };
-    }, []);
+    }, [pulseGradientKeyframes]); // Fixed: Added missing dependency
 
     // Prevent default behavior for mouse events
     useEffect(() => {
@@ -392,9 +392,8 @@ export default function VideoCard({
                             // Then handle external ref based on its type
                             if (typeof videoRef === 'function') {
                                 videoRef(el);  // Function ref
-                            } else if (videoRef) {
-                                // Object ref
-                                (videoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el;
+                            } else if (videoRef && 'current' in videoRef) {
+                                videoRef.current = el;  // Object ref
                             }
                         }}
                         src={videoUrl}
