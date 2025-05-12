@@ -12,10 +12,11 @@ import {
 // Feature imports
 import { Dashboard } from './Features/dashboard';
 import { NotFound } from './Features/core';
-import { Feed, CreateVideoCard } from './Features/property';
+import { Feed, CreateVideoCard, Profile, UserVideoFeed } from './Features/property'; // Add UserVideoFeed here
 
 // Shared component imports
 import { Layout } from './shared';
+
 const App: React.FC = () => {
     useEffect(() => {
         console.log("Current origin:", window.location.origin);
@@ -29,6 +30,12 @@ const App: React.FC = () => {
                     <Route element={<Layout />}>
                         <Route path="/feed" element={<Feed />} />
 
+                        {/* Add the user videos route */}
+                        <Route path="/user-videos/:userId" element={<UserVideoFeed />} />
+
+                        {/* Public profile route for viewing other users */}
+                        <Route path="/profile/:userId" element={<Profile />} />
+
                         {/* NotFound page - moved here to include navbar */}
                         <Route path="*" element={<NotFound />} />
 
@@ -36,6 +43,8 @@ const App: React.FC = () => {
                         <Route element={<ProtectedRoute />}>
                             <Route path="/dashboard" element={<Dashboard />} />
                             <Route path="/create" element={<CreateVideoCard />} />
+                            {/* Profile route - inside protected route wrapper */}
+                            <Route path="/profile" element={<Profile />} />
                             {/* Add more protected routes here */}
                         </Route>
                     </Route>

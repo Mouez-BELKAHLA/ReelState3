@@ -61,24 +61,27 @@ export interface PropertyPhoto {
  */
 export interface VideoCardProperty {
     id: string;
-    username: string;
+    userId: string; // Add this field
+    username?: string;
     caption: string;
     videoUrl: string;
-    likes: number;
-    comments: number;
-    avatarUrl: string;
+    likes?: number;
+    comments?: number;
+    avatarUrl?: string;
     rooms?: number;
     propertyType?: string;
     space?: number;
-    photos?: string[];
+    photos?: { id: string; photoUrl: string }[];
     location?: {
         address: string;
         city: string;
-        coordinates?: {
+        coordinates: {
             lat: number;
             lng: number;
         };
     };
+    title?: string;
+    // Other fields...
 }
 
 /**

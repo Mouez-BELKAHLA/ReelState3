@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import axios from 'axios';
 import { API_URL } from "../../../shared";
 import { useAuth } from "../../../Features/auth";
@@ -14,7 +14,6 @@ import { PropertyLikeState, PropertyLoadingState } from "../types/Property";
 export default function Feed() {
     const { authState } = useAuth();
     const { token, isAuthenticated } = authState;
-
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [properties, setProperties] = useState<VideoCardProperty[]>([]);
@@ -33,11 +32,48 @@ export default function Feed() {
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Comment panel width and animation offset
-    const commentPanelWidth = windowWidth < 1400 ? 500 : 580; // Moderately wider comment panel
+    const commentPanelWidth = windowWidth < 1400 ? 500 : 580;
     const slideOffset = 75;
 
-    // Breakpoint for large layout
+    // Breakpoints for responsive layout
     const LARGE_LAYOUT_BREAKPOINT = 1280;
+    const MEDIUM_LAYOUT_BREAKPOINT = 768;
+    const SMALL_LAYOUT_BREAKPOINT = 480;
+
+    // Memoize the checkAllLikeStatus function with useCallback
+    const checkAllLikeStatus = useCallback(async (props: VideoCardProperty[]) => {
+        if (!isAuthenticated || !token || props.length === 0) return;
+
+        try {
+            const newLikeStates: PropertyLikeState = {};
+
+            for (const property of props) {
+                try {
+                    const response = await LikeService.checkLikeStatus(property.id);
+
+                    if (response.isSuccess) {
+                        newLikeStates[property.id] = {
+                            count: response.likesCount || 0,
+                            isLiked: response.isLiked
+                        };
+                    }
+                } catch (propertyError) {
+                    console.error(`Error checking like status for property ${property.id}:`, propertyError);
+                }
+            }
+
+            // Only update state if we have new values
+            if (Object.keys(newLikeStates).length > 0) {
+                setPropertyLikes(prev => ({
+                    ...prev,
+                    ...newLikeStates
+                }));
+            }
+
+        } catch (error) {
+            console.error("Error checking like statuses:", error);
+        }
+    }, [isAuthenticated, token]);
 
     // Add global style to remove scrollbars and fix TikTok-style scrolling
     useEffect(() => {
@@ -67,6 +103,22 @@ export default function Feed() {
                 position: relative;
                 overflow: hidden;
             }
+            /* Responsive video container for all screens */
+            .video-container {
+                width: 100%;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: relative;
+            }
+            /* Ensure videos fill their container - cover instead of contain */
+            video {
+                width: 100%;
+                height: 100%;
+                object-fit: cover; /* Fill container and crop if necessary */
+                background-color: black;
+            }
             /* Smooth animation for comment panel */
             .comment-panel-slide {
                 transition: transform 400ms cubic-bezier(0.33, 1, 0.68, 1);
@@ -74,6 +126,13 @@ export default function Feed() {
             /* Smooth animation for video shift */
             .video-shift {
                 transition: transform 400ms cubic-bezier(0.33, 1, 0.68, 1), width 400ms cubic-bezier(0.33, 1, 0.68, 1);
+            }
+            
+            /* Responsive adjustments for small screens */
+            @media (max-width: 480px) {
+                .property-container {
+                    padding: 0;
+                }
             }
         `;
         document.head.appendChild(style);
@@ -99,6 +158,8 @@ export default function Feed() {
 
     // Fetch properties from the API
     useEffect(() => {
+        let isMounted = true;
+
         const fetchProperties = async () => {
             try {
                 setIsLoading(true);
@@ -113,64 +174,46 @@ export default function Feed() {
                     headers: headers
                 });
 
-                // Use our new transformer to convert API data to UI components
+                // Only update state if component is still mounted
+                if (!isMounted) return;
+
+                // Use our transformer to convert API data to UI components
                 const mappedProperties = toVideoCardProperties(response.data, API_URL);
 
                 // Initialize like state for all properties
                 const likesState: PropertyLikeState = {};
                 mappedProperties.forEach(prop => {
                     likesState[prop.id] = {
-                        count: prop.likes,
+                        count: prop.likes || 0,
                         isLiked: false
                     };
                 });
                 setPropertyLikes(likesState);
-
                 setProperties(mappedProperties);
 
                 // Check like statuses after loading properties
-                if (isAuthenticated) {
+                if (isAuthenticated && mappedProperties.length > 0) {
                     checkAllLikeStatus(mappedProperties);
                 }
-            } catch (err: unknown) { // Changed from any to unknown
+            } catch (err: unknown) {
                 console.error('Error fetching properties:', err);
-                setError(getErrorMessage(err, 'Failed to load properties'));
+                if (isMounted) {
+                    setError(getErrorMessage(err, 'Failed to load properties'));
+                }
             } finally {
-                setIsLoading(false);
+                if (isMounted) {
+                    setIsLoading(false);
+                }
             }
         };
 
         fetchProperties();
-    }, [token, isAuthenticated]);
 
-    // Function to check like status for all properties
-    const checkAllLikeStatus = async (props: VideoCardProperty[]) => {
-        if (!isAuthenticated || !token || props.length === 0) return;
-
-        try {
-            const newLikeStates = { ...propertyLikes };
-
-            for (const property of props) {
-                try {
-                    const response = await LikeService.checkLikeStatus(property.id);
-
-                    if (response.isSuccess) {
-                        newLikeStates[property.id] = {
-                            count: response.likesCount,
-                            isLiked: response.isLiked
-                        };
-                    }
-                } catch (propertyError) {
-                    console.error(`Error checking like status for property ${property.id}:`, propertyError);
-                }
-            }
-
-            setPropertyLikes(newLikeStates);
-
-        } catch (error) {
-            console.error("Error checking like statuses:", error);
-        }
-    };
+        // Cleanup function to prevent state updates after unmount
+        return () => {
+            isMounted = false;
+        };
+    }, [token, isAuthenticated, checkAllLikeStatus]);
 
     // Handle comment toggle
     const handleToggleComments = (propertyId: string) => {
@@ -201,7 +244,7 @@ export default function Feed() {
                 setPropertyLikes(prev => ({
                     ...prev,
                     [propertyId]: {
-                        count: response.likesCount,
+                        count: response.likesCount || 0,
                         isLiked: response.isLiked
                     }
                 }));
@@ -225,12 +268,20 @@ export default function Feed() {
         }));
     };
 
-    // Calculate video width based on screen size
+    // Calculate video width based on screen size - UPDATED FOR BETTER COVERAGE
     const getVideoWidth = () => {
-        // Always return the same width for the same screen size
-        // regardless of comment panel state
-        if (!hasLargeLayout) return '600px';
-        return windowWidth >= 1600 ? '760px' : '680px';
+        if (windowWidth < SMALL_LAYOUT_BREAKPOINT) {
+            // For very small screens, use full width
+            return '100%';
+        } else if (windowWidth < MEDIUM_LAYOUT_BREAKPOINT) {
+            // For small-medium screens
+            return '100%';
+        } else if (!hasLargeLayout) {
+            // For medium screens - wider than before
+            return '100%';
+        }
+        // For large screens - wider than before
+        return windowWidth >= 1600 ? '900px' : '800px';
     };
 
     // Set active video index when video is in view
@@ -238,25 +289,24 @@ export default function Feed() {
         setActiveVideoIndex(index);
     };
 
-    // *** NEW EFFECT: Update UI based on active video ***
+    // Update UI based on active video
     useEffect(() => {
         if (properties.length > 0 && activeVideoIndex >= 0 && activeVideoIndex < properties.length) {
             const activeProperty = properties[activeVideoIndex];
 
-            // 1. Update document title with current property
+            // Update document title with current property
             document.title = `Reelstate - ${activeProperty.caption.substring(0, 30)}${activeProperty.caption.length > 30 ? '...' : ''}`;
 
-            // 2. Update URL without page reload (for sharing)
             // Update URL without page reload (for sharing)
             if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
                 const newUrl = `/feed?property=${activeProperty.id}`;
                 window.history.replaceState({ path: newUrl }, '', newUrl);
             }
 
-            // 3. Update active property ID for potential comment display
+            // Update active property ID for potential comment display
             setActivePropertyId(activeProperty.id);
 
-            // 4. Could add analytics tracking here
+            // Could add analytics tracking here
             console.log(`Viewing property: ${activeProperty.id}`);
         }
     }, [activeVideoIndex, properties]);
@@ -316,9 +366,7 @@ export default function Feed() {
 
     return (
         <div className="bg-gray-100 h-screen overflow-hidden">
-            {/* Main container with fixed height and overflow control */}
             <div className="h-[calc(100vh-55px)] overflow-hidden" ref={containerRef}>
-                {/* Container with width adjustment for comment panel - now with video-shift class */}
                 <div
                     className="h-full video-shift"
                     style={{
@@ -337,14 +385,12 @@ export default function Feed() {
                         onLikeToggle={handleVideoCardLikeToggle}
                         onToggleComments={handleToggleComments}
                         handleLikeToggle={handleLikeToggle}
-                        activeVideoIndex={activeVideoIndex} /* Pass active index to PropertyList */
+                        activeVideoIndex={activeVideoIndex}
                     />
                 </div>
 
-                {/* Comments Panel with improved animation */}
                 {activePropertyId && (
                     <>
-                        {/* On large screens: Side panel WITH animation - now with comment-panel-slide class */}
                         {hasLargeLayout && (
                             <div
                                 className="fixed top-[55px] right-0 bottom-0 z-40 shadow-xl border-l border-gray-200 bg-white comment-panel-slide"
@@ -361,16 +407,14 @@ export default function Feed() {
                             </div>
                         )}
 
-                        {/* On smaller screens: Modal dialog with full overlay */}
                         {!hasLargeLayout && showComments && (
                             <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center animate-fadeIn">
                                 <div
                                     className="fixed bg-white rounded-xl shadow-2xl overflow-hidden animate-fadeIn"
                                     style={{
-                                        maxHeight: '90vh',
-                                        width: '90%',
+                                        maxHeight: windowWidth < MEDIUM_LAYOUT_BREAKPOINT ? '85vh' : '90vh',
+                                        width: windowWidth < MEDIUM_LAYOUT_BREAKPOINT ? '95%' : '90%',
                                         maxWidth: '480px',
-                                        // Ensure the modal doesn't introduce unexpected scrolling
                                         top: '50%',
                                         left: '50%',
                                         transform: 'translate(-50%, -50%)'

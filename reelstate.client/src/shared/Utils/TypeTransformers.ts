@@ -1,4 +1,3 @@
-
 import { Property, VideoCardProperty } from '../../Features/property/types/Property';
 
 /**
@@ -8,18 +7,34 @@ import { Property, VideoCardProperty } from '../../Features/property/types/Prope
  * @returns A VideoCardProperty suitable for UI rendering
  */
 export function toVideoCardProperty(property: Property, apiBaseUrl: string): VideoCardProperty {
+    // Ensure videoUrl and photoUrls have proper URL formatting
+    const videoUrl = property.videoUrl.startsWith('http') ?
+        property.videoUrl :
+        `${apiBaseUrl}${property.videoUrl}`;
+
+    const photos = property.photos?.map(p => {
+        const photoUrl = p.photoUrl.startsWith('http') ?
+            p.photoUrl :
+            `${apiBaseUrl}${p.photoUrl}`;
+        return {
+            id: p.id,
+            photoUrl: photoUrl
+        };
+    }) || [];
+
     return {
         id: property.id,
+        userId: property.userId, // Add userId here
         username: property.user?.firstName || 'Unknown User',
         caption: property.caption,
-        videoUrl: `${apiBaseUrl}${property.videoUrl}`,
+        videoUrl: videoUrl,
         likes: property.likesCount || 0,
         comments: property.commentsCount || 0,
         avatarUrl: property.user?.profilePictureUrl || 'https://randomuser.me/api/portraits/lego/1.jpg',
         rooms: property.rooms,
         propertyType: property.propertyType,
         space: property.space,
-        photos: property.photos?.map(p => `${apiBaseUrl}${p.photoUrl}`) || [],
+        photos: photos,
         location: {
             address: property.address,
             city: property.city,

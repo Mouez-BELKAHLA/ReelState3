@@ -44,6 +44,9 @@ const Navbar: React.FC = () => {
                                     <Link to="/create" className={`inline-flex items-center px-1 pt-1 border-b-2 ${isActive('/create') === 'text-blue-700 font-medium' ? 'border-blue-700' : 'border-transparent'} ${isActive('/create')}`}>
                                         Add Listing
                                     </Link>
+                                    <Link to="/profile" className={`inline-flex items-center px-1 pt-1 border-b-2 ${isActive('/profile') === 'text-blue-700 font-medium' ? 'border-blue-700' : 'border-transparent'} ${isActive('/profile')}`}>
+                                        Profile
+                                    </Link>
                                 </>
                             )}
                         </div>
@@ -53,19 +56,21 @@ const Navbar: React.FC = () => {
                     <div className="hidden sm:ml-6 sm:flex sm:items-center">
                         {isAuthenticated ? (
                             <div className="flex items-center space-x-4">
-                                {/* User info */}
-                                <div className="flex items-center">
+                                {/* User info with link to profile */}
+                                <Link to="/profile" className="flex items-center group">
                                     {user?.profilePictureUrl && (
                                         <img
                                             src={user.profilePictureUrl}
                                             alt="Profile"
-                                            className="h-8 w-8 rounded-full object-cover"
+                                            className="h-8 w-8 rounded-full object-cover group-hover:ring-2 group-hover:ring-blue-500"
                                         />
                                     )}
                                     <div className="ml-2 hidden md:block">
-                                        <p className="text-sm font-medium text-gray-900">{user?.firstName?.toUpperCase()} {user?.lastName?.toUpperCase()}</p>
+                                        <p className="text-sm font-medium text-gray-900 group-hover:text-blue-600">
+                                            {user?.firstName?.toUpperCase()} {user?.lastName?.toUpperCase()}
+                                        </p>
                                     </div>
-                                </div>
+                                </Link>
 
                                 {/* Logout button */}
                                 <button
@@ -141,24 +146,33 @@ const Navbar: React.FC = () => {
                             >
                                 Add Listing
                             </Link>
+                            <Link
+                                to="/profile"
+                                className={`block pl-3 pr-4 py-2 border-l-4 ${location.pathname === '/profile' ? 'border-blue-700 text-blue-700 bg-blue-50' : 'border-transparent'}`}
+                                onClick={() => setIsMenuOpen(false)}
+                            >
+                                Profile
+                            </Link>
                         </>
                     )}
 
                     {isAuthenticated ? (
                         <div className="border-t border-gray-200 pt-4 pb-3">
-                            <div className="flex items-center px-4">
-                                {user?.profilePictureUrl && (
-                                    <div className="flex-shrink-0">
-                                        <img className="h-10 w-10 rounded-full" src={user.profilePictureUrl} alt="Profile" />
+                            <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="block">
+                                <div className="flex items-center px-4">
+                                    {user?.profilePictureUrl && (
+                                        <div className="flex-shrink-0">
+                                            <img className="h-10 w-10 rounded-full" src={user.profilePictureUrl} alt="Profile" />
+                                        </div>
+                                    )}
+                                    <div className="ml-3">
+                                        <div className="text-base font-medium text-gray-800">
+                                            {user?.firstName} {user?.lastName}
+                                        </div>
+                                        <div className="text-sm font-medium text-gray-500">{user?.email}</div>
                                     </div>
-                                )}
-                                <div className="ml-3">
-                                    <div className="text-base font-medium text-gray-800">
-                                        {user?.firstName} {user?.lastName}
-                                    </div>
-                                    <div className="text-sm font-medium text-gray-500">{user?.email}</div>
                                 </div>
-                            </div>
+                            </Link>
                             <div className="mt-3 space-y-1">
                                 <button
                                     onClick={() => {

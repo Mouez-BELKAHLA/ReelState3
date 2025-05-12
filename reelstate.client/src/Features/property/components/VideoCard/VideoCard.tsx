@@ -23,26 +23,26 @@ type VideoCardProps = VideoCardProperty & {
     onCommentClick?: () => void;
     externalButtons?: boolean;
     onLikeToggle?: (isLiked: boolean, likesCount: number) => void;
-    title?: string;
     videoRef?: React.Ref<HTMLVideoElement>; // Accept video ref from parent
     isActive?: boolean; // Mark if this card is active
 };
 
 export default function VideoCard({
     id,
+    //userId, // Include userId from the interface
     username,
     caption,
     videoUrl,
-    likes,
-    comments,
-    avatarUrl,
+    likes = 0, // Default value if undefined
+    comments = 0, // Default value if undefined
+    avatarUrl = '',
     rooms = 2,
     propertyType = "appartement",
     space = 75,
-    photos = [
-        "https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1287&q=80",
-        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1770&q=80",
-        "https://images.unsplash.com/photo-1600585154526-990dced4db0d?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1287&q=80"
+    photos = [ // Default photos if none provided
+        { id: "default1", photoUrl: "https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1287&q=80" },
+        { id: "default2", photoUrl: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1770&q=80" },
+        { id: "default3", photoUrl: "https://images.unsplash.com/photo-1600585154526-990dced4db0d?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1287&q=80" }
     ],
     location = {
         address: "123 Avenue des Champs-Élysées",
@@ -310,7 +310,7 @@ export default function VideoCard({
         return () => {
             document.head.removeChild(styleElement);
         };
-    }, [pulseGradientKeyframes]); // Fixed: Added missing dependency
+    }, [pulseGradientKeyframes]);
 
     // Prevent default behavior for mouse events
     useEffect(() => {
@@ -423,14 +423,14 @@ export default function VideoCard({
                     </div>
                 </div>
 
-                {/* Photo items */}
+                {/* Photo items - FIXED: Now using photoUrl property from objects */}
                 {photos.map((photo, index) => (
                     <div
-                        key={index}
+                        key={photo.id || `photo-${index}`}
                         className="min-w-full w-full h-full flex-shrink-0 snap-center relative"
                     >
                         <img
-                            src={photo}
+                            src={photo.photoUrl}
                             alt={`Property photo ${index + 1}`}
                             className="w-full h-full object-cover"
                         />
@@ -469,7 +469,7 @@ export default function VideoCard({
                 </div>
             </div>
 
-            {/* Rest of your component remains the same */}
+            {/* Rest of the component remains unchanged */}
             <CarouselIndicators
                 totalItems={totalItems}
                 activeIndex={activeIndex}
@@ -588,7 +588,7 @@ export default function VideoCard({
                     {/* User icon */}
                     <UserProfile
                         avatarUrl={avatarUrl}
-                        username={username}
+                        username={username || ''}
                     />
 
                     {/* Like button */}
