@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth, GoogleSignInButton } from '..'; // Import from barrel file
-// Import the error helper from shared folder
-import { handleAuthError, isValidationError } from '../../../shared/helpers';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { GoogleSignInButton } from '..';
+import { useAppDispatch, useAppSelector } from '../../../store/hooks';
+import { registerUser, setAuthError } from '../../../store/slices/authSlice';
+import { isValidationError } from '../../../shared/helpers';
 
 const Register: React.FC = () => {
     const [firstName, setFirstName] = useState('');
@@ -10,43 +11,51 @@ const Register: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [error, setError] = useState('');
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-    const [loading, setLoading] = useState(false);
-    const { register } = useAuth();
+
+    const navigate = useNavigate();
+    const dispatch = useAppDispatch();
+
+    // Get auth state from Redux
+    const { isLoading, error, isAuthenticated } = useAppSelector(state => state.auth);
+
+    // If user is already authenticated, redirect to dashboard
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate('/dashboard');
+        }
+    }, [isAuthenticated, navigate]);
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true);
-        setError('');
         setFieldErrors({});
 
         // Validate passwords match
         if (password !== confirmPassword) {
-            setError('Passwords do not match');
-            setLoading(false);
+            setFieldErrors(prev => ({ ...prev, confirmPassword: 'Passwords do not match' }));
             return;
         }
 
         // Validate password strength
         const passwordRegex = /^(?=.*[A-Z])(?=.*[0-9])(?=.*[a-z]).{8,}$/;
         if (!passwordRegex.test(password)) {
-            setError('Password must be at least 8 characters long and include uppercase, lowercase, and numbers');
-            setLoading(false);
+            setFieldErrors(prev => ({
+                ...prev,
+                password: 'Password must be at least 8 characters with uppercase, lowercase, and numbers'
+            }));
             return;
         }
 
         try {
-            // Use PascalCase properties to match .NET backend
-            await register({
+            await dispatch(registerUser({
                 Email: email,
                 Password: password,
                 FirstName: firstName,
                 LastName: lastName
-            });
-            // Navigation will be handled in the register function
-        } catch (err) {
-            // Use your error helper
+            })).unwrap();
+
+            // Navigation will happen automatically due to the isAuthenticated effect
+        } catch (err: any) {
             if (isValidationError(err)) {
                 // Handle field-specific validation errors
                 const newFieldErrors: Record<string, string> = {};
@@ -54,23 +63,26 @@ const Register: React.FC = () => {
                 Object.entries(err.errors).forEach(([field, messages]) => {
                     // Convert to camelCase for frontend field matching
                     const fieldName = field.charAt(0).toLowerCase() + field.slice(1);
-                    newFieldErrors[fieldName] = messages[0];
+                    newFieldErrors[fieldName] = Array.isArray(messages) ? messages[0] : messages;
                 });
 
                 setFieldErrors(newFieldErrors);
-                setError(err.message); // General error message
-            } else {
-                // For non-validation errors, just set the error message
-                setError(handleAuthError(err, 'registration'));
             }
-        } finally {
-            setLoading(false);
         }
     };
 
+    // Clear errors when component unmounts
+    useEffect(() => {
+        return () => {
+            dispatch(setAuthError(null));
+        };
+    }, [dispatch]);
+
+    // Rest of the component remains the same
     return (
         <div className="min-h-screen bg-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
             <div className="w-full max-w-md mx-auto p-6 bg-white rounded-lg shadow-lg">
+                {/* Form remains the same */}
                 <div className="text-center mb-8">
                     <h2 className="text-3xl font-bold text-gray-900">Create an account</h2>
                     <p className="mt-2 text-sm text-gray-600">
@@ -88,6 +100,7 @@ const Register: React.FC = () => {
                 )}
 
                 <form className="mt-8 space-y-4" onSubmit={handleRegister}>
+                    {/* Form fields remain the same */}
                     <div className="flex gap-4">
                         <div className="flex-1">
                             <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
@@ -123,6 +136,7 @@ const Register: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* Rest of the form fields */}
                     <div>
                         <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                         <input
@@ -181,10 +195,10 @@ const Register: React.FC = () => {
                     <div className="pt-2">
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={isLoading}
                             className="w-full px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-800 transition-colors flex justify-center"
                         >
-                            {loading ? "Creating account..." : "Register with Email"}
+                            {isLoading ? "Creating account..." : "Register with Email"}
                         </button>
                     </div>
 

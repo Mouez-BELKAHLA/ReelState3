@@ -1,36 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth, GoogleSignInButton, LoginCredentials } from '..'; // Import from barrel file
+import { GoogleSignInButton } from '..'; // Import from barrel file
+import { useAppDispatch, useAppSelector } from '../../../store/hooks';
+import { loginUser, setAuthError } from '../../../store/slices/authSlice';
+import { LoginCredentials } from '../types/Auth';
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
-    const { login } = useAuth();
     const navigate = useNavigate();
+    const dispatch = useAppDispatch();
+
+    // Get auth state from Redux
+    const { isLoading, error, isAuthenticated } = useAppSelector(state => state.auth);
+
+    // If user is already authenticated, redirect to dashboard
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate('/dashboard');
+        }
+    }, [isAuthenticated, navigate]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true);
-        setError('');
-
         try {
             // Create credentials object with PascalCase property names to match .NET backend
             const credentials: LoginCredentials = {
-                Email: email,     // PascalCase - matches .NET naming convention
-                Password: password  // PascalCase - matches .NET naming convention
+                Email: email,
+                Password: password
             };
 
-            await login(credentials);
+            // Dispatch login action
+            await dispatch(loginUser(credentials)).unwrap();
             navigate('/dashboard');
         } catch (err: unknown) {
-            const errorMessage = err instanceof Error ? err.message : 'Invalid email or password';
-            setError(errorMessage);
-        } finally {
-            setLoading(false);
+            // Error handling is automatic through the Redux slice
+            console.error('Login failed:', err);
         }
     };
+
+    // Clear errors when component unmounts
+    useEffect(() => {
+        return () => {
+            dispatch(setAuthError(null));
+        };
+    }, [dispatch]);
 
     return (
         <div className="min-h-screen bg-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -82,10 +96,10 @@ const Login: React.FC = () => {
                     <div>
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={isLoading}
                             className="w-full px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-800 transition-colors flex justify-center"
                         >
-                            {loading ? "Signing in..." : "Sign in with Email"}
+                            {isLoading ? "Signing in..." : "Sign in with Email"}
                         </button>
                     </div>
 

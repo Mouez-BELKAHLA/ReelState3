@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { AuthContext } from '..';
+import { AuthContext } from '../../Features/auth';
 
 // ONLY use named export to match your existing imports
 export const useAuth = () => {

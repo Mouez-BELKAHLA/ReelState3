@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useAuth } from "../../../Features/auth";
-import { CommentService } from "../../../Features/property";
-import { CommentLikeService } from "../../../Features/property";
-import { useNavigate } from 'react-router-dom'; // Add this import
+import { useNavigate } from 'react-router-dom';
+import { CommentService, CommentLikeService } from "../../../Features/property";
+import { useAppSelector, useAppDispatch } from "../../../store/hooks";
 
 // Comment Type Definition
 export type Comment = {
@@ -32,8 +31,10 @@ const CommentPanel: React.FC<CommentPanelProps> = ({
     onCommentCountUpdate,
     displayMode = 'sidebar',
 }) => {
-    const { authState } = useAuth(); // Remove loginWithRedirect
-    const navigate = useNavigate(); // Add navigate hook
+    // Redux state instead of Auth context
+    const { user, isAuthenticated } = useAppSelector(state => state.auth);
+    const navigate = useNavigate();
+
     const [commentsList, setCommentsList] = useState<Comment[]>([]);
     const [isCommentsLoading, setIsCommentsLoading] = useState(false);
     const [commentText, setCommentText] = useState('');
@@ -101,7 +102,8 @@ const CommentPanel: React.FC<CommentPanelProps> = ({
     }, [replyingTo]);
 
     const handleSubmitComment = async () => {
-        if (!commentText.trim() || !authState.isAuthenticated || !propertyId) {
+        // Updated from authState.isAuthenticated to just isAuthenticated from Redux
+        if (!commentText.trim() || !isAuthenticated || !propertyId) {
             return;
         }
 
@@ -169,7 +171,8 @@ const CommentPanel: React.FC<CommentPanelProps> = ({
 
     // Start replying to a comment
     const handleReply = (comment: Comment) => {
-        if (!authState.isAuthenticated) {
+        // Updated from authState.isAuthenticated to just isAuthenticated from Redux
+        if (!isAuthenticated) {
             handleLogin();
             return;
         }
@@ -184,9 +187,9 @@ const CommentPanel: React.FC<CommentPanelProps> = ({
         setCommentText('');
     };
 
-    // Update handleLogin function
+    // Handle login - unchanged
     const handleLogin = () => {
-        navigate('/login'); // Use navigate instead of loginWithRedirect
+        navigate('/login');
     };
 
     // Recursive comment rendering component
@@ -197,7 +200,8 @@ const CommentPanel: React.FC<CommentPanelProps> = ({
         const [isLiking, setIsLiking] = useState(false);
 
         const handleLikeToggle = async () => {
-            if (!authState.isAuthenticated) {
+            // Updated from authState.isAuthenticated to just isAuthenticated from Redux
+            if (!isAuthenticated) {
                 handleLogin();
                 return;
             }
@@ -357,13 +361,13 @@ const CommentPanel: React.FC<CommentPanelProps> = ({
                 )}
             </div>
 
-            {/* Comment input area */}
+            {/* Comment input area - Updated to use Redux state */}
             <div className="p-4 border-t border-gray-200 bg-white">
-                {authState.isAuthenticated ? (
+                {isAuthenticated ? (
                     <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
                             <img
-                                src={authState.user?.profilePictureUrl || 'https://randomuser.me/api/portraits/lego/1.jpg'}
+                                src={user?.profilePictureUrl || 'https://randomuser.me/api/portraits/lego/1.jpg'}
                                 alt="User Profile"
                                 className="w-full h-full object-cover"
                             />

@@ -7,11 +7,11 @@ export { default as Login } from './Pages/Login';
 export { default as Register } from './Pages/Register';
 
 // Export contexts and providers
-export { default as AuthContext } from './contexts/AuthContext';
-export { default as AuthProvider } from './contexts/AuthProvider';
+export { default as AuthContext } from '../../unused/contexts/AuthContext';
+export { default as AuthProvider } from '../../unused/contexts/AuthProvider';
 
 // Export hooks
-export { useAuth } from './hooks/useAuth';
+export { useAuth } from '../../unused/hooks/useAuth';
 
 // Export constants
 export * from './Constants/auth';
@@ -22,5 +22,5 @@ export * from './services/AuthService';
 
 // Export types
 export * from './types/Auth';
-export { authReducer, initialState } from './contexts/AuthContext'; // Assuming they're defined there
+export { authReducer, initialState } from '../../unused/contexts/AuthContext'; // Assuming they're defined there
 

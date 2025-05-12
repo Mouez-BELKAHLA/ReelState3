@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '..'; // Import from the feature's barrel file
+import { useAppSelector } from '../../../store/hooks';
+
 interface ProtectedRouteProps {
     redirectPath?: string;
 }
@@ -8,16 +9,16 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     redirectPath = '/login'
 }) => {
-    const { authState } = useAuth();
+    const { isAuthenticated, isLoading } = useAppSelector(state => state.auth);
 
     console.log("ProtectedRoute - Auth state:",
-        authState.isLoading ? "Loading" : (authState.isAuthenticated ? "Authenticated" : "Not authenticated"));
+        isLoading ? "Loading" : (isAuthenticated ? "Authenticated" : "Not authenticated"));
 
-    if (authState.isLoading) {
+    if (isLoading) {
         return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
     }
 
-    if (!authState.isAuthenticated) {
+    if (!isAuthenticated) {
         console.log("Not authenticated - redirecting to:", redirectPath);
         return <Navigate to={redirectPath} replace />;
     }

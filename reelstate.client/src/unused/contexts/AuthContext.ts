@@ -4,7 +4,7 @@ import {
     LoginCredentials,
     RegisterCredentials,
     User
-} from '..'; // Import directly from the feature's barrel file
+} from '../../Features/auth'; // Import directly from the feature's barrel file
 
 // Define Action Types
 export type AuthAction =

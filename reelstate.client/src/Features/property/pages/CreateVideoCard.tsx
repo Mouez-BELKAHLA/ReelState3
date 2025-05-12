@@ -1,15 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAuth } from "../../../Features/auth"; // This is already using barrel
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from "../../../shared"; // Use shared barrel file
 import { VideoUploader } from ".."; // Import from property feature barrel
 import { getErrorMessage } from "../../../shared/helpers"; // Import error helpers
+import { useAppSelector } from "../../../store/hooks"; // Import Redux hooks
 
 const CreateVideoCard: React.FC = () => {
-    const { authState } = useAuth();
+    // Get auth state from Redux
+    const { user, token } = useAppSelector(state => state.auth);
     const navigate = useNavigate();
-    const { user } = authState;
 
     const [formData, setFormData] = useState({
         title: '',
@@ -147,8 +147,7 @@ const CreateVideoCard: React.FC = () => {
                 photosCount: formData.photos.length
             });
 
-            const token = localStorage.getItem('token');
-
+            // Use token from Redux
             const response = await axios.post(`${API_URL}/api/Property/create`, submitData, {
                 headers: {
                     'Authorization': `Bearer ${token}`,

@@ -1,50 +1,55 @@
 import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from "../../../Features/auth"; // Import from feature export
+import { Link, useNavigate } from 'react-router-dom';
+import { useAppDispatch, useAppSelector } from '../../../store/hooks';
+import { logoutUser } from '../../../store/slices/authSlice';
 
-const Navbar: React.FC = () => {
-    const { authState, logout } = useAuth();
-    const { isAuthenticated, user } = authState;
-    const location = useLocation();
-    const navigate = useNavigate();
+// Update this component to use Redux instead of the auth context
+const Navbar = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const navigate = useNavigate();
+    const dispatch = useAppDispatch();
 
-    const handleLogout = () => {
-        logout();
-        navigate('/login');
+    // Get auth state from Redux
+    const { isAuthenticated, user } = useAppSelector(state => state.auth);
+
+    const handleLogout = async () => {
+        try {
+            await dispatch(logoutUser()).unwrap();
+            navigate('/login');
+        } catch (error) {
+            console.error('Logout error:', error);
+            // Even if there's an error, navigate to login
+            navigate('/login');
+        }
     };
 
-    const isActive = (path: string) => {
-        return location.pathname === path ? 'text-blue-700 font-medium' : 'text-gray-700 hover:text-blue-700';
-    };
-
+    // Rest of your Navbar component...
     return (
-        <nav className="bg-white shadow-sm">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex justify-between h-16">
-                    {/* Logo and main nav */}
-                    <div className="flex">
-                        <div className="flex-shrink-0 flex items-center">
-                            <Link to="/" className="text-xl font-bold text-blue-700">
-                                ReelState
-                            </Link>
-                        </div>
-                        <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                            {/* Main nav links - always visible */}
-                            <Link to="/feed" className={`inline-flex items-center px-1 pt-1 border-b-2 ${isActive('/feed') === 'text-blue-700 font-medium' ? 'border-blue-700' : 'border-transparent'} ${isActive('/feed')}`}>
-                                Discover
-                            </Link>
+        <nav className="bg-gray-800 shadow-md">
+            <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
+                <div className="relative flex items-center justify-between h-16">
+                    {/* Brand */}
+                    <div className="flex-1 flex items-center justify-center sm:items-stretch sm:justify-start">
+                        <Link to="/" className="flex-shrink-0 flex items-center">
+                            <span className="text-white text-xl font-bold">ReelState</span>
+                        </Link>
+                    </div>
 
-                            {/* Links for authenticated users */}
+                    {/* Navigation Links - Large Screen */}
+                    <div className="hidden sm:block sm:ml-6">
+                        <div className="flex space-x-4">
+                            <Link to="/feed" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+                                Feed
+                            </Link>
                             {isAuthenticated && (
                                 <>
-                                    <Link to="/dashboard" className={`inline-flex items-center px-1 pt-1 border-b-2 ${isActive('/dashboard') === 'text-blue-700 font-medium' ? 'border-blue-700' : 'border-transparent'} ${isActive('/dashboard')}`}>
+                                    <Link to="/dashboard" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
                                         Dashboard
                                     </Link>
-                                    <Link to="/create" className={`inline-flex items-center px-1 pt-1 border-b-2 ${isActive('/create') === 'text-blue-700 font-medium' ? 'border-blue-700' : 'border-transparent'} ${isActive('/create')}`}>
-                                        Add Listing
+                                    <Link to="/create" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+                                        Create
                                     </Link>
-                                    <Link to="/profile" className={`inline-flex items-center px-1 pt-1 border-b-2 ${isActive('/profile') === 'text-blue-700 font-medium' ? 'border-blue-700' : 'border-transparent'} ${isActive('/profile')}`}>
+                                    <Link to="/profile" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
                                         Profile
                                     </Link>
                                 </>
@@ -52,68 +57,90 @@ const Navbar: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Auth buttons and profile */}
-                    <div className="hidden sm:ml-6 sm:flex sm:items-center">
+                    {/* User Menu - Large Screen */}
+                    <div className="hidden sm:block absolute inset-y-0 right-0 flex items-center pr-2 sm:static sm:inset-auto sm:ml-6 sm:pr-0">
                         {isAuthenticated ? (
-                            <div className="flex items-center space-x-4">
-                                {/* User info with link to profile */}
-                                <Link to="/profile" className="flex items-center group">
-                                    {user?.profilePictureUrl && (
+                            <div className="ml-3 relative">
+                                <div>
+                                    <button
+                                        onClick={() => setIsMenuOpen(!isMenuOpen)}
+                                        className="bg-gray-800 flex text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white"
+                                    >
                                         <img
-                                            src={user.profilePictureUrl}
-                                            alt="Profile"
-                                            className="h-8 w-8 rounded-full object-cover group-hover:ring-2 group-hover:ring-blue-500"
+                                            className="h-8 w-8 rounded-full"
+                                            src={user?.profilePictureUrl || "https://via.placeholder.com/40"}
+                                            alt="User profile"
                                         />
-                                    )}
-                                    <div className="ml-2 hidden md:block">
-                                        <p className="text-sm font-medium text-gray-900 group-hover:text-blue-600">
-                                            {user?.firstName?.toUpperCase()} {user?.lastName?.toUpperCase()}
-                                        </p>
-                                    </div>
-                                </Link>
+                                    </button>
+                                </div>
 
-                                {/* Logout button */}
-                                <button
-                                    onClick={handleLogout}
-                                    className="px-4 py-1.5 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors text-sm"
-                                >
-                                    Logout
-                                </button>
+                                {isMenuOpen && (
+                                    <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                        <div className="px-4 py-2 text-sm text-gray-700 border-b">
+                                            <p>Signed in as</p>
+                                            <p className="font-medium">{user?.email}</p>
+                                        </div>
+                                        <Link
+                                            to="/profile"
+                                            onClick={() => setIsMenuOpen(false)}
+                                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                        >
+                                            Your Profile
+                                        </Link>
+                                        <button
+                                            onClick={handleLogout}
+                                            className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                        >
+                                            Sign out
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         ) : (
-                            <div className="flex items-center space-x-4">
+                            <div className="flex space-x-2">
                                 <Link
                                     to="/login"
-                                    className="px-4 py-1.5 text-gray-700 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors text-sm"
+                                    className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium"
                                 >
-                                    Log In
+                                    Login
                                 </Link>
                                 <Link
                                     to="/register"
-                                    className="px-4 py-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors text-sm"
+                                    className="text-gray-300 border border-gray-600 hover:bg-gray-700 px-3 py-2 rounded-md text-sm font-medium"
                                 >
-                                    Sign Up
+                                    Register
                                 </Link>
                             </div>
                         )}
                     </div>
 
                     {/* Mobile menu button */}
-                    <div className="flex items-center sm:hidden">
+                    <div className="sm:hidden flex items-center">
                         <button
                             onClick={() => setIsMenuOpen(!isMenuOpen)}
-                            className="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none"
+                            className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
                         >
                             <span className="sr-only">Open main menu</span>
-                            {isMenuOpen ? (
-                                <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            ) : (
-                                <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                </svg>
-                            )}
+                            <svg
+                                className={`${isMenuOpen ? 'hidden' : 'block'} h-6 w-6`}
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                aria-hidden="true"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                            <svg
+                                className={`${isMenuOpen ? 'block' : 'hidden'} h-6 w-6`}
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                aria-hidden="true"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
                         </button>
                     </div>
                 </div>
@@ -121,88 +148,63 @@ const Navbar: React.FC = () => {
 
             {/* Mobile menu */}
             <div className={`${isMenuOpen ? 'block' : 'hidden'} sm:hidden`}>
-                <div className="pt-2 pb-3 space-y-1">
+                <div className="px-2 pt-2 pb-3 space-y-1">
                     <Link
                         to="/feed"
-                        className={`block pl-3 pr-4 py-2 border-l-4 ${location.pathname === '/feed' ? 'border-blue-700 text-blue-700 bg-blue-50' : 'border-transparent'}`}
+                        className="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
                         onClick={() => setIsMenuOpen(false)}
                     >
-                        Discover
+                        Feed
                     </Link>
-
-                    {isAuthenticated && (
+                    {isAuthenticated ? (
                         <>
                             <Link
                                 to="/dashboard"
-                                className={`block pl-3 pr-4 py-2 border-l-4 ${location.pathname === '/dashboard' ? 'border-blue-700 text-blue-700 bg-blue-50' : 'border-transparent'}`}
+                                className="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
                                 onClick={() => setIsMenuOpen(false)}
                             >
                                 Dashboard
                             </Link>
                             <Link
                                 to="/create"
-                                className={`block pl-3 pr-4 py-2 border-l-4 ${location.pathname === '/create' ? 'border-blue-700 text-blue-700 bg-blue-50' : 'border-transparent'}`}
+                                className="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
                                 onClick={() => setIsMenuOpen(false)}
                             >
-                                Add Listing
+                                Create
                             </Link>
                             <Link
                                 to="/profile"
-                                className={`block pl-3 pr-4 py-2 border-l-4 ${location.pathname === '/profile' ? 'border-blue-700 text-blue-700 bg-blue-50' : 'border-transparent'}`}
+                                className="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
                                 onClick={() => setIsMenuOpen(false)}
                             >
                                 Profile
                             </Link>
+                            <button
+                                onClick={() => {
+                                    setIsMenuOpen(false);
+                                    handleLogout();
+                                }}
+                                className="w-full text-left text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
+                            >
+                                Sign out
+                            </button>
                         </>
-                    )}
-
-                    {isAuthenticated ? (
-                        <div className="border-t border-gray-200 pt-4 pb-3">
-                            <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="block">
-                                <div className="flex items-center px-4">
-                                    {user?.profilePictureUrl && (
-                                        <div className="flex-shrink-0">
-                                            <img className="h-10 w-10 rounded-full" src={user.profilePictureUrl} alt="Profile" />
-                                        </div>
-                                    )}
-                                    <div className="ml-3">
-                                        <div className="text-base font-medium text-gray-800">
-                                            {user?.firstName} {user?.lastName}
-                                        </div>
-                                        <div className="text-sm font-medium text-gray-500">{user?.email}</div>
-                                    </div>
-                                </div>
-                            </Link>
-                            <div className="mt-3 space-y-1">
-                                <button
-                                    onClick={() => {
-                                        handleLogout();
-                                        setIsMenuOpen(false);
-                                    }}
-                                    className="block w-full text-left px-4 py-2 text-red-700 hover:bg-red-50"
-                                >
-                                    Logout
-                                </button>
-                            </div>
-                        </div>
                     ) : (
-                        <div className="border-t border-gray-200 pt-4 pb-3">
-                            <div className="flex flex-col space-y-3 px-4">
-                                <Link
-                                    to="/login"
-                                    className="block text-center py-2 px-4 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                                    onClick={() => setIsMenuOpen(false)}
-                                >
-                                    Log In
-                                </Link>
-                                <Link
-                                    to="/register"
-                                    className="block text-center py-2 px-4 bg-blue-600 border border-transparent rounded-md text-white hover:bg-blue-700"
-                                    onClick={() => setIsMenuOpen(false)}
-                                >
-                                    Sign Up
-                                </Link>
-                            </div>
+                        <div className="space-y-1">
+                            <Link
+                                to="/login"
+                                className="text-white bg-blue-600 hover:bg-blue-700 block px-3 py-2 rounded-md text-base font-medium"
+                                onClick={() => setIsMenuOpen(false)}
+                            >
+                                Login
+                            </Link>
+                            <Link
+                                to="/register"
+                                className="text-gray-300 border border-gray-600 hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium"
+                                onClick={() => setIsMenuOpen(false)}
+                            >
+                                Register
+                            </Link>
                         </div>
                     )}
                 </div>

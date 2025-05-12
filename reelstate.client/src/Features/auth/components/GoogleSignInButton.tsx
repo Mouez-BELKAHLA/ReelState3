@@ -1,35 +1,10 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import { useAuth, GOOGLE_CLIENT_ID } from '..'; // Import from the feature's barrel file
+import { useNavigate } from 'react-router-dom';
+import { GOOGLE_CLIENT_ID } from '../Constants/auth';
+import { useAppDispatch } from '../../../store/hooks';
+import { googleLogin } from '../../../store/slices/authSlice';
 
-// Strongly typed interfaces for Google Identity Services API
-interface GoogleCredentialResponse {
-    credential: string;
-    select_by?: string;
-    clientId?: string;
-}
-
-interface GoogleInitializeConfig {
-    client_id: string;
-    callback: (response: GoogleCredentialResponse) => void;
-    auto_select?: boolean;
-    cancel_on_tap_outside?: boolean;
-    context?: string;
-    state_cookie_domain?: string;
-    prompt_parent_id?: string;
-    nonce?: string;
-    use_fedcm_for_prompt?: boolean;
-}
-
-interface GoogleButtonOptions {
-    type?: 'standard' | 'icon';
-    theme?: 'outline' | 'filled_blue' | 'filled_black';
-    size?: 'large' | 'medium' | 'small';
-    text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin';
-    shape?: 'rectangular' | 'pill' | 'circle' | 'square';
-    logo_alignment?: 'left' | 'center';
-    width?: number | string;
-    locale?: string;
-}
+// Type definitions remain the same
 
 interface GoogleSignInButtonProps {
     variant?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin';
@@ -40,23 +15,24 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
     variant = 'signin_with',
     className = ''
 }) => {
-    const { googleLogin } = useAuth();
+    const dispatch = useAppDispatch();
+    const navigate = useNavigate();
     const googleButtonRef = useRef<HTMLDivElement>(null);
 
     const handleGoogleResponse = useCallback(async (response: GoogleCredentialResponse) => {
-        console.log("===== COPY THIS GOOGLE TOKEN =====");
-        console.log(response.credential);
-        console.log("==================================");
+        console.log("===== GOOGLE TOKEN RECEIVED =====");
         try {
             if (response.credential) {
                 console.log("Google sign-in successful, processing token...");
-                await googleLogin(response.credential);
+                await dispatch(googleLogin(response.credential)).unwrap();
+                navigate('/dashboard');
             }
         } catch (error) {
             console.error('Google sign-in error:', error);
         }
-    }, [googleLogin]);
+    }, [dispatch, navigate]);
 
+    // Rest of the component remains the same
     useEffect(() => {
         console.log("Current origin:", window.location.origin);
 
@@ -102,14 +78,14 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
     );
 };
 
-// Properly typed window object extension for Google Identity Services
+// Type definitions remain the same
 declare global {
     interface Window {
         google?: {
             accounts: {
                 id: {
-                    initialize: (config: GoogleInitializeConfig) => void;
-                    renderButton: (element: HTMLElement, options: GoogleButtonOptions) => void;
+                    initialize: (config: any) => void;
+                    renderButton: (element: HTMLElement, options: any) => void;
                 };
             };
         };

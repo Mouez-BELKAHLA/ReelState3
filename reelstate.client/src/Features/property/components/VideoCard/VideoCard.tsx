@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
-import { AuthContext } from "../../../../Features/auth";
+import React, { useState, useEffect, useRef } from 'react';
+import { useAppSelector, useAppDispatch } from '../../../../store/hooks';
+import { checkLikeStatus, toggleLike } from '../../../../store/slices/propertySlice';
 
-// Import components but NOT ArrowButton
+// Import components but NOT ArrowButton (keeping your existing imports)
 import {
     CarouselIndicators,
     CommentButton,
@@ -9,7 +10,6 @@ import {
     LikeButton,
     PropertyInfoTags,
     UserProfile,
-    LikeService,
 } from '../..';
 
 // Import from shared
@@ -29,7 +29,7 @@ type VideoCardProps = VideoCardProperty & {
 
 export default function VideoCard({
     id,
-    //userId, // Include userId from the interface
+    userId,
     username,
     caption,
     videoUrl,
@@ -59,17 +59,18 @@ export default function VideoCard({
     videoRef, // External ref for video element
     isActive = false // Whether this video is the active one
 }: VideoCardProps) {
+    // Redux hooks
+    const dispatch = useAppDispatch();
+    const { isAuthenticated } = useAppSelector(state => state.auth);
+    const { propertyLikes, likeLoading } = useAppSelector(state => state.property);
+
+    // Component state
     const [activeIndex, setActiveIndex] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isAnimating, setIsAnimating] = useState(false);
     const [commentsCount] = useState(comments);
-    const [likeCount, setLikeCount] = useState(likes);
-    const [isLiked, setIsLiked] = useState(false);
-    const [isLikeLoading, setIsLikeLoading] = useState(false);
 
-    const auth = useContext(AuthContext);
-
-    // Touch handling
+    // Touch handling state
     const [touchStart, setTouchStart] = useState(0);
     const [touchEnd, setTouchEnd] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -82,6 +83,10 @@ export default function VideoCard({
     const totalItems = 1 + photos.length + 1;
     const locationIndex = 1 + photos.length;
 
+    // Get like state from Redux
+    const likeState = propertyLikes[id] || { isLiked: false, count: likes };
+    const isLikeLoading = likeLoading[id] || false;
+
     // Animation keyframes
     const pulseGradientKeyframes = `
     @keyframes pulseGradient {
@@ -93,24 +98,12 @@ export default function VideoCard({
 
     // Check like status when component mounts
     useEffect(() => {
-        const checkLikeStatus = async () => {
-            if (auth?.authState.isAuthenticated) {
-                try {
-                    const response = await LikeService.checkLikeStatus(id);
-                    if (response.isSuccess) {
-                        setIsLiked(response.isLiked);
-                        setLikeCount(response.likesCount);
-                    }
-                } catch (error) {
-                    console.error("Error checking like status:", error);
-                }
-            }
-        };
+        if (isAuthenticated) {
+            dispatch(checkLikeStatus(id));
+        }
+    }, [id, isAuthenticated, dispatch]);
 
-        checkLikeStatus();
-    }, [id, auth?.authState.isAuthenticated]);
-
-    // FIX: Ensure proper video state when active status changes
+    // Ensure proper video state when active status changes
     useEffect(() => {
         if (!internalVideoRef.current) return;
 
@@ -137,7 +130,7 @@ export default function VideoCard({
         }
     }, [isActive, activeIndex]);
 
-    // FIX: Make sure video is paused when the carousel is not showing the video
+    // Make sure video is paused when the carousel is not showing the video
     useEffect(() => {
         if (!internalVideoRef.current) return;
 
@@ -153,28 +146,21 @@ export default function VideoCard({
         }
     }, [activeIndex, isActive, isPlaying]);
 
-    // Handle like toggle
+    // Handle like toggle using Redux
     const handleLikeToggle = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!auth?.authState.isAuthenticated) {
+        if (!isAuthenticated) {
             alert("Please log in to like this property");
             return;
         }
 
-        setIsLikeLoading(true);
         try {
-            const response = await LikeService.toggleLike(id);
-            if (response.isSuccess) {
-                setIsLiked(response.isLiked);
-                setLikeCount(response.likesCount);
-                if (onLikeToggle) {
-                    onLikeToggle(response.isLiked, response.likesCount);
-                }
+            const resultAction = await dispatch(toggleLike(id)).unwrap();
+            if (onLikeToggle) {
+                onLikeToggle(resultAction.isLiked, resultAction.count);
             }
         } catch (error) {
             console.error("Error toggling like:", error);
-        } finally {
-            setIsLikeLoading(false);
         }
     };
 
@@ -185,7 +171,7 @@ export default function VideoCard({
         return 'photo';
     };
 
-    // FIX: Improved video play/pause control with proper state synchronization
+    // Improved video play/pause control with proper state synchronization
     const togglePlay = () => {
         if (!internalVideoRef.current) return;
 
@@ -222,7 +208,7 @@ export default function VideoCard({
             }, 400);
         }
 
-        // FIX: Always ensure video is paused when navigating away from video
+        // Always ensure video is paused when navigating away from video
         if (newIndex !== 0 && internalVideoRef.current) {
             internalVideoRef.current.pause();
             setIsPlaying(false);
@@ -345,7 +331,7 @@ export default function VideoCard({
         }
     };
 
-    // FIX: Handle direct video events to ensure state synchronization
+    // Handle direct video events to ensure state synchronization
     const handleVideoPlay = () => {
         setIsPlaying(true);
     };
@@ -423,7 +409,7 @@ export default function VideoCard({
                     </div>
                 </div>
 
-                {/* Photo items - FIXED: Now using photoUrl property from objects */}
+                {/* Photo items */}
                 {photos.map((photo, index) => (
                     <div
                         key={photo.id || `photo-${index}`}
@@ -469,7 +455,7 @@ export default function VideoCard({
                 </div>
             </div>
 
-            {/* Rest of the component remains unchanged */}
+            {/* Carousel indicators */}
             <CarouselIndicators
                 totalItems={totalItems}
                 activeIndex={activeIndex}
@@ -523,9 +509,9 @@ export default function VideoCard({
                 </>
             )}
 
-            {/* Left side - Updated to include the left arrow */}
+            {/* Left side */}
             <div className="absolute left-4 bottom-24 flex flex-col items-center space-y-4 z-10">
-                {/* Left arrow - Now positioned on the left side */}
+                {/* Left arrow */}
                 {!externalButtons && (isPhotoMode || isLocationMode) && (
                     <button
                         onClick={(e) => {
@@ -546,19 +532,18 @@ export default function VideoCard({
                     </button>
                 )}
 
-                {/* Placeholders to maintain spacing */}
+                {/* Placeholders */}
                 <div className="opacity-0 pointer-events-none" style={{ width: '40px', height: '40px' }}></div>
                 <div className="opacity-0 pointer-events-none" style={{ width: '34px', height: '48px' }}></div>
                 <div className="opacity-0 pointer-events-none" style={{ width: '34px', height: '48px' }}></div>
                 <div className="opacity-0 pointer-events-none" style={{ width: '34px', height: '48px' }}></div>
             </div>
 
-            {/* Right side action buttons - only shown if not using external buttons */}
+            {/* Right side action buttons */}
             {!externalButtons && (
                 <div className="absolute right-4 bottom-24 flex flex-col items-center space-y-4 z-10">
-                    {/* RIGHT SIDE: Right arrow only (left arrow moved to left side) */}
+                    {/* Right arrow */}
                     <div className="relative flex items-center justify-center" style={{ height: '34px', width: '34px' }}>
-                        {/* Right arrow - in the normal position */}
                         {(isVideoMode || isPhotoMode) && (
                             <button
                                 onClick={(e) => {
@@ -579,7 +564,7 @@ export default function VideoCard({
                             </button>
                         )}
 
-                        {/* Invisible placeholder when no right arrow is visible */}
+                        {/* Placeholder */}
                         {!(isVideoMode || isPhotoMode) && (
                             <div style={{ width: '34px', height: '34px' }} className="opacity-0"></div>
                         )}
@@ -591,11 +576,11 @@ export default function VideoCard({
                         username={username || ''}
                     />
 
-                    {/* Like button */}
+                    {/* Like button - Now using Redux state */}
                     <LikeButton
-                        isLiked={isLiked}
+                        isLiked={likeState.isLiked}
                         isLoading={isLikeLoading}
-                        count={likeCount}
+                        count={likeState.count}
                         onToggle={handleLikeToggle}
                     />
 
@@ -617,7 +602,7 @@ export default function VideoCard({
                 </div>
             )}
 
-            {/* Media type indicator with animation */}
+            {/* Content type indicator */}
             <ContentTypeIndicator
                 isVideoMode={isVideoMode}
                 isPhotoMode={isPhotoMode}

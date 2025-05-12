@@ -1,10 +1,10 @@
-// src/Pages/Dashboard.tsx (refactored)
 import React from 'react';
-import { useAuth } from "../../../Features/auth"; // Import from feature export
+import { useAppSelector } from "../../../store/hooks"; // Import Redux hooks
 import { DashboardCard } from "..";
+
 const Dashboard: React.FC = () => {
-    const { authState } = useAuth();
-    const { user } = authState;
+    // Replace useAuth with Redux selector
+    const { user } = useAppSelector(state => state.auth);
 
     if (!user) {
         return <div>Loading...</div>;

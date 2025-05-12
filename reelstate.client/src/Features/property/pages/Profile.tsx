@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from "../../../Features/auth";
 import axios from 'axios';
 import { API_URL } from "../../../shared";
-import { VideoCard, LikeService } from '..';
+import { VideoCard } from '..';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { toVideoCardProperties } from "../../../shared/Utils/TypeTransformers";
 import { getErrorMessage } from "../../../shared";
+import { useAppSelector, useAppDispatch } from "../../../store/hooks";
+import { checkLikeStatus, toggleLike, updatePropertyLike } from "../../../store/slices/propertySlice";
 
 // Import property types
 import { Property, VideoCardProperty } from "../types/Property";
-import { PropertyLikeState, PropertyLoadingState } from "../types/Property";
 
 // Define user profile data structure
 interface UserProfileData {
@@ -32,8 +32,11 @@ interface ExtendedVideoCardProperty extends VideoCardProperty {
 }
 
 const Profile: React.FC = () => {
-    const { authState } = useAuth();
-    const { token, isAuthenticated } = authState;
+    // Get auth state from Redux
+    const dispatch = useAppDispatch();
+    const { user, token, isAuthenticated } = useAppSelector(state => state.auth);
+    const { propertyLikes, likeLoading } = useAppSelector(state => state.property);
+
     const [activeTab, setActiveTab] = useState<'videos' | 'liked'>('videos');
     const [properties, setProperties] = useState<ExtendedVideoCardProperty[]>([]);
     const [likedProperties, setLikedProperties] = useState<ExtendedVideoCardProperty[]>([]);
@@ -42,97 +45,42 @@ const Profile: React.FC = () => {
     const [profileData, setProfileData] = useState<UserProfileData | null>(null);
     const navigate = useNavigate();
 
-    // State for likes management
-    const [propertyLikes, setPropertyLikes] = useState<PropertyLikeState>({});
-    const [isLikeLoading, setIsLikeLoading] = useState<PropertyLoadingState>({});
-
     // Get userId from URL params, or use logged in user
     const { userId } = useParams<{ userId?: string }>();
-    const isOwnProfile = !userId || (authState.user && authState.user.id === userId);
+    const isOwnProfile = !userId || (user && user.id === userId);
 
     // Determine which userId to use for API calls
-    const targetUserId = userId || (authState.user ? authState.user.id : '');
+    const targetUserId = userId || (user ? user.id : '');
 
     // Default avatar - data URI for a simple user icon
     const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgM2MyLjY3IDAgOC0xLjM0IDggNHYyYzAgMi42Ny01LjMzIDQtOCA0cy04LTEuMzMtOC00VjljMC0yLjY2IDUuMzMtNCA4LTR6bTAgMTAuOThjNy42NCAwIDkuMzktMy4zOCA5LjQtMy45OFYxNWMwIC42Ny0zLjEzIDQtOS40IDQtNi4yOCAwLTkuNC0zLjMzLTkuNC00di0yLjk4YzAtLjA3IDEuNzYgMy45OCA5LjQgMy45OHoiLz48L3N2Zz4=";
 
-    // Function to check like status for all properties
+    // Function to check like status for properties - using Redux
     const checkAllLikeStatus = async (props: ExtendedVideoCardProperty[]) => {
-        if (!isAuthenticated || !token || props.length === 0) return;
+        if (!isAuthenticated || !props.length) return;
 
-        try {
-            const newLikeStates = { ...propertyLikes };
-
-            for (const property of props) {
-                try {
-                    const response = await LikeService.checkLikeStatus(property.id);
-
-                    if (response.isSuccess) {
-                        newLikeStates[property.id] = {
-                            count: response.likesCount,
-                            isLiked: response.isLiked
-                        };
-                    }
-                } catch (propertyError) {
-                    console.error(`Error checking like status for property ${property.id}:`, propertyError);
-                }
-            }
-
-            setPropertyLikes(newLikeStates);
-
-        } catch (error) {
-            console.error("Error checking like statuses:", error);
+        for (const property of props) {
+            dispatch(checkLikeStatus(property.id));
         }
     };
 
-    // Handle like toggle with proper state management
+    // Handle like toggle using Redux
     const handleLikeToggle = async (propertyId: string) => {
         // Check if user is authenticated
-        if (!authState.isAuthenticated) {
+        if (!isAuthenticated) {
             alert("Please log in to like this property");
             return;
         }
 
-        // Set loading for this specific property
-        setIsLikeLoading(prev => ({
-            ...prev,
-            [propertyId]: true
-        }));
-
-        try {
-            // Use LikeService
-            const response = await LikeService.toggleLike(propertyId);
-
-            if (response.isSuccess) {
-                // Update the likes state
-                setPropertyLikes(prev => ({
-                    ...prev,
-                    [propertyId]: {
-                        count: response.likesCount,
-                        isLiked: response.isLiked
-                    }
-                }));
-            }
-        } catch (error) {
-            console.error("Error toggling like:", error);
-        } finally {
-            // Clear loading state
-            setIsLikeLoading(prev => ({
-                ...prev,
-                [propertyId]: false
-            }));
-        }
+        dispatch(toggleLike(propertyId));
     };
 
     // Handle like toggle from VideoCard components
     const handleVideoCardLikeToggle = (propertyId: string, isLiked: boolean, count: number) => {
-        setPropertyLikes(prev => ({
-            ...prev,
-            [propertyId]: { count, isLiked }
-        }));
+        dispatch(updatePropertyLike({ propertyId, isLiked, count }));
     };
 
-    // NEW: Handle navigation to feed page with the property ID
+    // Navigate to feed with property ID
     const navigateToFeedWithProperty = (propertyId: string, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -152,7 +100,7 @@ const Profile: React.FC = () => {
 
     useEffect(() => {
         // If we have no auth state and no userId, redirect to login
-        if (!authState.isAuthenticated && !userId) {
+        if (!isAuthenticated && !userId) {
             navigate('/login', { state: { from: location.pathname } });
             return;
         }
@@ -168,13 +116,13 @@ const Profile: React.FC = () => {
                 setIsLoading(true);
 
                 // Create profile data from auth state if it's the user's own profile
-                if (isOwnProfile && authState.user) {
+                if (isOwnProfile && user) {
                     setProfileData({
-                        id: authState.user.id,
-                        firstName: authState.user.firstName,
-                        lastName: authState.user.lastName,
-                        email: authState.user.email,
-                        profilePictureUrl: authState.user.profilePictureUrl,
+                        id: user.id,
+                        firstName: user.firstName,
+                        lastName: user.lastName,
+                        email: user.email,
+                        profilePictureUrl: user.profilePictureUrl,
                         followersCount: 0,
                         followingCount: 0,
                         totalLikes: 0,
@@ -220,17 +168,6 @@ const Profile: React.FC = () => {
                     console.log(`Found ${userProperties.length} properties for user out of ${allProperties.length} total`);
                     setProperties(userProperties);
 
-                    // Initialize like state for all properties
-                    const likesState: PropertyLikeState = {};
-                    userProperties.forEach(prop => {
-                        likesState[prop.id] = {
-                            count: prop.likes || 0,
-                            isLiked: false
-                        };
-                    });
-
-                    setPropertyLikes(likesState);
-
                     // Check like statuses for authenticated users
                     if (isAuthenticated && userProperties.length > 0) {
                         await checkAllLikeStatus(userProperties);
@@ -269,9 +206,10 @@ const Profile: React.FC = () => {
         };
 
         fetchData();
-    }, [authState.isAuthenticated, authState.user, targetUserId, isOwnProfile, navigate, token, userId]);
-    // Important: Do NOT include checkAllLikeStatus, profileData, or isAuthenticated in the dependencies
-    // as they would cause infinite loops - these are handled inside the effect
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAuthenticated, user, targetUserId, isOwnProfile, navigate, token, userId]);
+    // Important: Still need the eslint-disable comment since we're intentionally 
+    // avoiding some dependencies to prevent loops
 
     // Function to render the appropriate properties based on the active tab
     const getDisplayProperties = () => {
@@ -485,11 +423,12 @@ const Profile: React.FC = () => {
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {displayProperties.map(property => {
-                            // Get the current like state for this property or use defaults
+                            // Get the current like state for this property from Redux store
                             const propertyLikeState = propertyLikes[property.id] || {
                                 count: property.likes || 0,
                                 isLiked: false
                             };
+                            const isLikeLoadingState = likeLoading[property.id] || false;
 
                             return (
                                 <div
@@ -501,7 +440,7 @@ const Profile: React.FC = () => {
                                     <div className="h-full w-full">
                                         <VideoCard
                                             id={property.id}
-                                            userId={property.userId} // Pass the required userId prop
+                                            userId={property.userId}
                                             username={property.username || displayName}
                                             caption={property.caption}
                                             videoUrl={property.videoUrl}
@@ -553,10 +492,10 @@ const Profile: React.FC = () => {
                                                 handleLikeToggle(property.id);
                                             }}
                                             className={`flex flex-col items-center ${propertyLikeState.isLiked ? 'text-red-500' : 'text-white'} transition-colors`}
-                                            disabled={isLikeLoading[property.id]}
+                                            disabled={isLikeLoadingState}
                                         >
                                             <div className="backdrop-blur-lg bg-black/30 rounded-full p-3 hover:bg-white/20 transition-all border border-white/20">
-                                                {isLikeLoading[property.id] ? (
+                                                {isLikeLoadingState ? (
                                                     <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"></div>
                                                 ) : (
                                                     <svg className="w-6 h-6" fill={propertyLikeState.isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">

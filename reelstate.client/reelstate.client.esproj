@@ -14,8 +14,8 @@
     <Folder Include="src\Components\Feed\" />
     <Folder Include="src\Components\CreateForm\" />
     <Folder Include="src\Components\Layout\" />
-    <Folder Include="src\Features\auth\contexts\" />
-    <Folder Include="src\Features\auth\hooks\" />
+    <Folder Include="src\unused\contexts\" />
+    <Folder Include="src\unused\hooks\" />
     <Folder Include="src\Features\auth\Constants\" />
   </ItemGroup>
 </Project>

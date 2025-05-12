@@ -5,16 +5,16 @@ import {
     LoginCredentials,
     RegisterCredentials,
     User
-} from '..';
+} from '../../Features/auth';
 
 // Import these directly
 import { authReducer, initialState } from './AuthContext';
 
 // Import the AuthService with correct casing
-import AuthService from '../services/AuthService';
+import AuthService from '../../Features/auth/services/AuthService';
 
 // Import error helpers from shared
-import { getErrorMessage, handleAuthError } from '../../../shared/helpers';
+import { getErrorMessage, handleAuthError } from '../../shared/helpers';
 
 // Provider Component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

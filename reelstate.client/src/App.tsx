@@ -1,64 +1,55 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-
-// Consolidated auth imports
-import {
-    AuthProvider,
-    ProtectedRoute,
-    Login,
-    Register
-} from './Features/auth';
+import { useAppDispatch } from './store/hooks';
+import { setupAxiosInterceptors } from './store/middleware/authMiddleware';
+import { store } from './store';
 
 // Feature imports
+import { ProtectedRoute, Login, Register } from './Features/auth';
 import { Dashboard } from './Features/dashboard';
 import { NotFound } from './Features/core';
-import { Feed, CreateVideoCard, Profile, UserVideoFeed } from './Features/property'; // Add UserVideoFeed here
+import { Feed, CreateVideoCard, Profile, UserVideoFeed } from './Features/property';
 
 // Shared component imports
 import { Layout } from './shared';
 
+// Set up axios interceptors
+setupAxiosInterceptors(store);
+
 const App: React.FC = () => {
+    const dispatch = useAppDispatch();
+
     useEffect(() => {
         console.log("Current origin:", window.location.origin);
     }, []);
 
     return (
         <Router>
-            <AuthProvider>
-                <Routes>
-                    {/* Routes with navbar */}
-                    <Route element={<Layout />}>
-                        <Route path="/feed" element={<Feed />} />
+            <Routes>
+                {/* Routes with navbar */}
+                <Route element={<Layout />}>
+                    <Route path="/feed" element={<Feed />} />
+                    <Route path="/user-videos/:userId" element={<UserVideoFeed />} />
+                    <Route path="/profile/:userId" element={<Profile />} />
+                    <Route path="*" element={<NotFound />} />
 
-                        {/* Add the user videos route */}
-                        <Route path="/user-videos/:userId" element={<UserVideoFeed />} />
-
-                        {/* Public profile route for viewing other users */}
-                        <Route path="/profile/:userId" element={<Profile />} />
-
-                        {/* NotFound page - moved here to include navbar */}
-                        <Route path="*" element={<NotFound />} />
-
-                        {/* Protected routes with navbar */}
-                        <Route element={<ProtectedRoute />}>
-                            <Route path="/dashboard" element={<Dashboard />} />
-                            <Route path="/create" element={<CreateVideoCard />} />
-                            {/* Profile route - inside protected route wrapper */}
-                            <Route path="/profile" element={<Profile />} />
-                            {/* Add more protected routes here */}
-                        </Route>
+                    {/* Protected routes with navbar */}
+                    <Route element={<ProtectedRoute />}>
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/create" element={<CreateVideoCard />} />
+                        <Route path="/profile" element={<Profile />} />
                     </Route>
+                </Route>
 
-                    {/* Routes without navbar */}
-                    <Route element={<Layout hideNavbar />}>
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/register" element={<Register />} />
-                    </Route>
+                {/* Routes without navbar */}
+                <Route element={<Layout hideNavbar />}>
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                </Route>
 
-                    {/* Redirect root to feed as a public page */}
-                    <Route path="/" element={<Navigate to="/feed" replace />} />
-                </Routes>
-            </AuthProvider>
+                {/* Redirect root to feed as a public page */}
+                <Route path="/" element={<Navigate to="/feed" replace />} />
+            </Routes>
         </Router>
     );
 };

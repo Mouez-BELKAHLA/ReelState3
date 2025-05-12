@@ -1,33 +1,34 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import axios from 'axios';
-import { API_URL } from "../../../shared";
-import { useAuth } from "../../../Features/auth";
+import { useAppSelector, useAppDispatch } from "../../../store/hooks";
+import {
+    fetchProperties,
+    checkAllLikeStatuses,
+    toggleLike,
+    setActiveVideoIndex,
+    toggleComments,
+    setActiveProperty,
+    updatePropertyLike
+} from "../../../store/slices/propertySlice";
 import { CommentPanel } from "../../../shared";
-import { LikeService, PropertyList } from "..";
-import { toVideoCardProperties } from "../../../shared/Utils/TypeTransformers";
-import { getErrorMessage } from "../../../shared";
-
-// Import the VideoCardProperty type
-import { Property, VideoCardProperty } from "../types/Property";
-import { PropertyLikeState, PropertyLoadingState } from "../types/Property";
+import { PropertyList } from "..";
 
 export default function Feed() {
-    const { authState } = useAuth();
-    const { token, isAuthenticated } = authState;
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [properties, setProperties] = useState<VideoCardProperty[]>([]);
-    const [activeVideoIndex, setActiveVideoIndex] = useState(0);
+    const dispatch = useAppDispatch();
+    const {
+        properties,
+        propertyLikes,
+        likeLoading,
+        activeVideoIndex,
+        activePropertyId,
+        isLoading,
+        error,
+        showComments
+    } = useAppSelector(state => state.property);
+    const { isAuthenticated } = useAppSelector(state => state.auth);
 
-    // State for comment sidebar
-    const [showComments, setShowComments] = useState(false);
-    const [activePropertyId, setActivePropertyId] = useState<string | null>(null);
+    // Layout state - still kept locally as it's UI related
     const [hasLargeLayout, setHasLargeLayout] = useState(false);
     const [windowWidth, setWindowWidth] = useState(0);
-
-    // State for likes to manage from parent
-    const [propertyLikes, setPropertyLikes] = useState<PropertyLikeState>({});
-    const [isLikeLoading, setIsLikeLoading] = useState<PropertyLoadingState>({});
 
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -39,41 +40,6 @@ export default function Feed() {
     const LARGE_LAYOUT_BREAKPOINT = 1280;
     const MEDIUM_LAYOUT_BREAKPOINT = 768;
     const SMALL_LAYOUT_BREAKPOINT = 480;
-
-    // Memoize the checkAllLikeStatus function with useCallback
-    const checkAllLikeStatus = useCallback(async (props: VideoCardProperty[]) => {
-        if (!isAuthenticated || !token || props.length === 0) return;
-
-        try {
-            const newLikeStates: PropertyLikeState = {};
-
-            for (const property of props) {
-                try {
-                    const response = await LikeService.checkLikeStatus(property.id);
-
-                    if (response.isSuccess) {
-                        newLikeStates[property.id] = {
-                            count: response.likesCount || 0,
-                            isLiked: response.isLiked
-                        };
-                    }
-                } catch (propertyError) {
-                    console.error(`Error checking like status for property ${property.id}:`, propertyError);
-                }
-            }
-
-            // Only update state if we have new values
-            if (Object.keys(newLikeStates).length > 0) {
-                setPropertyLikes(prev => ({
-                    ...prev,
-                    ...newLikeStates
-                }));
-            }
-
-        } catch (error) {
-            console.error("Error checking like statuses:", error);
-        }
-    }, [isAuthenticated, token]);
 
     // Add global style to remove scrollbars and fix TikTok-style scrolling
     useEffect(() => {
@@ -156,137 +122,54 @@ export default function Feed() {
         return () => window.removeEventListener('resize', checkLayoutSize);
     }, []);
 
-    // Fetch properties from the API
+    // Fetch properties on component mount
     useEffect(() => {
-        let isMounted = true;
+        dispatch(fetchProperties());
+    }, [dispatch]);
 
-        const fetchProperties = async () => {
-            try {
-                setIsLoading(true);
-
-                // Configure headers based on authentication
-                const headers: Record<string, string> = {};
-                if (token) {
-                    headers.Authorization = `Bearer ${token}`;
-                }
-
-                const response = await axios.get<Property[]>(`${API_URL}/api/Property`, {
-                    headers: headers
-                });
-
-                // Only update state if component is still mounted
-                if (!isMounted) return;
-
-                // Use our transformer to convert API data to UI components
-                const mappedProperties = toVideoCardProperties(response.data, API_URL);
-
-                // Initialize like state for all properties
-                const likesState: PropertyLikeState = {};
-                mappedProperties.forEach(prop => {
-                    likesState[prop.id] = {
-                        count: prop.likes || 0,
-                        isLiked: false
-                    };
-                });
-                setPropertyLikes(likesState);
-                setProperties(mappedProperties);
-
-                // Check like statuses after loading properties
-                if (isAuthenticated && mappedProperties.length > 0) {
-                    checkAllLikeStatus(mappedProperties);
-                }
-            } catch (err: unknown) {
-                console.error('Error fetching properties:', err);
-                if (isMounted) {
-                    setError(getErrorMessage(err, 'Failed to load properties'));
-                }
-            } finally {
-                if (isMounted) {
-                    setIsLoading(false);
-                }
-            }
-        };
-
-        fetchProperties();
-
-        // Cleanup function to prevent state updates after unmount
-        return () => {
-            isMounted = false;
-        };
-    }, [token, isAuthenticated, checkAllLikeStatus]);
+    // Check like statuses when properties are loaded or auth changes
+    useEffect(() => {
+        if (isAuthenticated && properties.length > 0) {
+            dispatch(checkAllLikeStatuses());
+        }
+    }, [dispatch, isAuthenticated, properties.length]);
 
     // Handle comment toggle
     const handleToggleComments = (propertyId: string) => {
-        setActivePropertyId(propertyId);
-        setShowComments(true);
+        dispatch(setActiveProperty(propertyId));
+        dispatch(toggleComments(true));
     };
 
-    // Handle like toggle with proper state management
+    // Handle like toggle
     const handleLikeToggle = async (propertyId: string) => {
-        // Check if user is authenticated
-        if (!authState.isAuthenticated) {
+        if (!isAuthenticated) {
             alert("Please log in to like this property");
             return;
         }
 
-        // Set loading for this specific property
-        setIsLikeLoading(prev => ({
-            ...prev,
-            [propertyId]: true
-        }));
-
-        try {
-            // Use LikeService
-            const response = await LikeService.toggleLike(propertyId);
-
-            if (response.isSuccess) {
-                // Update both states to keep them in sync
-                setPropertyLikes(prev => ({
-                    ...prev,
-                    [propertyId]: {
-                        count: response.likesCount || 0,
-                        isLiked: response.isLiked
-                    }
-                }));
-            }
-        } catch (error) {
-            console.error("Error toggling like:", error);
-        } finally {
-            // Clear loading state
-            setIsLikeLoading(prev => ({
-                ...prev,
-                [propertyId]: false
-            }));
-        }
+        dispatch(toggleLike(propertyId));
     };
 
     // Handle external like toggle - this is called from VideoCard
     const handleVideoCardLikeToggle = (propertyId: string, isLiked: boolean, count: number) => {
-        setPropertyLikes(prev => ({
-            ...prev,
-            [propertyId]: { count, isLiked }
-        }));
+        dispatch(updatePropertyLike({ propertyId, isLiked, count }));
     };
 
-    // Calculate video width based on screen size - UPDATED FOR BETTER COVERAGE
-    const getVideoWidth = () => {
+    // Calculate video width based on screen size
+    const getVideoWidth = useCallback(() => {
         if (windowWidth < SMALL_LAYOUT_BREAKPOINT) {
-            // For very small screens, use full width
             return '100%';
         } else if (windowWidth < MEDIUM_LAYOUT_BREAKPOINT) {
-            // For small-medium screens
             return '100%';
         } else if (!hasLargeLayout) {
-            // For medium screens - wider than before
             return '100%';
         }
-        // For large screens - wider than before
         return windowWidth >= 1600 ? '900px' : '800px';
-    };
+    }, [windowWidth, hasLargeLayout, SMALL_LAYOUT_BREAKPOINT, MEDIUM_LAYOUT_BREAKPOINT]);
 
     // Set active video index when video is in view
     const handleVideoInView = (index: number) => {
-        setActiveVideoIndex(index);
+        dispatch(setActiveVideoIndex(index));
     };
 
     // Update UI based on active video
@@ -302,12 +185,6 @@ export default function Feed() {
                 const newUrl = `/feed?property=${activeProperty.id}`;
                 window.history.replaceState({ path: newUrl }, '', newUrl);
             }
-
-            // Update active property ID for potential comment display
-            setActivePropertyId(activeProperty.id);
-
-            // Could add analytics tracking here
-            console.log(`Viewing property: ${activeProperty.id}`);
         }
     }, [activeVideoIndex, properties]);
 
@@ -332,7 +209,7 @@ export default function Feed() {
                     <h2 className="text-2xl font-semibold text-gray-800 mb-2">Error Loading Properties</h2>
                     <p className="text-gray-600 mb-4">{error}</p>
                     <button
-                        onClick={() => window.location.reload()}
+                        onClick={() => dispatch(fetchProperties())}
                         className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
                     >
                         Try Again
@@ -376,7 +253,7 @@ export default function Feed() {
                     <PropertyList
                         properties={properties}
                         propertyLikes={propertyLikes}
-                        isLikeLoading={isLikeLoading}
+                        isLikeLoading={likeLoading}
                         showComments={showComments}
                         hasLargeLayout={hasLargeLayout}
                         slideOffset={slideOffset}
@@ -401,7 +278,7 @@ export default function Feed() {
                             >
                                 <CommentPanel
                                     propertyId={activePropertyId}
-                                    onClose={() => setShowComments(false)}
+                                    onClose={() => dispatch(toggleComments(false))}
                                     displayMode="sidebar"
                                 />
                             </div>
@@ -422,7 +299,7 @@ export default function Feed() {
                                 >
                                     <CommentPanel
                                         propertyId={activePropertyId}
-                                        onClose={() => setShowComments(false)}
+                                        onClose={() => dispatch(toggleComments(false))}
                                         displayMode="modal"
                                     />
                                 </div>

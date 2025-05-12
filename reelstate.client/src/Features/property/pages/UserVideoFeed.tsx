@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import axios from 'axios';
 import { API_URL } from "../../../shared";
-import { useAuth } from "../../../Features/auth";
 import { CommentPanel } from "../../../shared";
-import { LikeService, PropertyList } from "..";
+import { PropertyList } from "..";
 import { toVideoCardProperties } from "../../../shared/Utils/TypeTransformers";
 import { getErrorMessage } from "../../../shared";
 import { useParams, useSearchParams } from 'react-router-dom';
+import { useAppSelector, useAppDispatch } from "../../../store/hooks";
+import {
+    checkLikeStatus,
+    toggleLike,
+    setActiveVideoIndex,
+    toggleComments,
+    setActiveProperty,
+    updatePropertyLike
+} from "../../../store/slices/propertySlice";
 
 // Import types
 import { Property, VideoCardProperty } from "../types/Property";
-import { PropertyLikeState, PropertyLoadingState } from "../types/Property";
 
 export default function UserVideoFeed() {
     // Get userId from URL parameters
@@ -18,23 +25,25 @@ export default function UserVideoFeed() {
     const [searchParams] = useSearchParams();
     const propertyIdFromUrl = searchParams.get('property');
 
-    const { authState } = useAuth();
-    const { token, isAuthenticated } = authState;
+    // Redux
+    const dispatch = useAppDispatch();
+    const { isAuthenticated, token } = useAppSelector(state => state.auth);
+    const { propertyLikes, likeLoading } = useAppSelector(state => state.property);
+    const authUser = useAppSelector(state => state.auth.user);
+
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [properties, setProperties] = useState<VideoCardProperty[]>([]);
     const [activeVideoIndex, setActiveVideoIndex] = useState(0);
     const [userName, setUserName] = useState("");
 
-    // State for comment sidebar
+    // State for comment sidebar - consider moving more of this to Redux
     const [showComments, setShowComments] = useState(false);
     const [activePropertyId, setActivePropertyId] = useState<string | null>(null);
     const [hasLargeLayout, setHasLargeLayout] = useState(false);
     const [windowWidth, setWindowWidth] = useState(0);
 
-    // State for likes management
-    const [propertyLikes, setPropertyLikes] = useState<PropertyLikeState>({});
-    const [isLikeLoading, setIsLikeLoading] = useState<PropertyLoadingState>({});
+    // Track if like statuses have been checked
     const [likeStatusChecked, setLikeStatusChecked] = useState(false);
 
     // Use refs to track component mount state and prevent race conditions
@@ -65,34 +74,21 @@ export default function UserVideoFeed() {
 
     // Define checkAllLikeStatus with proper memoization and mount check
     const checkAllLikeStatus = useCallback(async (props: VideoCardProperty[]) => {
-        if (!isAuthenticated || !token || props.length === 0 || likeStatusChecked || !isMounted.current) return;
+        if (!isAuthenticated || props.length === 0 || likeStatusChecked || !isMounted.current) return;
 
         try {
-            const newLikeStates = { ...propertyLikes };
             for (const property of props) {
                 if (!isMounted.current) break; // Stop processing if component unmounted
-
-                try {
-                    const response = await LikeService.checkLikeStatus(property.id);
-                    if (response.isSuccess) {
-                        newLikeStates[property.id] = {
-                            count: response.likesCount || 0,
-                            isLiked: response.isLiked
-                        };
-                    }
-                } catch (propertyError) {
-                    console.error(`Error checking like status for property ${property.id}:`, propertyError);
-                }
+                dispatch(checkLikeStatus(property.id));
             }
 
             if (isMounted.current) {
-                setPropertyLikes(newLikeStates);
                 setLikeStatusChecked(true);
             }
         } catch (error) {
             console.error("Error checking like statuses:", error);
         }
-    }, [isAuthenticated, token, propertyLikes, likeStatusChecked]);
+    }, [isAuthenticated, likeStatusChecked, dispatch]);
 
     // Add global style to remove scrollbars and fix TikTok-style scrolling
     useEffect(() => {
@@ -185,9 +181,9 @@ export default function UserVideoFeed() {
                 // Filter for user properties
                 const userProperties = mappedProperties.filter(prop => {
                     if (prop.userId === userId) return true;
-                    if (prop.username && authState.user &&
-                        (prop.username === authState.user.firstName ||
-                            prop.username.includes(authState.user.firstName || ''))) {
+                    if (prop.username && authUser &&
+                        (prop.username === authUser.firstName ||
+                            prop.username.includes(authUser.firstName || ''))) {
                         return true;
                     }
                     return false;
@@ -205,16 +201,6 @@ export default function UserVideoFeed() {
                     }
                 }
 
-                // Initialize like states
-                const likesState: PropertyLikeState = {};
-                (userProperties.length > 0 ? userProperties : mappedProperties).forEach(prop => {
-                    likesState[prop.id] = {
-                        count: prop.likes || 0,
-                        isLiked: false
-                    };
-                });
-                setPropertyLikes(likesState);
-
                 // Handle specific property from URL after data is loaded
                 if (propertyIdFromUrl) {
                     const properties = userProperties.length > 0 ? userProperties : mappedProperties;
@@ -222,6 +208,9 @@ export default function UserVideoFeed() {
                     if (index !== -1) {
                         setActiveVideoIndex(index);
                         setActivePropertyId(propertyIdFromUrl);
+                        // Update Redux state too
+                        dispatch(setActiveVideoIndex(index));
+                        dispatch(setActiveProperty(propertyIdFromUrl));
 
                         // Use RAF to ensure DOM is ready
                         requestAnimationFrame(() => {
@@ -253,7 +242,7 @@ export default function UserVideoFeed() {
         };
 
         fetchProperties();
-    }, [token, userId, propertyIdFromUrl, authState.user]);
+    }, [token, userId, propertyIdFromUrl, authUser, dispatch]);
 
     // Check like status in a separate effect
     useEffect(() => {
@@ -265,46 +254,32 @@ export default function UserVideoFeed() {
     const handleToggleComments = useCallback((propertyId: string) => {
         setActivePropertyId(propertyId);
         setShowComments(true);
-    }, []);
+        // Also update Redux state
+        dispatch(setActiveProperty(propertyId));
+        dispatch(toggleComments(true));
+    }, [dispatch]);
 
-    // Debounced like toggle to prevent multiple rapid calls
+    // Handle like toggle using Redux
     const handleLikeToggle = useCallback(async (propertyId: string) => {
-        if (!authState.isAuthenticated) {
+        if (!isAuthenticated) {
             alert("Please log in to like this property");
             return;
         }
 
         // Don't proceed if already loading
-        if (isLikeLoading[propertyId]) return;
-
-        setIsLikeLoading(prev => ({ ...prev, [propertyId]: true }));
+        if (likeLoading[propertyId]) return;
 
         try {
-            const response = await LikeService.toggleLike(propertyId);
-            if (isMounted.current && response.isSuccess) {
-                setPropertyLikes(prev => ({
-                    ...prev,
-                    [propertyId]: {
-                        count: response.likesCount,
-                        isLiked: response.isLiked
-                    }
-                }));
-            }
+            await dispatch(toggleLike(propertyId)).unwrap();
         } catch (error) {
             console.error("Error toggling like:", error);
-        } finally {
-            if (isMounted.current) {
-                setIsLikeLoading(prev => ({ ...prev, [propertyId]: false }));
-            }
         }
-    }, [authState.isAuthenticated, isLikeLoading]);
+    }, [isAuthenticated, likeLoading, dispatch]);
 
     const handleVideoCardLikeToggle = useCallback((propertyId: string, isLiked: boolean, count: number) => {
-        setPropertyLikes(prev => ({
-            ...prev,
-            [propertyId]: { count, isLiked }
-        }));
-    }, []);
+        // Update Redux state
+        dispatch(updatePropertyLike({ propertyId, isLiked, count }));
+    }, [dispatch]);
 
     const getVideoWidth = useCallback(() => {
         if (!hasLargeLayout) return '600px';
@@ -315,8 +290,10 @@ export default function UserVideoFeed() {
         // Only update if it actually changed to avoid race conditions
         if (index !== activeVideoIndex) {
             setActiveVideoIndex(index);
+            // Update Redux state too
+            dispatch(setActiveVideoIndex(index));
         }
-    }, [activeVideoIndex]);
+    }, [activeVideoIndex, dispatch]);
 
     // Update UI based on active video
     useEffect(() => {
@@ -330,11 +307,13 @@ export default function UserVideoFeed() {
                 const newUrl = `/user-videos/${userId}?property=${activeProperty.id}`;
                 window.history.replaceState({ path: newUrl }, '', newUrl);
                 setActivePropertyId(activeProperty.id);
+                // Also update Redux state
+                dispatch(setActiveProperty(activeProperty.id));
             }
         }
-    }, [activeVideoIndex, properties, userId, userName, activePropertyId]);
+    }, [activeVideoIndex, properties, userId, userName, activePropertyId, dispatch]);
 
-    // Render code remains the same...
+    // Render code remains the same
     if (isLoading) {
         return (
             <div className="bg-gray-100 min-h-screen flex items-center justify-center">
@@ -423,7 +402,7 @@ export default function UserVideoFeed() {
                     <PropertyList
                         properties={properties}
                         propertyLikes={propertyLikes}
-                        isLikeLoading={isLikeLoading}
+                        isLikeLoading={likeLoading}
                         showComments={showComments}
                         hasLargeLayout={hasLargeLayout}
                         slideOffset={slideOffset}
@@ -451,7 +430,10 @@ export default function UserVideoFeed() {
                             >
                                 <CommentPanel
                                     propertyId={activePropertyId}
-                                    onClose={() => setShowComments(false)}
+                                    onClose={() => {
+                                        setShowComments(false);
+                                        dispatch(toggleComments(false));
+                                    }}
                                     displayMode="sidebar"
                                 />
                             </div>
@@ -473,7 +455,10 @@ export default function UserVideoFeed() {
                                 >
                                     <CommentPanel
                                         propertyId={activePropertyId}
-                                        onClose={() => setShowComments(false)}
+                                        onClose={() => {
+                                            setShowComments(false);
+                                            dispatch(toggleComments(false));
+                                        }}
                                         displayMode="modal"
                                     />
                                 </div>

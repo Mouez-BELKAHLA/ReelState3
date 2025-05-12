@@ -15,7 +15,7 @@ interface PropertyListProps {
     onLikeToggle: (propertyId: string, isLiked: boolean, count: number) => void;
     onToggleComments: (propertyId: string) => void;
     handleLikeToggle: (propertyId: string) => Promise<void>;
-    activeVideoIndex: number; // NEW PROP: Receive active index from parent
+    activeVideoIndex: number;
 }
 
 const PropertyList: React.FC<PropertyListProps> = ({
