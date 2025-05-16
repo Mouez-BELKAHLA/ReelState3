@@ -125,9 +125,9 @@ const PropertyList: React.FC<PropertyListProps> = ({
                                 transform: hasLargeLayout && showComments ? `translateX(-${slideOffset}px)` : 'translateX(0)'
                             }}
                         >
-                            {/* Video Card Component - using fixed width across all cards */}
+                            {/* Video Card Component - using fixed width across all cards - removed ring-2 ring-blue-500 */}
                             <div
-                                className={`h-full rounded-lg overflow-hidden ${isActive ? 'ring-2 ring-blue-500' : ''}`}
+                                className="h-full rounded-lg overflow-hidden"
                                 style={{
                                     width: videoWidth,
                                     minWidth: videoWidth,
