@@ -94,11 +94,40 @@ export default function Feed() {
                 transition: transform 400ms cubic-bezier(0.33, 1, 0.68, 1), width 400ms cubic-bezier(0.33, 1, 0.68, 1);
             }
             
-            /* Responsive adjustments for small screens */
+            /* TikTok-style slim video card */
+            .tiktok-slim-card {
+                aspect-ratio: 9/16 !important;
+                max-width: 360px !important;
+                width: 360px !important;
+                margin: 0 auto;
+                border-radius: 0 !important;
+            }
+            
+            /* Responsive adjustments for different screens */
             @media (max-width: 480px) {
                 .property-container {
                     padding: 0;
                 }
+                .tiktok-slim-card {
+                    max-width: 100% !important;
+                    width: 100% !important;
+                }
+            }
+            
+            @media (min-width: 481px) and (max-width: 768px) {
+                .tiktok-slim-card {
+                    max-width: 340px !important;
+                    width: 340px !important;
+                }
+            }
+            
+            /* Property list item styles for TikTok-like appearance */
+            .property-list-item {
+                padding: 0 !important;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #000;
             }
         `;
         document.head.appendChild(style);
@@ -155,17 +184,18 @@ export default function Feed() {
         dispatch(updatePropertyLike({ propertyId, isLiked, count }));
     };
 
-    // Calculate video width based on screen size
+    // Calculate video width based on screen size - TikTok style slim videos
     const getVideoWidth = useCallback(() => {
+        // For TikTok-like videos, we want a narrow width with 9:16 aspect ratio
         if (windowWidth < SMALL_LAYOUT_BREAKPOINT) {
-            return '100%';
+            return '100%';  // Full width on small screens but with enforced aspect ratio
         } else if (windowWidth < MEDIUM_LAYOUT_BREAKPOINT) {
-            return '100%';
-        } else if (!hasLargeLayout) {
-            return '100%';
+            return '340px'; // Slim width on medium screens
+        } else {
+            // Even on large screens, we keep it slim
+            return '360px';
         }
-        return windowWidth >= 1600 ? '900px' : '800px';
-    }, [windowWidth, hasLargeLayout, SMALL_LAYOUT_BREAKPOINT, MEDIUM_LAYOUT_BREAKPOINT]);
+    }, [windowWidth, SMALL_LAYOUT_BREAKPOINT, MEDIUM_LAYOUT_BREAKPOINT]);
 
     // Set active video index when video is in view
     const handleVideoInView = (index: number) => {
@@ -231,7 +261,7 @@ export default function Feed() {
                         <p className="text-gray-600 mb-4">Be the first to create a property listing!</p>
                         <a
                             href="/create"
-                            className="inline-block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                            className="inline-block px-4 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors"
                         >
                             Create Listing
                         </a>
@@ -242,7 +272,7 @@ export default function Feed() {
     }
 
     return (
-        <div className="bg-gray-100 h-screen overflow-hidden">
+        <div className="bg-black h-screen overflow-hidden">
             <div className="h-[calc(100vh-55px)] overflow-hidden" ref={containerRef}>
                 <div
                     className="h-full video-shift"

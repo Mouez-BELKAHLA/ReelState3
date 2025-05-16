@@ -1,7 +1,13 @@
-// Export dashboard components
-export { default as DashboardCard } from './components/DashboardCard';
+import Dashboard from './pages/Dashboard';
+import ActivityItem from './components/ActivityItem';
+import UserActivityService from './services/UserActivityService';
+import * as DashboardTypes from './types/UserActivity';
+import { DASHBOARD_ENDPOINTS } from './constants/endpoints';
 
-// Export dashboard pages
-export { default as Dashboard } from './pages/Dashboard';
-
-// Add any other dashboard-specific exports here
+export {
+    Dashboard,
+    ActivityItem,
+    UserActivityService,
+    DashboardTypes,
+    DASHBOARD_ENDPOINTS
+};

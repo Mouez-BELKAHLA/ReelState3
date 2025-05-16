@@ -8,7 +8,7 @@ export default defineConfig({
     server: {
         proxy: {
             '/api': {
-                target: 'https://localhost:7096', // Update with your ASP.NET Core port
+                target: 'http://localhost:5034',  // Update to match your actual backend port
                 changeOrigin: true,
                 secure: false
             }

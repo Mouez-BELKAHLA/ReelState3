@@ -3,12 +3,14 @@ import { persistReducer, persistStore, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, 
 import storage from 'redux-persist/lib/storage';
 import authReducer from './slices/authSlice';
 import propertyReducer from './slices/propertySlice';
+import userActivityReducer from './slices/userActivitySlice';  // Import the new reducer
 import { authMiddleware } from './middleware/authMiddleware';
 
 // Root reducer configuration
 const rootReducer = combineReducers({
     auth: authReducer,
     property: propertyReducer,
+    userActivity: userActivityReducer,  // Add the new reducer
     // Add other reducers here as needed
 });
 
