@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import { logoutUser } from '../../../store/slices/authSlice';
+import { NotificationBadge } from '../../../Features/notification';
 
 const Navbar: React.FC = () => {
     const navigate = useNavigate();
@@ -24,6 +25,10 @@ const Navbar: React.FC = () => {
 
     const isActive = (path: string) => {
         return location.pathname === path ? 'text-blue-700 font-medium' : 'text-gray-700 hover:text-blue-700';
+    };
+
+    const handleNotificationClick = () => {
+        navigate('/notifications');
     };
 
     return (
@@ -64,6 +69,11 @@ const Navbar: React.FC = () => {
                     <div className="hidden sm:ml-6 sm:flex sm:items-center">
                         {isAuthenticated ? (
                             <div className="flex items-center space-x-4">
+                                {/* Notification Badge */}
+                                {isAuthenticated && (
+                                    <NotificationBadge onClick={handleNotificationClick} />
+                                )}
+
                                 {/* User info with link to profile */}
                                 <Link to="/profile" className="flex items-center group">
                                     {user?.profilePictureUrl && (
@@ -160,6 +170,13 @@ const Navbar: React.FC = () => {
                                 onClick={() => setIsMenuOpen(false)}
                             >
                                 Profile
+                            </Link>
+                            <Link
+                                to="/notifications"
+                                className={`block pl-3 pr-4 py-2 border-l-4 ${location.pathname === '/notifications' ? 'border-blue-700 text-blue-700 bg-blue-50' : 'border-transparent'}`}
+                                onClick={() => setIsMenuOpen(false)}
+                            >
+                                Notifications
                             </Link>
                         </>
                     )}

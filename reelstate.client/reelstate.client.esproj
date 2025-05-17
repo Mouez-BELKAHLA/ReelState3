@@ -12,6 +12,9 @@
     <Folder Include="src\Features\dashboard\constants\" />
     <Folder Include="src\Features\dashboard\types\" />
     <Folder Include="src\Features\dashboard\services\" />
+    <Folder Include="src\Features\notification\components\" />
+    <Folder Include="src\Features\notification\services\" />
+    <Folder Include="src\Features\notification\types\" />
     <Folder Include="src\Features\property\constants\" />
     <Folder Include="src\shared\components\Common\" />
     <Folder Include="src\Components\Feed\" />

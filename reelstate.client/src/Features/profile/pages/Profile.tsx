@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_URL } from "../../../shared";
-import { VideoCard } from '..';
+import { VideoCard } from '../../property';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { toVideoCardProperties } from "../../../shared/Utils/TypeTransformers";
 import { getErrorMessage } from "../../../shared";

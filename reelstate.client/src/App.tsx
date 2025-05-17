@@ -8,7 +8,9 @@ import { store } from './store';
 import { ProtectedRoute, Login, Register } from './Features/auth';
 import { Dashboard } from './Features/dashboard';
 import { NotFound } from './Features/core';
-import { Feed, CreateVideoCard, Profile, UserVideoFeed } from './Features/property';
+import { Feed, CreateVideoCard, UserVideoFeed } from './Features/property';
+import { Profile } from './Features/profile';
+import { Notification } from './Features/notification'; // Importing Notification (singular)
 
 // Shared component imports
 import { Layout } from './shared';
@@ -38,6 +40,7 @@ const App: React.FC = () => {
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/create" element={<CreateVideoCard />} />
                         <Route path="/profile" element={<Profile />} />
+                        <Route path="/notifications" element={<Notification />} /> {/* Use Notification (singular) to match the import */}
                     </Route>
                 </Route>
 

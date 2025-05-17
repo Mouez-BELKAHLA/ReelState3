@@ -23,6 +23,7 @@ export { default as CommentLikeService } from './services/CommentLikeService';
 // Export pages
 export { default as CreateVideoCard } from './pages/CreateVideoCard';
 export { default as Feed } from './pages/Feed';
-export { default as Profile } from './pages/Profile';
+// Remove the Profile import from here since it's moved to profile feature
 export * from './types/Comment';
-export { default as UserVideoFeed } from './pages/UserVideoFeed';
+// Import UserVideoFeed from profile feature
+export { default as UserVideoFeed } from '../profile/components/UserVideoFeed';

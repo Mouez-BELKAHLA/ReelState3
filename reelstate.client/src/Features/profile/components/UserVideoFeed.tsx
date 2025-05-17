@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import axios from 'axios';
 import { API_URL } from "../../../shared";
 import { CommentPanel } from "../../../shared";
-import { PropertyList } from "..";
+import { PropertyList } from "../../property";
 import { toVideoCardProperties } from "../../../shared/Utils/TypeTransformers";
 import { getErrorMessage } from "../../../shared";
 import { useParams, useSearchParams } from 'react-router-dom';
@@ -17,7 +17,7 @@ import {
 } from "../../../store/slices/propertySlice";
 
 // Import types
-import { Property, VideoCardProperty } from "../types/Property";
+import { Property, VideoCardProperty } from "../../property/types/Property";
 
 export default function UserVideoFeed() {
     // Get userId from URL parameters
