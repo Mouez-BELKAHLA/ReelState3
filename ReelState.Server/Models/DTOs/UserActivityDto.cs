@@ -9,6 +9,8 @@ namespace ReelState.Server.Models.DTOs
         public LikesActivityDto Likes { get; set; } = new LikesActivityDto();
         public LikedCommentsActivityDto LikedComments { get; set; } = new LikedCommentsActivityDto();
         public PropertiesActivityDto Properties { get; set; } = new PropertiesActivityDto();
+        public FollowingActivityDto Following { get; set; } = new FollowingActivityDto();
+        public FollowersActivityDto Followers { get; set; } = new FollowersActivityDto();
     }
 
     public class CommentsActivityDto
@@ -68,6 +70,37 @@ namespace ReelState.Server.Models.DTOs
     {
         public string Id { get; set; } = string.Empty;
         public string Title { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+    }
+
+    // New DTOs for Follows
+    public class FollowingActivityDto
+    {
+        public int Total { get; set; }
+        public List<FollowingActivityItemDto> Recent { get; set; } = new List<FollowingActivityItemDto>();
+    }
+
+    public class FollowingActivityItemDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string FollowedUserId { get; set; } = string.Empty;
+        public string FollowedUsername { get; set; } = string.Empty;
+        public string? FollowedProfilePicture { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class FollowersActivityDto
+    {
+        public int Total { get; set; }
+        public List<FollowerActivityItemDto> Recent { get; set; } = new List<FollowerActivityItemDto>();
+    }
+
+    public class FollowerActivityItemDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string FollowerUserId { get; set; } = string.Empty;
+        public string FollowerUsername { get; set; } = string.Empty;
+        public string? FollowerProfilePicture { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 }

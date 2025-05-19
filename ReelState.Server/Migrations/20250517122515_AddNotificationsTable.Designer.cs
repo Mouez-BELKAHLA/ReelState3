@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ReelState.Data;
 
@@ -11,9 +12,11 @@ using ReelState.Data;
 namespace ReelState.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250517122515_AddNotificationsTable")]
+    partial class AddNotificationsTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -162,9 +165,6 @@ namespace ReelState.Server.Migrations
 
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("int");
-
-                    b.Property<string>("Bio")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
@@ -464,32 +464,6 @@ namespace ReelState.Server.Migrations
                     b.ToTable("PropertyPhotos");
                 });
 
-            modelBuilder.Entity("UserFollow", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("FollowedId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("FollowerId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FollowedId");
-
-                    b.HasIndex("FollowerId", "FollowedId")
-                        .IsUnique();
-
-                    b.ToTable("UserFollows");
-                });
-
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -656,25 +630,6 @@ namespace ReelState.Server.Migrations
                         .IsRequired();
 
                     b.Navigation("Property");
-                });
-
-            modelBuilder.Entity("UserFollow", b =>
-                {
-                    b.HasOne("ReelState.Server.Models.ApplicationUser", "Followed")
-                        .WithMany()
-                        .HasForeignKey("FollowedId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ReelState.Server.Models.ApplicationUser", "Follower")
-                        .WithMany()
-                        .HasForeignKey("FollowerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Followed");
-
-                    b.Navigation("Follower");
                 });
 
             modelBuilder.Entity("ReelState.Server.Models.Comment", b =>

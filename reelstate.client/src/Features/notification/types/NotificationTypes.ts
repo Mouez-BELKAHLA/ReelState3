@@ -2,6 +2,7 @@ export enum NotificationType {
     LIKE = 'like',
     COMMENT = 'comment',
     FOLLOW = 'follow',
+    COMMENT_LIKE = 'comment_like',
     PROPERTY_VIEW = 'property_view',
     SYSTEM = 'system'
 }

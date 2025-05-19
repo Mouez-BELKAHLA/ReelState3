@@ -267,6 +267,102 @@ namespace ReelState.Server.Controllers
                     };
                 }
 
+                // NEW: Get Following data
+                try
+                {
+                    _logger.LogInformation("Fetching following data");
+
+                    // Get users that the current user follows
+                    var following = await _context.UserFollows
+                        .Where(f => f.FollowerId == userId)
+                        .OrderByDescending(f => f.CreatedAt)
+                        .Take(10)
+                        .Join(
+                            _context.Users,
+                            follow => follow.FollowedId,
+                            user => user.Id,
+                            (follow, user) => new FollowingActivityItemDto
+                            {
+                                Id = follow.Id,
+                                FollowedUserId = user.Id,
+                                FollowedUsername = string.IsNullOrEmpty(user.UserName)
+                                    ? $"{user.FirstName} {user.LastName}"
+                                    : user.UserName,
+                                FollowedProfilePicture = user.ProfilePictureUrl,
+                                CreatedAt = follow.CreatedAt
+                            })
+                        .ToListAsync();
+
+                    // Get total following count
+                    var totalFollowing = await _context.UserFollows
+                        .CountAsync(f => f.FollowerId == userId);
+
+                    // Assign to response
+                    activityResponse.Following = new FollowingActivityDto
+                    {
+                        Total = totalFollowing,
+                        Recent = following
+                    };
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error fetching following data");
+                    // Return empty data for this section
+                    activityResponse.Following = new FollowingActivityDto
+                    {
+                        Total = 0,
+                        Recent = new List<FollowingActivityItemDto>()
+                    };
+                }
+
+                // NEW: Get Followers data
+                try
+                {
+                    _logger.LogInformation("Fetching followers data");
+
+                    // Get users that follow the current user
+                    var followers = await _context.UserFollows
+                        .Where(f => f.FollowedId == userId)
+                        .OrderByDescending(f => f.CreatedAt)
+                        .Take(10)
+                        .Join(
+                            _context.Users,
+                            follow => follow.FollowerId,
+                            user => user.Id,
+                            (follow, user) => new FollowerActivityItemDto
+                            {
+                                Id = follow.Id,
+                                FollowerUserId = user.Id,
+                                FollowerUsername = string.IsNullOrEmpty(user.UserName)
+                                    ? $"{user.FirstName} {user.LastName}"
+                                    : user.UserName,
+                                FollowerProfilePicture = user.ProfilePictureUrl,
+                                CreatedAt = follow.CreatedAt
+                            })
+                        .ToListAsync();
+
+                    // Get total followers count
+                    var totalFollowers = await _context.UserFollows
+                        .CountAsync(f => f.FollowedId == userId);
+
+                    // Assign to response
+                    activityResponse.Followers = new FollowersActivityDto
+                    {
+                        Total = totalFollowers,
+                        Recent = followers
+                    };
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error fetching followers data");
+                    // Return empty data for this section
+                    activityResponse.Followers = new FollowersActivityDto
+                    {
+                        Total = 0,
+                        Recent = new List<FollowerActivityItemDto>()
+                    };
+                }
+
                 return Ok(activityResponse);
             }
             catch (Exception ex)

@@ -574,6 +574,8 @@ export default function VideoCard({
                     <UserProfile
                         avatarUrl={avatarUrl}
                         username={username || ''}
+                        userId={userId} // Pass the userId 
+                        linkToProfile={true} // Enable profile linking
                     />
 
                     {/* Like button - Now using Redux state */}

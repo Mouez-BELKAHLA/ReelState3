@@ -9,7 +9,20 @@ const initialState: NotificationState = {
     isLoading: false,
     error: null
 };
+export const refreshNotifications = createAsyncThunk(
+    'notifications/refreshNotifications',
+    async (_, { getState, rejectWithValue }) => {
+        try {
+            const { auth } = getState() as { auth: { token: string } };
+            if (!auth.token) return rejectWithValue('Authentication required');
 
+            const notifications = await NotificationService.getNotifications(auth.token);
+            return notifications;
+        } catch (error) {
+            return rejectWithValue(error.message || 'Failed to refresh notifications');
+        }
+    }
+);
 // Async thunks
 export const fetchNotifications = createAsyncThunk(
     'notifications/fetchNotifications',

@@ -1,6 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
+// Add this base64 encoded simple image as fallback
+const fallbackImageBase64 = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAg" +
+    "MjQwIiBmaWxsPSIjZTJlOGYwIj48cmVjdCB3aWR0aD0iMjQwIiBoZWlnaHQ9IjI0MCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQX" +
+    "JpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZpbGw9IiM5" +
+    "NDlkYTUiPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==";
+
 interface ActivityItemProps {
     icon: React.ReactNode;
     title: string;
@@ -40,8 +46,8 @@ const ActivityItem: React.FC<ActivityItemProps> = ({ icon, title, subtitle, date
                             alt={title}
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                                // Fallback if image fails to load
-                                e.currentTarget.src = 'https://via.placeholder.com/150?text=No+Image';
+                                // Use local fallback image data URL instead of external service
+                                e.currentTarget.src = fallbackImageBase64;
                             }}
                         />
                     </div>

@@ -20,14 +20,15 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification, onClo
         }
 
         // Navigate based on notification type
-        if (notification.propertyId) {
+        if (notification.type === NotificationType.FOLLOW && notification.senderId) {
+            console.log(`Navigating to profile of user who followed: ${notification.senderId}`);
+            navigate(`/profile/${notification.senderId}`);
+        } else if (notification.propertyId) {
             if (notification.type === NotificationType.COMMENT) {
                 navigate(`/feed?property=${notification.propertyId}&showComments=true`);
             } else {
                 navigate(`/feed?property=${notification.propertyId}`);
             }
-        } else if (notification.type === NotificationType.FOLLOW) {
-            navigate(`/profile/${notification.senderId}`);
         }
 
         if (onClose) onClose();

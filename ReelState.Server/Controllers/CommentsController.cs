@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using ReelState.Data;
 using ReelState.Server.Models;
 using ReelState.Server.Models.DTOs;
+using ReelState.Server.Services;
 
 namespace ReelState.Server.Controllers
 {
@@ -17,10 +18,14 @@ namespace ReelState.Server.Controllers
     public class CommentsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly NotificationService _notificationService;
 
-        public CommentsController(ApplicationDbContext context)
+        public CommentsController(
+            ApplicationDbContext context,
+            NotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         // GET: api/Comments/property/{propertyId}
@@ -28,8 +33,6 @@ namespace ReelState.Server.Controllers
         [AllowAnonymous]
         public async Task<ActionResult<IEnumerable<CommentResponseDto>>> GetPropertyComments(string propertyId)
         {
-            // Existing code...
-
             // Try to get current user ID if authenticated
             var currentUserId = User.Identity?.IsAuthenticated == true ?
                 User.FindFirst(ClaimTypes.NameIdentifier)?.Value : null;
@@ -114,28 +117,7 @@ namespace ReelState.Server.Controllers
                 return NotFound("Property not found");
             }
 
-            // Validate parent comment if it's a reply
-            if (!string.IsNullOrEmpty(commentDto.ParentCommentId))
-            {
-                var parentComment = await _context.Comments.FindAsync(commentDto.ParentCommentId);
-                if (parentComment == null)
-                {
-                    return NotFound("Parent comment not found");
-                }
-
-                // Ensure parent comment belongs to same property
-                if (parentComment.PropertyId != commentDto.PropertyId)
-                {
-                    return BadRequest("Parent comment does not belong to the specified property");
-                }
-            }
-
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null)
-            {
-                return NotFound("User not found");
-            }
-
+            // Create the comment
             var comment = new Comment
             {
                 PropertyId = commentDto.PropertyId,
@@ -148,12 +130,64 @@ namespace ReelState.Server.Controllers
             _context.Comments.Add(comment);
             await _context.SaveChangesAsync();
 
+            // IMPROVED NOTIFICATION LOGIC
+            try
+            {
+                if (string.IsNullOrEmpty(commentDto.ParentCommentId))
+                {
+                    // This is a top-level comment on the property
+                    // Notify the property owner
+                    await _notificationService.CreateNewCommentNotification(
+                        commentDto.PropertyId, comment.Id, userId);
+                    Console.WriteLine($"Created property comment notification for property {commentDto.PropertyId}");
+                }
+                else
+                {
+                    // This is a reply to another comment
+                    // Get the parent comment to find who to notify
+                    var parentComment = await _context.Comments.FindAsync(commentDto.ParentCommentId);
+                    if (parentComment != null && parentComment.UserId != userId)
+                    {
+                        // Create a custom notification for the reply if it's not to your own comment
+                        var replier = await _context.Users.FindAsync(userId);
+                        var parentCommentOwner = await _context.Users.FindAsync(parentComment.UserId);
+
+                        if (replier != null && parentCommentOwner != null)
+                        {
+                            var replierName = $"{replier.FirstName} {replier.LastName}".Trim();
+
+                            var notification = new Notification
+                            {
+                                UserId = parentComment.UserId,
+                                SenderId = userId,
+                                Type = "comment",
+                                Message = $"{replierName} replied to your comment",
+                                PropertyId = commentDto.PropertyId,
+                                CommentId = comment.Id,
+                                IsRead = false,
+                                CreatedAt = DateTime.UtcNow
+                            };
+
+                            _context.Notifications.Add(notification);
+                            await _context.SaveChangesAsync();
+                            Console.WriteLine($"Created comment reply notification for user {parentComment.UserId}");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating comment notification: {ex.Message}");
+                // Continue - don't let notification failure stop comment creation
+            }
+
+            var user = await _context.Users.FindAsync(userId);
             var commentResponse = new CommentResponseDto
             {
                 Id = comment.Id,
                 UserId = comment.UserId,
-                Username = $"{user.FirstName} {user.LastName}",
-                AvatarUrl = user.ProfilePictureUrl != null ? user.ProfilePictureUrl : string.Empty,
+                Username = user != null ? $"{user.FirstName} {user.LastName}" : "Unknown User",
+                AvatarUrl = user?.ProfilePictureUrl ?? string.Empty,
                 Text = comment.Text,
                 CreatedAt = comment.CreatedAt,
                 ParentCommentId = comment.ParentCommentId,
@@ -163,7 +197,6 @@ namespace ReelState.Server.Controllers
             return CreatedAtAction("GetComment", new { id = comment.Id }, commentResponse);
         }
 
-        // GET: api/Comments/{id}
         // GET: api/Comments/{id}
         [HttpGet("{id}")]
         [AllowAnonymous]

@@ -32,6 +32,23 @@ export interface PropertyActivity {
     createdAt: string;
 }
 
+// New Follow Activity interfaces
+export interface FollowActivity {
+    id: string;
+    followedUserId: string;
+    followedUsername: string;
+    followedProfilePicture?: string;
+    createdAt: string;
+}
+
+export interface FollowerActivity {
+    id: string;
+    followerUserId: string;
+    followerUsername: string;
+    followerProfilePicture?: string;
+    createdAt: string;
+}
+
 export interface UserActivityResponse {
     comments: {
         total: number;
@@ -48,6 +65,15 @@ export interface UserActivityResponse {
     properties: {
         total: number;
         recent: PropertyActivity[];
+    };
+    // Add new follow sections
+    following: {
+        total: number;
+        recent: FollowActivity[];
+    };
+    followers: {
+        total: number;
+        recent: FollowerActivity[];
     };
 }
 

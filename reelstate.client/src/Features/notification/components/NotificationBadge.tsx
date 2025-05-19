@@ -8,7 +8,13 @@ interface NotificationBadgeProps {
 
 const NotificationBadge: React.FC<NotificationBadgeProps> = ({ onClick }) => {
     const dispatch = useAppDispatch();
-    const { unreadCount, isLoading } = useAppSelector(state => state.notifications);
+    const { unreadCount, isLoading, notifications } = useAppSelector(state => state.notifications);
+    // Get the latest unread notification for the tooltip
+    const latestUnread = notifications.find(n => !n.isRead);
+    const tooltipText = latestUnread
+        ? `${latestUnread.message}`
+        : "No new notifications";
+
     const { isAuthenticated } = useAppSelector(state => state.auth);
 
     useEffect(() => {
@@ -29,6 +35,7 @@ const NotificationBadge: React.FC<NotificationBadgeProps> = ({ onClick }) => {
             onClick={onClick}
             className="relative inline-flex items-center p-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full"
             aria-label="Notifications"
+            title={tooltipText}
         >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path

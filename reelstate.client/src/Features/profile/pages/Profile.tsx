@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { API_URL } from "../../../shared";
 import { VideoCard } from '../../property';
@@ -7,28 +7,31 @@ import { toVideoCardProperties } from "../../../shared/Utils/TypeTransformers";
 import { getErrorMessage } from "../../../shared";
 import { useAppSelector, useAppDispatch } from "../../../store/hooks";
 import { checkLikeStatus, toggleLike, updatePropertyLike } from "../../../store/slices/propertySlice";
+import { refreshNotifications } from "../../../store/slices/notificationSlice";
 
 // Import property types
 import { Property, VideoCardProperty } from "../types/Property";
 
-// Define user profile data structure
-interface UserProfileData {
-    id: string;
-    firstName?: string;
-    lastName?: string;
-    username?: string;
-    email?: string;
-    bio?: string;
-    profilePictureUrl?: string;
-    followersCount?: number;
-    followingCount?: number;
-    totalLikes?: number;
-    isVerified?: boolean;
-}
+// Import ProfileService
+import {
+    getUserProfile,
+    getUserProperties,
+    getFollowStatus,
+    toggleFollow,
+    UserProfileData,
+    FollowStatusData
+} from '../services/ProfileService';
 
 // Extend VideoCardProperty with optional views property
 interface ExtendedVideoCardProperty extends VideoCardProperty {
     views?: number;
+}
+
+// Add interface for follow status
+interface FollowStatusData {
+    isFollowing: boolean;
+    followersCount: number;
+    followingCount: number;
 }
 
 const Profile: React.FC = () => {
@@ -43,6 +46,15 @@ const Profile: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [profileData, setProfileData] = useState<UserProfileData | null>(null);
+
+    // Add state for follow functionality
+    const [followData, setFollowData] = useState<FollowStatusData>({
+        isFollowing: false,
+        followersCount: 0,
+        followingCount: 0
+    });
+    const [isFollowLoading, setIsFollowLoading] = useState(false);
+
     const navigate = useNavigate();
 
     // Get userId from URL params, or use logged in user
@@ -55,12 +67,84 @@ const Profile: React.FC = () => {
     // Default avatar - data URI for a simple user icon
     const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgM2MyLjY3IDAgOC0xLjM0IDggNHYyYzAgMi42Ny01LjMzIDQtOCA0cy04LTEuMzMtOC00VjljMC0yLjY2IDUuMzMtNCA4LTR6bTAgMTAuOThjNy42NCAwIDkuMzktMy4zOCA5LjQtMy45OFYxNWMwIC42Ny0zLjEzIDQtOS40IDQtNi4yOCAwLTkuNC0zLjMzLTkuNC00di0yLjk4YzAtLjA3IDEuNzYgMy45OCA5LjQgMy45OHoiLz48L3N2Zz4=";
 
-    // Function to check like status for properties - using Redux
+    // Function to check like status for properties - using Redux - Fixed the missing function
     const checkAllLikeStatus = async (props: ExtendedVideoCardProperty[]) => {
         if (!isAuthenticated || !props.length) return;
 
         for (const property of props) {
             dispatch(checkLikeStatus(property.id));
+        }
+    };
+
+    // Function to fetch follow status
+    const fetchFollowStatus = useCallback(async () => {
+        if (!isAuthenticated || !targetUserId || isOwnProfile || !token) return;
+
+        try {
+            // Use the service instead of direct axios call
+            const response = await getFollowStatus(targetUserId, token);
+
+            setFollowData({
+                isFollowing: response.isFollowing,
+                followersCount: response.followersCount,
+                followingCount: response.followingCount
+            });
+        } catch (error) {
+            console.error('Error fetching follow status:', error);
+        }
+    }, [isAuthenticated, targetUserId, isOwnProfile, token]);
+
+    // Function to toggle follow status
+    const handleToggleFollow = async () => {
+        if (!isAuthenticated) {
+            alert("Please log in to follow this user");
+            navigate('/login', { state: { from: location.pathname } });
+            return;
+        }
+
+        if (isOwnProfile || !token) {
+            return;
+        }
+
+        try {
+            setIsFollowLoading(true);
+            console.log(`Attempting to toggle follow for user: ${targetUserId}`);
+
+            // Use the service to toggle follow
+            const response = await toggleFollow(targetUserId, token);
+            console.log('Toggle follow response:', response);
+
+            if (response && response.isSuccess) {
+                setFollowData({
+                    isFollowing: response.isFollowing,
+                    followersCount: response.followersCount,
+                    followingCount: response.followingCount
+                });
+
+                // Update profile data with new follower counts
+                if (profileData) {
+                    setProfileData({
+                        ...profileData,
+                        followersCount: response.followersCount,
+                        followingCount: response.followingCount
+                    });
+                }
+
+                // Refresh notifications to show new follow notification
+                dispatch(refreshNotifications());
+
+                console.log(`Successfully ${response.isFollowing ? 'followed' : 'unfollowed'} user ${targetUserId}`);
+            } else {
+                console.error('Toggle follow failed:', response);
+                if (response?.message) {
+                    alert(response.message);
+                }
+            }
+        } catch (error) {
+            console.error('Error toggling follow:', error);
+            alert('Failed to follow/unfollow user. Please try again later.');
+        } finally {
+            setIsFollowLoading(false);
         }
     };
 
@@ -98,7 +182,25 @@ const Profile: React.FC = () => {
         window.location.href = `/feed?property=${propertyId}`;
     };
 
+    // Fetch follow status on component mount
     useEffect(() => {
+        fetchFollowStatus();
+    }, [fetchFollowStatus]);
+
+    // Update profileData with follow counts when they change
+    useEffect(() => {
+        if (profileData && (followData.followersCount > 0 || followData.followingCount > 0)) {
+            setProfileData({
+                ...profileData,
+                followersCount: followData.followersCount,
+                followingCount: followData.followingCount
+            });
+        }
+    }, [followData]);
+
+    useEffect(() => {
+        console.log("Profile loading for userId:", userId);
+        console.log("Target userId:", targetUserId);
         // If we have no auth state and no userId, redirect to login
         if (!isAuthenticated && !userId) {
             navigate('/login', { state: { from: location.pathname } });
@@ -131,18 +233,12 @@ const Profile: React.FC = () => {
                     console.log('Using auth user data for profile');
                 }
 
-                // Configure headers based on authentication
-                const headers: Record<string, string> = {};
-                if (token) {
-                    headers.Authorization = `Bearer ${token}`;
-                }
-
                 // Fetch ALL properties from the main endpoint
                 try {
                     console.log('Fetching all properties');
 
                     const response = await axios.get<Property[]>(`${API_URL}/api/Property`, {
-                        headers: headers
+                        headers: token ? { Authorization: `Bearer ${token}` } : {}
                     });
 
                     // Use the transformer to convert API data to UI components
@@ -185,7 +281,7 @@ const Profile: React.FC = () => {
                     try {
                         const userResponse = await axios.get(
                             `${API_URL}/api/User/${targetUserId}`,
-                            { headers }
+                            { headers: token ? { Authorization: `Bearer ${token}` } : {} }
                         );
 
                         if (userResponse.data && userResponse.data.isSuccess) {
@@ -319,11 +415,11 @@ const Profile: React.FC = () => {
                             {/* Stats */}
                             <div className="flex justify-center md:justify-start mt-4 space-x-6">
                                 <div className="text-center">
-                                    <p className="font-bold">{profileData?.followingCount || 0}</p>
+                                    <p className="font-bold">{profileData?.followingCount || followData.followingCount || 0}</p>
                                     <p className="text-gray-600 text-sm">Following</p>
                                 </div>
                                 <div className="text-center">
-                                    <p className="font-bold">{profileData?.followersCount || 0}</p>
+                                    <p className="font-bold">{profileData?.followersCount || followData.followersCount || 0}</p>
                                     <p className="text-gray-600 text-sm">Followers</p>
                                 </div>
                                 <div className="text-center">
@@ -349,8 +445,23 @@ const Profile: React.FC = () => {
                                 </>
                             ) : (
                                 <>
-                                    <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md">
-                                        Follow
+                                    <button
+                                        className={`flex items-center ${followData.isFollowing ? 'bg-gray-200 text-gray-800' : 'bg-blue-600 text-white'} px-6 py-2 rounded-md hover:opacity-90 transition-colors`}
+                                        onClick={handleToggleFollow}
+                                        disabled={isFollowLoading}
+                                    >
+                                        {isFollowLoading ? (
+                                            <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
+                                        ) : followData.isFollowing ? (
+                                            <svg className="w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                            </svg>
+                                        )}
+                                        {followData.isFollowing ? 'Following' : 'Follow'}
                                     </button>
                                     <button className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md">
                                         Message

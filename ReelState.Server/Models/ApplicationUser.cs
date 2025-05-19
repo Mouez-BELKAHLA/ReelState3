@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using System;
 
-namespace ReelState.Server.Models // Updated namespace to match folder structure
+namespace ReelState.Server.Models
 {
     public class ApplicationUser : IdentityUser
     {
@@ -12,6 +12,7 @@ namespace ReelState.Server.Models // Updated namespace to match folder structure
         // Optional properties should be nullable
         public string? ProfilePictureUrl { get; set; }
         public string? RefreshToken { get; set; }
+        public string? Bio { get; set; } // Add this new field
 
         // Non-nullable DateTime should have default values
         public DateTime RefreshTokenExpiryTime { get; set; } = DateTime.MinValue;

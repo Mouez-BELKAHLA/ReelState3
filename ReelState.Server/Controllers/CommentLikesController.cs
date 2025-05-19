@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using ReelState.Data;
 using ReelState.Server.Models;
 using ReelState.Server.Models.DTOs;
+using ReelState.Server.Services;
 
 namespace ReelState.Server.Controllers
 {
@@ -14,10 +15,14 @@ namespace ReelState.Server.Controllers
     public class CommentLikesController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly NotificationService _notificationService; // Added notification service
 
-        public CommentLikesController(ApplicationDbContext context)
+        public CommentLikesController(
+            ApplicationDbContext context,
+            NotificationService notificationService) // Updated constructor
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         // GET: api/CommentLikes/status/{commentId}
@@ -110,6 +115,18 @@ namespace ReelState.Server.Controllers
 
                 _context.CommentLikes.Add(like);
                 await _context.SaveChangesAsync();
+
+                // Add notification for comment like - THIS WAS MISSING
+                try
+                {
+                    await _notificationService.CreateCommentLikeNotification(request.CommentId, userId);
+                    Console.WriteLine($"Created comment like notification for comment {request.CommentId}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error creating comment like notification: {ex.Message}");
+                    // Continue even if notification fails
+                }
 
                 var likesCount = await _context.CommentLikes.CountAsync(l => l.CommentId == request.CommentId);
 

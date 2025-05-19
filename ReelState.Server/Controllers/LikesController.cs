@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using ReelState.Data;
 using ReelState.Server.Models;
 using ReelState.Server.Models.DTOs;
+using ReelState.Server.Services;
 
 namespace ReelState.Server.Controllers
 {
@@ -16,10 +17,14 @@ namespace ReelState.Server.Controllers
     public class LikesController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly NotificationService _notificationService;
 
-        public LikesController(ApplicationDbContext context)
+        public LikesController(
+            ApplicationDbContext context,
+            NotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         // GET: api/Likes/status/{propertyId}
@@ -90,6 +95,9 @@ namespace ReelState.Server.Controllers
             var like = await _context.Likes
                 .FirstOrDefaultAsync(l => l.PropertyId == request.PropertyId && l.UserId == userId);
 
+            // Check if we are liking our own property
+            bool isOwnProperty = property.UserId == userId;
+
             if (like != null)
             {
                 // Unlike: Remove existing like
@@ -107,21 +115,52 @@ namespace ReelState.Server.Controllers
             }
             else
             {
-                // Like: Add new like
-               // Like: Add new like - USE THE PUBLIC CONSTRUCTOR HERE
-        like = new Like(request.PropertyId, userId);
-        
-        _context.Likes.Add(like);
-        await _context.SaveChangesAsync();
+                try
+                {
+                    // Like: Add new like
+                    like = new Like(request.PropertyId, userId);
 
-        var likesCount = await _context.Likes.CountAsync(l => l.PropertyId == request.PropertyId);
+                    _context.Likes.Add(like);
+                    await _context.SaveChangesAsync();
 
-        return Ok(new LikeResponseDto
-        {
-            IsSuccess = true,
-            IsLiked = true,
-            LikesCount = likesCount
-        });
+                    // Only create notification if the like was successfully added
+                    // and it's not the user's own property
+                    if (!isOwnProperty)
+                    {
+                        try
+                        {
+                            // Create notification
+                            await _notificationService.CreatePropertyLikeNotification(request.PropertyId, userId);
+                            Console.WriteLine($"Created property like notification for property {request.PropertyId}");
+                        }
+                        catch (Exception ex)
+                        {
+                            // Log the error but don't fail the like operation
+                            Console.WriteLine($"Error creating property like notification: {ex.Message}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Skip notification for user liking their own property {request.PropertyId}");
+                    }
+
+                    var likesCount = await _context.Likes.CountAsync(l => l.PropertyId == request.PropertyId);
+
+                    return Ok(new LikeResponseDto
+                    {
+                        IsSuccess = true,
+                        IsLiked = true,
+                        LikesCount = likesCount
+                    });
+                }
+                catch (Exception ex)
+                {
+                    return BadRequest(new LikeResponseDto
+                    {
+                        IsSuccess = false,
+                        Message = $"Error adding like: {ex.Message}"
+                    });
+                }
             }
         }
     }

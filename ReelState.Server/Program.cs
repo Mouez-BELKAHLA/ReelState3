@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.FileProviders;
 using System.Text.Json.Serialization.Metadata;
+using ReelState.Server.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -161,9 +162,10 @@ builder.Services.AddCors(options =>
 // Add Services
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IGoogleAuthService, GoogleAuthService>();
-
+builder.Services.AddScoped<ReelState.Server.Services.NotificationService>();
 // Configure static files to serve uploaded files
 builder.Services.AddDirectoryBrowser();
+builder.Services.AddScoped<NotificationService>();
 
 var app = builder.Build();
 
