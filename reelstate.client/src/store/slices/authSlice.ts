@@ -18,6 +18,7 @@ export const loginUser = createAsyncThunk(
     async (credentials: LoginCredentials, { rejectWithValue }) => {
         try {
             const response = await AuthService.login(credentials);
+            console.log('Login response:', response); // Debug log
             return response;
         } catch (error) {
             return rejectWithValue(handleAuthError(error, 'login'));
@@ -117,11 +118,15 @@ const authSlice = createSlice({
                         email: action.payload.email,
                         firstName: action.payload.firstName,
                         lastName: action.payload.lastName,
-                        profilePictureUrl: action.payload.profilePictureUrl
+                        profilePictureUrl: action.payload.profilePictureUrl,
+                        roles: action.payload.roles || [] // Include roles from the payload
                     };
                     state.token = action.payload.token;
                     state.refreshToken = action.payload.refreshToken;
                     state.isAuthenticated = true;
+
+                    // Debug log
+                    console.log('User authenticated with roles:', action.payload.roles);
                 }
                 state.isLoading = false;
                 state.error = action.payload.isSuccess ? null : action.payload.message || null;
@@ -143,7 +148,8 @@ const authSlice = createSlice({
                         email: action.payload.email,
                         firstName: action.payload.firstName,
                         lastName: action.payload.lastName,
-                        profilePictureUrl: action.payload.profilePictureUrl
+                        profilePictureUrl: action.payload.profilePictureUrl,
+                        roles: action.payload.roles || [] // Include roles from the payload
                     };
                     state.token = action.payload.token;
                     state.refreshToken = action.payload.refreshToken;
@@ -169,7 +175,8 @@ const authSlice = createSlice({
                         email: action.payload.email,
                         firstName: action.payload.firstName,
                         lastName: action.payload.lastName,
-                        profilePictureUrl: action.payload.profilePictureUrl
+                        profilePictureUrl: action.payload.profilePictureUrl,
+                        roles: action.payload.roles || [] // Include roles from the payload
                     };
                     state.token = action.payload.token;
                     state.refreshToken = action.payload.refreshToken;
@@ -201,7 +208,8 @@ const authSlice = createSlice({
                         email: action.payload.email,
                         firstName: action.payload.firstName,
                         lastName: action.payload.lastName,
-                        profilePictureUrl: action.payload.profilePictureUrl
+                        profilePictureUrl: action.payload.profilePictureUrl,
+                        roles: action.payload.roles || [] // Include roles from the payload
                     };
                     state.token = action.payload.token;
                     state.refreshToken = action.payload.refreshToken;

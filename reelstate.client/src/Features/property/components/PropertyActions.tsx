@@ -1,5 +1,6 @@
 import React from 'react';
 import { VideoCardProperty } from '../types/Property';
+import { UserProfile } from '..'; // Import the UserProfile component
 
 interface PropertyActionsProps {
     property: VideoCardProperty;
@@ -107,15 +108,14 @@ const PropertyActions: React.FC<PropertyActionsProps> = ({
                 </button>
             </div>
 
-            {/* User Profile Picture */}
+            {/* User Profile Picture - Now using UserProfile component */}
             <div className="mt-2">
-                <div className="w-10 h-10 rounded-full border border-gray-300 overflow-hidden">
-                    <img
-                        src={property.avatarUrl || "https://via.placeholder.com/40"}
-                        alt={property.username || "User"}
-                        className="w-full h-full object-cover"
-                    />
-                </div>
+                <UserProfile
+                    avatarUrl={property.avatarUrl || "https://via.placeholder.com/40"}
+                    username={property.username || "User"}
+                    userId={property.userId}
+                    linkToProfile={true}
+                />
             </div>
         </div>
     );

@@ -43,6 +43,8 @@ export interface Property {
     likesCount?: number;
     commentsCount?: number;
     isLiked?: boolean;
+    status: 'pending' | 'approved' | 'rejected';
+    statusReason?: string; // For storing rejection reasons
 }
 
 /**
@@ -82,6 +84,9 @@ export interface VideoCardProperty {
     };
     title?: string;
     // Other fields...
+    // Add status field
+    status?: 'pending' | 'approved' | 'rejected';
+    statusReason?: string;
 }
 
 /**

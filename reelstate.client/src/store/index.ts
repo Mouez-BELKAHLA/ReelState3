@@ -6,13 +6,15 @@ import propertyReducer from './slices/propertySlice';
 import userActivityReducer from './slices/userActivitySlice';
 import { authMiddleware } from './middleware/authMiddleware';
 import notificationReducer from './slices/notificationSlice';
+import adminReducer from './slices/adminSlice';
 
 // Root reducer configuration
 const rootReducer = combineReducers({
     auth: authReducer,
     property: propertyReducer,
     userActivity: userActivityReducer,
-    notifications: notificationReducer, // Add the notification reducer
+    notifications: notificationReducer,
+    admin: adminReducer, // Added admin reducer
 });
 
 // Redux persist configuration

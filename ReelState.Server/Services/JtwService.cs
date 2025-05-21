@@ -4,11 +4,12 @@ using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
-using ReelState.Server.Models; // Changed from ReelState.Models to match ApplicationUser's namespace
+using ReelState.Server.Models;
 
 namespace ReelState.Services
 {
@@ -17,6 +18,22 @@ namespace ReelState.Services
         Task<string> GenerateJwtToken(ApplicationUser user);
         string GenerateRefreshToken();
         ClaimsPrincipal? GetPrincipalFromExpiredToken(string token);
+    }
+
+    // JWT Response to include roles
+    public class JwtResponse
+    {
+        public bool IsSuccess { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public string Token { get; set; } = string.Empty;
+        public string RefreshToken { get; set; } = string.Empty;
+        public DateTime Expiration { get; set; }
+        public string UserId { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string? ProfilePictureUrl { get; set; }
+        public List<string> Roles { get; set; } = new List<string>();
     }
 
     public class JwtService : IJwtService
@@ -75,6 +92,27 @@ namespace ReelState.Services
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        public async Task<JwtResponse> GenerateTokenResponseAsync(ApplicationUser user)
+        {
+            var userRoles = await _userManager.GetRolesAsync(user);
+            var token = await GenerateJwtToken(user);
+            var refreshToken = GenerateRefreshToken();
+
+            return new JwtResponse
+            {
+                IsSuccess = true,
+                Token = token,
+                RefreshToken = refreshToken,
+                Expiration = DateTime.Now.AddMinutes(60),
+                UserId = user.Id,
+                Email = user.Email ?? string.Empty,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                ProfilePictureUrl = user.ProfilePictureUrl,
+                Roles = userRoles.ToList()
+            };
         }
 
         public string GenerateRefreshToken()

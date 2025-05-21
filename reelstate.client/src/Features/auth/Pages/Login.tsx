@@ -12,7 +12,7 @@ const Login: React.FC = () => {
     const dispatch = useAppDispatch();
 
     // Get auth state from Redux
-    const { isLoading, error, isAuthenticated } = useAppSelector(state => state.auth);
+    const { isLoading, error, isAuthenticated, user } = useAppSelector(state => state.auth);
 
     // If user is already authenticated, redirect to dashboard
     useEffect(() => {
@@ -31,13 +31,24 @@ const Login: React.FC = () => {
             };
 
             // Dispatch login action
-            await dispatch(loginUser(credentials)).unwrap();
+            const result = await dispatch(loginUser(credentials)).unwrap();
+            console.log('Login successful, roles:', result.roles);
+            console.log('Full login response:', result);
+
             navigate('/dashboard');
         } catch (err: unknown) {
             // Error handling is automatic through the Redux slice
             console.error('Login failed:', err);
         }
     };
+
+    // Debug output for user
+    useEffect(() => {
+        if (user) {
+            console.log('Current user:', user);
+            console.log('User roles:', user.roles);
+        }
+    }, [user]);
 
     // Clear errors when component unmounts
     useEffect(() => {

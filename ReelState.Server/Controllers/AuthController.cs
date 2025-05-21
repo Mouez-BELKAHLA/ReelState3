@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using ReelState.Models;
@@ -30,134 +32,6 @@ namespace ReelState.Server.Controllers
             _jwtService = jwtService;
             _googleAuthService = googleAuthService;
         }
-
-        // ======================================================
-        // TEMPORARY TEST METHODS - REMOVE IN PRODUCTION
-        // ======================================================
-
-        /*
-        // Test endpoint for forcing token refresh - REMOVE IN PRODUCTION
-        [HttpPost("refreshTokenForce")]
-        public async Task<IActionResult> RefreshTokenForce([FromBody] TokenRequestDto model, [FromQuery] bool force = true)
-        {
-            if (model == null)
-                return BadRequest("Invalid client request");
-
-            var principal = _jwtService.GetPrincipalFromExpiredToken(model.Token);
-            if (principal == null)
-                return BadRequest("Invalid jwt token");
-
-            var email = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (email == null)
-                return BadRequest("Invalid token claim");
-
-            var user = await _userManager.FindByEmailAsync(email);
-
-            // Only check refresh token validity, not token expiration
-            if (user == null || user.RefreshToken != model.RefreshToken)
-                return BadRequest("Invalid refresh token");
-
-            // Skip the expiration check that exists in the original method
-            if (!force && user.RefreshTokenExpiryTime <= DateTime.Now)
-                return BadRequest("Refresh token expired");
-
-            var newToken = await _jwtService.GenerateJwtToken(user);
-            var newRefreshToken = _jwtService.GenerateRefreshToken();
-
-            user.RefreshToken = newRefreshToken;
-            await _userManager.UpdateAsync(user);
-
-            return Ok(new AuthResponseDto
-            {
-                IsSuccess = true,
-                Token = newToken,
-                RefreshToken = newRefreshToken,
-                Expiration = DateTime.Now.AddMinutes(120),
-                UserId = user.Id,
-                Email = user.Email ?? string.Empty,
-                FirstName = user.FirstName,
-                LastName = user.LastName
-            });
-        }
-
-        // Debug endpoint for token inspection - REMOVE IN PRODUCTION
-        [HttpGet("debug-token")]
-        public async Task<IActionResult> DebugToken(string email)
-        {
-            if (string.IsNullOrEmpty(email))
-                return BadRequest("Email is required");
-
-            var user = await _userManager.FindByEmailAsync(email);
-            if (user == null)
-                return NotFound("User not found");
-
-            return Ok(new
-            {
-                email = user.Email,
-                refreshToken = user.RefreshToken?.Substring(0, 10) + "..." // Show first 10 chars for safety
-            });
-        }
-
-        // Debug endpoint for full token inspection - REMOVE IN PRODUCTION
-        [HttpGet("debug-token-full")]
-        public async Task<IActionResult> DebugTokenFull(string email)
-        {
-            if (string.IsNullOrEmpty(email))
-                return BadRequest("Email is required");
-
-            var user = await _userManager.FindByEmailAsync(email);
-            if (user == null)
-                return NotFound("User not found");
-
-            return Ok(new
-            {
-                email = user.Email,
-                refreshTokenFull = user.RefreshToken,
-                tokenLength = user.RefreshToken?.Length
-            });
-        }
-
-        // Test endpoint for token refresh bypassing validation - REMOVE IN PRODUCTION
-        [HttpPost("refreshTokenFull")]
-        public async Task<IActionResult> RefreshTokenFull([FromBody] TokenRequestDto model)
-        {
-            if (model == null)
-                return BadRequest("Invalid client request");
-
-            var principal = _jwtService.GetPrincipalFromExpiredToken(model.Token);
-            if (principal == null)
-                return BadRequest("Invalid jwt token");
-
-            var email = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (email == null)
-                return BadRequest("Invalid token claim");
-
-            var user = await _userManager.FindByEmailAsync(email);
-            if (user == null)
-                return BadRequest($"User not found with email: {email}");
-
-            // Generate new tokens regardless of current token values
-            var newToken = await _jwtService.GenerateJwtToken(user);
-            var newRefreshToken = _jwtService.GenerateRefreshToken();
-
-            // Store the new refresh token
-            user.RefreshToken = newRefreshToken;
-            await _userManager.UpdateAsync(user);
-
-            // Return new tokens
-            return Ok(new AuthResponseDto
-            {
-                IsSuccess = true,
-                Token = newToken,
-                RefreshToken = newRefreshToken,
-                Expiration = DateTime.Now.AddMinutes(120),
-                UserId = user.Id,
-                Email = user.Email ?? string.Empty,
-                FirstName = user.FirstName,
-                LastName = user.LastName
-            });
-        }
-        */
 
         // ======================================================
         // CORE AUTHENTICATION ENDPOINTS
@@ -191,6 +65,12 @@ namespace ReelState.Server.Controllers
                     Message = "User creation failed! Please check details and try again."
                 });
 
+            // Add user to standard User role
+            await _userManager.AddToRoleAsync(user, "User");
+
+            // Get user roles
+            var userRoles = await _userManager.GetRolesAsync(user);
+
             // Generate tokens
             var token = await _jwtService.GenerateJwtToken(user);
             var refreshToken = _jwtService.GenerateRefreshToken();
@@ -210,7 +90,8 @@ namespace ReelState.Server.Controllers
                 Email = user.Email,
                 FirstName = user.FirstName,
                 LastName = user.LastName,
-                Message = "User created successfully!"
+                Message = "User created successfully!",
+                Roles = userRoles.ToList()
             });
         }
 
@@ -240,6 +121,12 @@ namespace ReelState.Server.Controllers
             user.LastLogin = DateTime.UtcNow;
             await _userManager.UpdateAsync(user);
 
+            // Get user roles
+            var userRoles = await _userManager.GetRolesAsync(user);
+
+            // Log roles to debug
+            Console.WriteLine($"User {user.Email} has the following roles: {string.Join(", ", userRoles)}");
+
             // Generate tokens
             var token = await _jwtService.GenerateJwtToken(user);
             var refreshToken = _jwtService.GenerateRefreshToken();
@@ -259,7 +146,8 @@ namespace ReelState.Server.Controllers
                 Email = user.Email ?? string.Empty,
                 FirstName = user.FirstName,
                 LastName = user.LastName,
-                ProfilePictureUrl = user.ProfilePictureUrl
+                ProfilePictureUrl = user.ProfilePictureUrl,
+                Roles = userRoles.ToList() // Include roles in the response
             });
         }
 
@@ -298,6 +186,9 @@ namespace ReelState.Server.Controllers
                         IsSuccess = false,
                         Message = "User creation failed! Please try again."
                     });
+
+                // Add new user to standard User role
+                await _userManager.AddToRoleAsync(user, "User");
             }
             else
             {
@@ -310,6 +201,9 @@ namespace ReelState.Server.Controllers
                     await _userManager.UpdateAsync(user);
                 }
             }
+
+            // Get user roles
+            var userRoles = await _userManager.GetRolesAsync(user);
 
             // Update last login
             user.LastLogin = DateTime.UtcNow;
@@ -334,7 +228,8 @@ namespace ReelState.Server.Controllers
                 Email = user.Email ?? string.Empty,
                 FirstName = user.FirstName,
                 LastName = user.LastName,
-                ProfilePictureUrl = user.ProfilePictureUrl
+                ProfilePictureUrl = user.ProfilePictureUrl,
+                Roles = userRoles.ToList() // Include roles in the response
             });
         }
 
@@ -357,6 +252,9 @@ namespace ReelState.Server.Controllers
             if (user == null || user.RefreshToken != model.RefreshToken || user.RefreshTokenExpiryTime <= DateTime.Now)
                 return BadRequest("Invalid refresh token or token expired");
 
+            // Get user roles
+            var userRoles = await _userManager.GetRolesAsync(user);
+
             var newToken = await _jwtService.GenerateJwtToken(user);
             var newRefreshToken = _jwtService.GenerateRefreshToken();
 
@@ -372,7 +270,9 @@ namespace ReelState.Server.Controllers
                 UserId = user.Id,
                 Email = user.Email ?? string.Empty,
                 FirstName = user.FirstName,
-                LastName = user.LastName
+                LastName = user.LastName,
+                ProfilePictureUrl = user.ProfilePictureUrl,
+                Roles = userRoles.ToList() // Include roles in the response
             });
         }
 
@@ -410,6 +310,9 @@ namespace ReelState.Server.Controllers
             if (user == null)
                 return NotFound(new { IsSuccess = false, Message = "User not found in database" });
 
+            // Get user roles
+            var userRoles = await _userManager.GetRolesAsync(user);
+
             return Ok(new
             {
                 IsSuccess = true,
@@ -419,7 +322,34 @@ namespace ReelState.Server.Controllers
                 LastName = user.LastName,
                 ProfilePictureUrl = user.ProfilePictureUrl,
                 Provider = user.Provider,
-                LastLogin = user.LastLogin
+                LastLogin = user.LastLogin,
+                Roles = userRoles.ToList() // Include roles in the response
+            });
+        }
+
+        // For debugging - This will help validate if a user has admin role
+        [Authorize]
+        [HttpGet("check-admin")]
+        public async Task<IActionResult> CheckAdminStatus()
+        {
+            var userEmail = User.FindFirst(ClaimTypes.Name)?.Value;
+            if (string.IsNullOrEmpty(userEmail))
+                return BadRequest(new { IsAdmin = false, Message = "User not found in token" });
+
+            var user = await _userManager.FindByEmailAsync(userEmail);
+            if (user == null)
+                return NotFound(new { IsAdmin = false, Message = "User not found in database" });
+
+            var isAdmin = await _userManager.IsInRoleAsync(user, "Admin");
+            var roles = await _userManager.GetRolesAsync(user);
+
+            return Ok(new
+            {
+                IsAdmin = isAdmin,
+                Roles = roles,
+                UserEmail = userEmail,
+                UserId = user.Id,
+                Claims = User.Claims.Select(c => new { c.Type, c.Value }).ToList()
             });
         }
     }

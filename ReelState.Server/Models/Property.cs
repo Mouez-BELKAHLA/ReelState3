@@ -5,6 +5,13 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ReelState.Server.Models
 {
+    public enum PropertyStatus
+    {
+        Pending = 0,
+        Approved = 1,
+        Rejected = 2
+    }
+
     public class Property
     {
         public Property()
@@ -13,6 +20,7 @@ namespace ReelState.Server.Models
             Id = Guid.NewGuid().ToString();
             CreatedAt = DateTime.UtcNow;
             Photos = new List<PropertyPhoto>();
+            Status = PropertyStatus.Pending; // Default to pending
         }
 
         [Key]
@@ -47,13 +55,19 @@ namespace ReelState.Server.Models
 
         public DateTime CreatedAt { get; set; }
 
+        // New properties for admin approval
+        public PropertyStatus Status { get; set; }
+
+        public string? RejectionReason { get; set; }
+
         [ForeignKey("UserId")]
         public virtual ApplicationUser? User { get; set; }
 
         public virtual ICollection<PropertyPhoto> Photos { get; set; }
     }
 
-    public class PropertyPhoto
+
+public class PropertyPhoto
     {
         public PropertyPhoto()
         {

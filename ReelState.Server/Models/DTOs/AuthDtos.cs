@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace ReelState.Models.DTOs
@@ -45,6 +46,7 @@ namespace ReelState.Models.DTOs
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
         public string? ProfilePictureUrl { get; set; } // Optional, can be null
+        public List<string> Roles { get; set; } = new List<string>(); // Add roles property
     }
 
     public class TokenRequestDto

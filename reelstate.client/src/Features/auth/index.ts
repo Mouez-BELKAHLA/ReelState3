@@ -3,10 +3,11 @@ export { default as GoogleSignInButton } from './components/GoogleSignInButton';
 export { default as ProtectedRoute } from './components/ProtectedRoute';
 
 // Export pages
-export { default as Login } from './Pages/Login';
-export { default as Register } from './Pages/Register';
+export { default as Login } from './pages/Login';
+export { default as Register } from './pages/Register';
+export { default as UnauthorizedPage } from './pages/UnauthorizedPage';
 
-// Export contexts and providers
+// Export contexts and providers if needed
 export { default as AuthContext } from '../../unused/contexts/AuthContext';
 export { default as AuthProvider } from '../../unused/contexts/AuthProvider';
 
@@ -22,5 +23,4 @@ export * from './services/AuthService';
 
 // Export types
 export * from './types/Auth';
-export { authReducer, initialState } from '../../unused/contexts/AuthContext'; // Assuming they're defined there
-
+export { authReducer, initialState } from '../../unused/contexts/AuthContext'; // Only if defined there

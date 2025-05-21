@@ -1,10 +1,11 @@
-// User and AuthState look good - they follow frontend convention
 export interface User {
     id: string;
     email: string;
     firstName: string;
     lastName: string;
     profilePictureUrl?: string;
+    displayName?: string;
+    roles?: string[]; // Add this field for roles
 }
 
 export interface AuthState {
@@ -30,7 +31,7 @@ export interface RegisterCredentials {
     LastName: string;    // PascalCase to match .NET backend
 }
 
-// AuthResponse and TokenRequest look good
+// AuthResponse to include roles
 export interface AuthResponse {
     isSuccess: boolean;
     message?: string;
@@ -42,6 +43,7 @@ export interface AuthResponse {
     firstName: string;
     lastName: string;
     profilePictureUrl?: string;
+    roles?: string[]; // Add this field for roles
 }
 
 export interface TokenRequest {

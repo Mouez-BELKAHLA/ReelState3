@@ -10,7 +10,6 @@ using ReelState.Server.Models;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Encodings.Web;
-using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.FileProviders;
@@ -180,6 +179,11 @@ if (app.Environment.IsDevelopment())
 
     // In development, detailed errors are helpful
     app.UseDeveloperExceptionPage();
+
+    // Initialize roles and admin user in development mode
+    Task.Run(async () => {
+        await ReelState.Server.InitializeDb.InitializeRolesAndAdmin(app);
+    }).GetAwaiter().GetResult();
 }
 else
 {

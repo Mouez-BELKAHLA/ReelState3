@@ -36,9 +36,10 @@ namespace ReelState.Server.Controllers
             _env = env;
             _logger = logger;
         }
-        [HttpGet]
-        [AllowAnonymous] // Add this attribute to allow anonymous access
+        
 
+        [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetProperties()
         {
             try
@@ -46,6 +47,7 @@ namespace ReelState.Server.Controllers
                 _logger.LogInformation("Fetching all properties");
 
                 var properties = await _context.Properties
+                    .Where(p => p.Status == PropertyStatus.Approved) // Only return approved properties
                     .Include(p => p.User)
                     .Include(p => p.Photos)
                     .OrderByDescending(p => p.CreatedAt)
