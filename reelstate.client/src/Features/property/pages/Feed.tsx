@@ -9,6 +9,7 @@ import {
     setActiveProperty,
     updatePropertyLike
 } from "../../../store/slices/propertySlice";
+import { setShowNavbar } from "../../../store/slices/uiSlice";
 import { CommentPanel } from "../../../shared";
 import { PropertyList } from "..";
 
@@ -25,10 +26,13 @@ export default function Feed() {
         showComments
     } = useAppSelector(state => state.property);
     const { isAuthenticated } = useAppSelector(state => state.auth);
+    const { showNavbar } = useAppSelector(state => state.ui);
 
     // Layout state - still kept locally as it's UI related
     const [hasLargeLayout, setHasLargeLayout] = useState(false);
     const [windowWidth, setWindowWidth] = useState(0);
+    const [previousIndex, setPreviousIndex] = useState(-1);
+    const [isMobile, setIsMobile] = useState(false);
 
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -40,6 +44,42 @@ export default function Feed() {
     const LARGE_LAYOUT_BREAKPOINT = 1280;
     const MEDIUM_LAYOUT_BREAKPOINT = 768;
     const SMALL_LAYOUT_BREAKPOINT = 480;
+    const MOBILE_BREAKPOINT = 768; // Define mobile breakpoint
+
+    // Show navbar by default when entering this component
+    useEffect(() => {
+        // Make sure navbar is visible when component mounts
+        dispatch(setShowNavbar(true));
+
+        // Cleanup - ensure navbar is visible when leaving this component
+        return () => {
+            dispatch(setShowNavbar(true));
+        };
+    }, [dispatch]);
+
+    // Add scroll event listener to detect when user scrolls to a new property
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container || !isMobile) return; // Only apply on mobile
+
+        const handleScroll = () => {
+            const scrollPosition = container.scrollTop;
+            const itemHeight = container.clientHeight;
+            const currentIndex = Math.round(scrollPosition / itemHeight);
+
+            // If scrolled to a new item, hide the navbar (only on mobile)
+            if (currentIndex !== previousIndex && currentIndex >= 0 && isMobile) {
+                dispatch(setShowNavbar(false));
+                setPreviousIndex(currentIndex);
+            }
+        };
+
+        container.addEventListener('scroll', handleScroll);
+
+        return () => {
+            container.removeEventListener('scroll', handleScroll);
+        };
+    }, [dispatch, previousIndex, isMobile]);
 
     // Add global style to remove scrollbars and fix TikTok-style scrolling
     useEffect(() => {
@@ -129,6 +169,42 @@ export default function Feed() {
                 justify-content: center;
                 background: #000;
             }
+            
+            /* Navbar toggle button styles */
+            .navbar-toggle {
+                position: fixed;
+                top: 16px;
+                right: 16px;
+                z-index: 1000;
+                background-color: rgba(0, 0, 0, 0.5);
+                color: white;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                opacity: 0;
+                visibility: hidden;
+            }
+            
+            .navbar-toggle.visible {
+                opacity: 1;
+                visibility: visible;
+            }
+            
+            .navbar-toggle:hover {
+                background-color: rgba(0, 0, 0, 0.7);
+            }
+            
+            /* Only hide navbar on mobile */
+            @media (min-width: 769px) {
+                .navbar-toggle {
+                    display: none !important;
+                }
+            }
         `;
         document.head.appendChild(style);
 
@@ -143,13 +219,19 @@ export default function Feed() {
             const width = window.innerWidth;
             setWindowWidth(width);
             setHasLargeLayout(width >= LARGE_LAYOUT_BREAKPOINT);
+            setIsMobile(width < MOBILE_BREAKPOINT);
+
+            // On desktop, always show navbar
+            if (width >= MOBILE_BREAKPOINT) {
+                dispatch(setShowNavbar(true));
+            }
         };
 
         checkLayoutSize();
         window.addEventListener('resize', checkLayoutSize);
 
         return () => window.removeEventListener('resize', checkLayoutSize);
-    }, []);
+    }, [dispatch]);
 
     // Fetch properties on component mount
     useEffect(() => {
@@ -199,6 +281,15 @@ export default function Feed() {
 
     // Set active video index when video is in view
     const handleVideoInView = (index: number) => {
+        // If we're moving to a new video
+        if (index !== previousIndex) {
+            // Hide navbar when switching to a new property (only on mobile)
+            if (isMobile) {
+                dispatch(setShowNavbar(false));
+            }
+            setPreviousIndex(index);
+        }
+
         dispatch(setActiveVideoIndex(index));
     };
 
@@ -217,6 +308,20 @@ export default function Feed() {
             }
         }
     }, [activeVideoIndex, properties]);
+
+    // Handle navbar toggle
+    const handleShowNavbar = (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent event from bubbling to container
+        dispatch(setShowNavbar(true));
+    };
+
+    // Calculate container height based on navbar visibility - but always subtract navbar height on desktop
+    const getContainerHeight = () => {
+        if (!isMobile) {
+            return 'calc(100vh - 55px)'; // Always leave space for navbar on desktop
+        }
+        return showNavbar ? 'calc(100vh - 55px)' : '100vh'; // Dynamic on mobile
+    };
 
     if (isLoading) {
         return (
@@ -273,7 +378,21 @@ export default function Feed() {
 
     return (
         <div className="bg-black h-screen overflow-hidden">
-            <div className="h-[calc(100vh-55px)] overflow-hidden" ref={containerRef}>
+            {/* Navbar toggle button - only visible when navbar is hidden on mobile */}
+            <div
+                className={`navbar-toggle ${!showNavbar && isMobile ? 'visible' : ''}`}
+                onClick={handleShowNavbar}
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </div>
+
+            <div
+                className="overflow-hidden snap-y snap-mandatory"
+                style={{ height: getContainerHeight(), transition: 'height 0.3s ease' }}
+                ref={containerRef}
+            >
                 <div
                     className="h-full video-shift"
                     style={{
@@ -300,10 +419,12 @@ export default function Feed() {
                     <>
                         {hasLargeLayout && (
                             <div
-                                className="fixed top-[55px] right-0 bottom-0 z-40 shadow-xl border-l border-gray-200 bg-white comment-panel-slide"
+                                className="fixed right-0 bottom-0 z-40 shadow-xl border-l border-gray-200 bg-white comment-panel-slide"
                                 style={{
                                     width: `${commentPanelWidth}px`,
-                                    transform: showComments ? 'translateX(0)' : 'translateX(100%)'
+                                    top: '55px', // Always account for navbar on desktop
+                                    transform: showComments ? 'translateX(0)' : 'translateX(100%)',
+                                    transition: 'transform 400ms cubic-bezier(0.33, 1, 0.68, 1)'
                                 }}
                             >
                                 <CommentPanel

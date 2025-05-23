@@ -4,9 +4,10 @@ import { fetchNotifications } from '../../../store/slices/notificationSlice';
 
 interface NotificationBadgeProps {
     onClick: () => void;
+    small?: boolean;
 }
 
-const NotificationBadge: React.FC<NotificationBadgeProps> = ({ onClick }) => {
+const NotificationBadge: React.FC<NotificationBadgeProps> = ({ onClick, small = false }) => {
     const dispatch = useAppDispatch();
     const { unreadCount, isLoading, notifications } = useAppSelector(state => state.notifications);
     // Get the latest unread notification for the tooltip
@@ -33,11 +34,11 @@ const NotificationBadge: React.FC<NotificationBadgeProps> = ({ onClick }) => {
     return (
         <button
             onClick={onClick}
-            className="relative inline-flex items-center p-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full"
+            className={`relative inline-flex items-center ${small ? 'p-1' : 'p-2'} text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full`}
             aria-label="Notifications"
             title={tooltipText}
         >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`${small ? 'w-5 h-5' : 'w-6 h-6'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -46,8 +47,9 @@ const NotificationBadge: React.FC<NotificationBadgeProps> = ({ onClick }) => {
                 />
             </svg>
 
+            {/* Enhanced notification badge with animation for new notifications */}
             {unreadCount > 0 && (
-                <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full">
+                <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/3 -translate-y-1/3 bg-red-600 rounded-full animate-pulse-short">
                     {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
             )}

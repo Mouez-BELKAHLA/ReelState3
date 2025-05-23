@@ -15,13 +15,15 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.FileProviders;
 using System.Text.Json.Serialization.Metadata;
 using ReelState.Server.Services;
+using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure Kestrel to handle large file uploads
-builder.Services.Configure<KestrelServerOptions>(options =>
+// Configure Kestrel to handle large file uploads and listen on all interfaces
+builder.WebHost.ConfigureKestrel(serverOptions =>
 {
-    options.Limits.MaxRequestBodySize = 104857600; // 100MB
+    serverOptions.Limits.MaxRequestBodySize = 104857600; // 100MB
+    serverOptions.ListenAnyIP(5034); // Listen on all network interfaces
 });
 
 // Configure IIS Server options for large file uploads
@@ -146,15 +148,29 @@ builder.Services.AddAuthentication(options =>
     options.CallbackPath = "/api/auth/google-callback";
 });
 
-// Add CORS
+// Enhanced CORS policy to allow access from mobile devices on the same network
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("CorsPolicy", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:5174")
-            .AllowAnyMethod()
-            .AllowAnyHeader()
-            .AllowCredentials();
+        // In development mode, allow any origin to make it easier to test from mobile
+        if (builder.Environment.IsDevelopment())
+        {
+            policy
+                .SetIsOriginAllowed(_ => true) // Allow any origin in development
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .AllowCredentials();
+        }
+        else
+        {
+            // In production, be more specific about allowed origins
+            policy
+                .WithOrigins("https://yourproductionsite.com") // Replace with your actual production domain
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .AllowCredentials();
+        }
     });
 });
 
@@ -179,6 +195,21 @@ if (app.Environment.IsDevelopment())
 
     // In development, detailed errors are helpful
     app.UseDeveloperExceptionPage();
+
+    // Print listening addresses for debugging
+    Console.WriteLine("Development server is running. Listening on:");
+    Console.WriteLine($"- http://localhost:5034");
+
+    // Find and print local IP addresses
+    var hostName = Dns.GetHostName();
+    var addresses = Dns.GetHostAddresses(hostName)
+        .Where(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+        .Select(ip => ip.ToString());
+
+    foreach (var address in addresses)
+    {
+        Console.WriteLine($"- http://{address}:5034");
+    }
 
     // Initialize roles and admin user in development mode
     Task.Run(async () => {
