@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { GOOGLE_CLIENT_ID } from '../Constants/auth';
 import { useAppDispatch } from '../../../store/hooks';
 import { googleLogin } from '../../../store/slices/authSlice';
-
-// Type definitions remain the same
+import { API_URL } from '../../../shared/services/config'; // ADD THIS IMPORT
 
 interface GoogleSignInButtonProps {
     variant?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin';
@@ -24,11 +23,18 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
         try {
             if (response.credential) {
                 console.log("Google sign-in successful, processing token...");
+                console.log("Current hostname:", window.location.hostname);
+                console.log("Using API URL:", API_URL); // Now API_URL is defined
+
                 await dispatch(googleLogin(response.credential)).unwrap();
                 navigate('/dashboard');
             }
         } catch (error) {
             console.error('Google sign-in error:', error);
+            // Show user-friendly error on mobile
+            if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                alert("Sign-in failed. Please try again or use email login.");
+            }
         }
     }, [dispatch, navigate]);
 
@@ -90,6 +96,10 @@ declare global {
             };
         };
     }
+}
+
+interface GoogleCredentialResponse {
+    credential: string;
 }
 
 export default GoogleSignInButton;

@@ -7,7 +7,7 @@ import {
 } from '..'; // Import from barrel file
 import { getErrorMessage, processAuthError } from '../../../shared';
 
-const API_URL = 'http://localhost:5034/api'; // Update to your actual running server URL
+import { API_URL } from '../../../shared/services/config'; // IMPORT FROM CONFIG
 
 class AuthService {
     private setAuthHeader(token: string | null) {
@@ -18,9 +18,23 @@ class AuthService {
         }
     }
 
+    // Helper method to construct API endpoints correctly
+    private getApiEndpoint(path: string): string {
+        // Check if API_URL already ends with /api or is empty (ngrok case)
+        if (API_URL === '') {
+            return `/api/${path}`; // For ngrok case, ensure /api prefix
+        }
+
+        // For localhost or IP cases where API_URL is already http://hostname:5034
+        return `${API_URL}/api/${path}`;
+    }
+
     async login(credentials: LoginCredentials): Promise<AuthResponse> {
         try {
-            const response = await axios.post<AuthResponse>(`${API_URL}/Auth/login`, credentials);
+            const response = await axios.post<AuthResponse>(
+                this.getApiEndpoint('Auth/login'),
+                credentials
+            );
             const data = response.data;
 
             if (data.isSuccess && data.token) {
@@ -43,7 +57,10 @@ class AuthService {
 
     async register(credentials: RegisterCredentials): Promise<AuthResponse> {
         try {
-            const response = await axios.post<AuthResponse>(`${API_URL}/Auth/register`, credentials);
+            const response = await axios.post<AuthResponse>(
+                this.getApiEndpoint('Auth/register'),
+                credentials
+            );
             const data = response.data;
 
             if (data.isSuccess && data.token) {
@@ -65,9 +82,12 @@ class AuthService {
 
     async googleAuth(idToken: string): Promise<AuthResponse> {
         try {
-            const response = await axios.post<AuthResponse>(`${API_URL}/Auth/google-login`, {
-                IdToken: idToken  // Capital I to match C# model
-            });
+            const response = await axios.post<AuthResponse>(
+                this.getApiEndpoint('Auth/google-login'),
+                {
+                    IdToken: idToken  // Capital I to match C# model
+                }
+            );
 
             const data = response.data;
 
@@ -104,10 +124,13 @@ class AuthService {
             });
 
             try {
-                const response = await axios.post<AuthResponse>(`${API_URL}/Auth/refreshToken`, {
-                    Token: token,
-                    RefreshToken: refreshToken
-                });
+                const response = await axios.post<AuthResponse>(
+                    this.getApiEndpoint('Auth/refreshToken'),
+                    {
+                        Token: token,
+                        RefreshToken: refreshToken
+                    }
+                );
 
                 console.log("Refresh Token Response:", response.data);
 

@@ -331,6 +331,14 @@ export default function VideoCard({
         }
     };
 
+    // Handle more options click
+    const handleMoreOptionsClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        // Add your implementation for more options here
+        // For example, you could show a dropdown or a modal
+        alert("More options clicked");
+    };
+
     // Handle direct video events to ensure state synchronization
     const handleVideoPlay = () => {
         setIsPlaying(true);
@@ -511,32 +519,41 @@ export default function VideoCard({
 
             {/* Left side */}
             <div className="absolute left-4 bottom-24 flex flex-col items-center space-y-4 z-10">
-                {/* Left arrow */}
-                {!externalButtons && (isPhotoMode || isLocationMode) && (
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (isLocationMode) {
-                                goToPhotos();
-                            } else {
-                                goToVideo();
-                            }
-                        }}
-                        className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center"
-                        style={{ width: '34px', height: '34px' }}
-                        aria-label={isLocationMode ? "View photos" : "View video"}
-                    >
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
-                )}
+                {/* Left arrow - using same wrapper structure as right side */}
+                <div className="relative flex items-center justify-center" style={{ height: '34px', width: '34px' }}>
+                    {!externalButtons && (isPhotoMode || isLocationMode) && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (isLocationMode) {
+                                    goToPhotos();
+                                } else {
+                                    goToVideo();
+                                }
+                            }}
+                            className="backdrop-blur-lg bg-black/30 rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center"
+                            style={{ width: '34px', height: '34px' }}
+                            aria-label={isLocationMode ? "View photos" : "View video"}
+                        >
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                    )}
 
-                {/* Placeholders */}
+                    {/* Placeholder for when arrow is hidden */}
+                    {(!externalButtons && !(isPhotoMode || isLocationMode)) && (
+                        <div style={{ width: '34px', height: '34px' }} className="opacity-0"></div>
+                    )}
+                </div>
+
+                {/* Placeholders to match the right side buttons */}
                 <div className="opacity-0 pointer-events-none" style={{ width: '40px', height: '40px' }}></div>
                 <div className="opacity-0 pointer-events-none" style={{ width: '34px', height: '48px' }}></div>
                 <div className="opacity-0 pointer-events-none" style={{ width: '34px', height: '48px' }}></div>
                 <div className="opacity-0 pointer-events-none" style={{ width: '34px', height: '48px' }}></div>
+                {/* New placeholder for More Options button */}
+                <div className="opacity-0 pointer-events-none" style={{ width: '34px', height: '34px' }}></div>
             </div>
 
             {/* Right side action buttons */}
@@ -601,6 +618,21 @@ export default function VideoCard({
                         iconClassName="w-5 h-5 text-white"
                         textClassName="text-white text-xs font-medium mt-2"
                     />
+
+                    {/* More Options button (new) */}
+                    <button
+                        onClick={handleMoreOptionsClick}
+                        className="backdrop-blur-lg bg-transparent rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center"
+                    >
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                            />
+                        </svg>
+                    </button>
                 </div>
             )}
 

@@ -3,9 +3,16 @@
 // Get API base URL that works for both local and network access
 const getApiBaseUrl = () => {
     const hostname = window.location.hostname;
-    const backendPort = '5034';
 
-    // Replace localhost with current hostname to support mobile access
+    // Special handling for ngrok to avoid mixed content errors
+    if (hostname.includes('ngrok')) {
+        // When on ngrok, return empty string (not /api) to avoid path duplication
+        // Your service files are already adding /api to the paths
+        return '';
+    }
+
+    // For localhost and direct IP access (keep existing behavior)
+    const backendPort = '5034';
     return `http://${hostname}:${backendPort}`;
 };
 
