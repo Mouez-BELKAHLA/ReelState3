@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { API_URL } from '../../shared';
 import { UserActivityState } from '../../Features/dashboard/types/UserActivity';
+import { getErrorMessage } from '../../shared/helpers';
 
 // Initial state
 const initialState: UserActivityState = {
@@ -71,19 +72,18 @@ export const fetchUserActivity = createAsyncThunk(
             };
 
             return data;
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error in fetchUserActivity:', error);
 
-            if (error.response) {
+            if (axios.isAxiosError(error) && error.response) {
                 console.error('Response status:', error.response.status);
                 console.error('Response data:', error.response.data);
-            } else if (error.request) {
+            } else if (axios.isAxiosError(error) && error.request) {
                 console.error('No response received. Is the API running?');
                 console.error('API URL used:', `${API_URL}/api/UserActivity/${userId}/activity`);
             }
 
-            const errorMessage = error.response?.data?.message || 'Failed to fetch user activity';
-            return rejectWithValue(errorMessage);
+            return rejectWithValue(getErrorMessage(error, 'Failed to fetch user activity'));
         }
     }
 );
