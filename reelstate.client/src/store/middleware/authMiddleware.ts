@@ -10,7 +10,7 @@ interface JwtPayload {
     [key: string]: unknown;
 }
 
-// Standard Redux middleware without any reference to deprecated types
+// Standard Redux middleware 
 export const authMiddleware: Middleware =
     store => next => action => {
         // Process the action first
@@ -30,8 +30,11 @@ export const authMiddleware: Middleware =
 
             // If token will expire in less than 5 minutes, refresh it proactively
             if (tokenData.exp && tokenData.exp - currentTime < 300) {
-                // Using Promise handling without type assertions
-                Promise.resolve(store.dispatch(refreshUserToken()))
+                // TODO: Improve type safety here. Current 'as any' is a workaround for TypeScript's 
+                // inability to properly type AsyncThunkAction. Consider implementing a properly typed 
+                // ThunkMiddleware in the future. See:
+                // https://redux-toolkit.js.org/usage/usage-with-typescript#typing-the-thunkapi-object
+                store.dispatch(refreshUserToken() as any)
                     .catch((error: unknown) => {
                         console.error('Failed to refresh token:', getErrorMessage(error));
                         store.dispatch(setAuthError('Session expired. Please login again.'));
@@ -52,7 +55,6 @@ function parseJwt(token: string): JwtPayload {
         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
         return JSON.parse(window.atob(base64));
     } catch {
-        // Using empty catch block (allowed in TypeScript)
         return {};
     }
 }
@@ -62,7 +64,7 @@ interface ExtendedAxiosRequestConfig extends AxiosRequestConfig {
     _retry?: boolean;
 }
 
-// Strong typing for the store parameter with specific types
+// Strong typing for the store parameter
 interface TypedStore {
     dispatch: (action: unknown) => unknown;
     getState: () => RootState;
@@ -88,8 +90,12 @@ export const setupAxiosInterceptors = (store: TypedStore): void => {
                 const { auth } = store.getState();
                 if (auth.refreshToken) {
                     try {
-                        // Try to refresh the token without type assertions
-                        await Promise.resolve(store.dispatch(refreshUserToken()));
+                        // TODO: Improve type safety here. Current 'as any' is a workaround for TypeScript's
+                        // limitations with async thunks. For a better solution, consider:
+                        // 1. Using ThunkDispatch from redux-thunk
+                        // 2. Creating custom dispatch type extending AsyncThunkDispatch
+                        // 3. Properly typing the middleware with redux-thunk typings
+                        await store.dispatch(refreshUserToken() as any);
                         const newState = store.getState();
 
                         // If we got a new token, retry the original request

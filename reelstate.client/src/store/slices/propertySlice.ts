@@ -5,6 +5,7 @@ import { toVideoCardProperties } from '../../shared/Utils/TypeTransformers';
 import { VideoCardProperty } from '../../Features/property/types/Property';
 import { PropertyLikeState, PropertyLoadingState } from '../../Features/property/types/Property';
 import { LikeService } from '../../Features/property';
+import { getErrorMessage } from '../../shared/helpers';
 
 // Define the property state interface
 interface PropertyState {
@@ -43,8 +44,8 @@ export const fetchProperties = createAsyncThunk(
 
             const response = await axios.get(`${API_URL}/api/Property`, { headers });
             return toVideoCardProperties(response.data, API_URL);
-        } catch (error: any) {
-            return rejectWithValue(error.message || 'Failed to fetch properties');
+        } catch (error: unknown) {
+            return rejectWithValue(getErrorMessage(error, 'Failed to fetch properties'));
         }
     }
 );
@@ -56,15 +57,16 @@ export const checkLikeStatus = createAsyncThunk(
         try {
             const response = await LikeService.checkLikeStatus(propertyId);
             if (!response.isSuccess) {
-                return rejectWithValue(response.message || 'Failed to check like status');
+                // Use a fallback message since response.message might not exist
+                return rejectWithValue('Failed to check like status');
             }
             return {
                 propertyId,
                 isLiked: response.isLiked,
                 count: response.likesCount
             };
-        } catch (error: any) {
-            return rejectWithValue(error.message || 'Failed to check like status');
+        } catch (error: unknown) {
+            return rejectWithValue(getErrorMessage(error, 'Failed to check like status'));
         }
     }
 );
@@ -93,33 +95,36 @@ export const checkAllLikeStatuses = createAsyncThunk(
                             isLiked: response.isLiked
                         };
                     }
-                } catch (error) {
-                    console.error(`Error checking like status for property ${prop.id}:`, error);
+                } catch (innerError: unknown) {
+                    console.error(`Error checking like status for property ${prop.id}:`,
+                        getErrorMessage(innerError));
                 }
             }
 
             return propertyLikes;
-        } catch (error: any) {
-            return rejectWithValue(error.message || 'Failed to check like statuses');
+        } catch (error: unknown) {
+            return rejectWithValue(getErrorMessage(error, 'Failed to check like statuses'));
         }
     }
 );
 
+// Removed unused getState parameter
 export const toggleLike = createAsyncThunk(
     'property/toggleLike',
-    async (propertyId: string, { getState, rejectWithValue }) => {
+    async (propertyId: string, { rejectWithValue }) => {
         try {
             const response = await LikeService.toggleLike(propertyId);
             if (!response.isSuccess) {
-                return rejectWithValue(response.message || 'Failed to toggle like');
+                // Use a fallback message since response.message might not exist
+                return rejectWithValue('Failed to toggle like');
             }
             return {
                 propertyId,
                 isLiked: response.isLiked,
                 count: response.likesCount
             };
-        } catch (error: any) {
-            return rejectWithValue(error.message || 'Failed to toggle like');
+        } catch (error: unknown) {
+            return rejectWithValue(getErrorMessage(error, 'Failed to toggle like'));
         }
     }
 );

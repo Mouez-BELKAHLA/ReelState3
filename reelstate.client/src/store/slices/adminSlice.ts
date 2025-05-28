@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { API_URL } from '../../shared';
 import { VideoCardProperty } from '../../Features/property/types/Property';
+import { getErrorMessage } from '../../shared/helpers';
 
 // Define types
 interface AdminState {
@@ -34,8 +35,9 @@ export const fetchPendingVideos = createAsyncThunk(
             }
 
             return response.data.videos;
-        } catch (error: any) {
-            return rejectWithValue(error.response?.data?.message || error.message || 'An error occurred');
+        } catch (error: unknown) {
+            // Use our error helper to safely extract error message
+            return rejectWithValue(getErrorMessage(error, 'Failed to fetch pending videos'));
         }
     }
 );
@@ -60,8 +62,9 @@ export const approveVideo = createAsyncThunk(
             }
 
             return videoId;
-        } catch (error: any) {
-            return rejectWithValue(error.response?.data?.message || error.message || 'An error occurred');
+        } catch (error: unknown) {
+            // Use our error helper to safely extract error message
+            return rejectWithValue(getErrorMessage(error, 'Failed to approve video'));
         }
     }
 );
@@ -86,8 +89,9 @@ export const rejectVideo = createAsyncThunk(
             }
 
             return videoId;
-        } catch (error: any) {
-            return rejectWithValue(error.response?.data?.message || error.message || 'An error occurred');
+        } catch (error: unknown) {
+            // Use our error helper to safely extract error message
+            return rejectWithValue(getErrorMessage(error, 'Failed to reject video'));
         }
     }
 );

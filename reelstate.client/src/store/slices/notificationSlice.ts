@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import NotificationService from '../../Features/notification/services/NotificationService';
 import { Notification, NotificationState } from '../../Features/notification/types/NotificationTypes';
+import { getErrorMessage } from '../../shared/helpers';
 
 // Initial state
 const initialState: NotificationState = {
@@ -9,6 +10,7 @@ const initialState: NotificationState = {
     isLoading: false,
     error: null
 };
+
 export const refreshNotifications = createAsyncThunk(
     'notifications/refreshNotifications',
     async (_, { getState, rejectWithValue }) => {
@@ -18,11 +20,12 @@ export const refreshNotifications = createAsyncThunk(
 
             const notifications = await NotificationService.getNotifications(auth.token);
             return notifications;
-        } catch (error) {
-            return rejectWithValue(error.message || 'Failed to refresh notifications');
+        } catch (error: unknown) {
+            return rejectWithValue(getErrorMessage(error, 'Failed to refresh notifications'));
         }
     }
 );
+
 // Async thunks
 export const fetchNotifications = createAsyncThunk(
     'notifications/fetchNotifications',
@@ -33,8 +36,8 @@ export const fetchNotifications = createAsyncThunk(
 
             const notifications = await NotificationService.getNotifications(auth.token);
             return notifications;
-        } catch (error) {
-            return rejectWithValue(error.message || 'Failed to fetch notifications');
+        } catch (error: unknown) {
+            return rejectWithValue(getErrorMessage(error, 'Failed to fetch notifications'));
         }
     }
 );
@@ -48,8 +51,8 @@ export const markNotificationAsRead = createAsyncThunk(
 
             await NotificationService.markAsRead(notificationId, auth.token);
             return notificationId;
-        } catch (error) {
-            return rejectWithValue(error.message || 'Failed to mark notification as read');
+        } catch (error: unknown) {
+            return rejectWithValue(getErrorMessage(error, 'Failed to mark notification as read'));
         }
     }
 );
@@ -63,8 +66,8 @@ export const markAllNotificationsAsRead = createAsyncThunk(
 
             await NotificationService.markAllAsRead(auth.token);
             return true;
-        } catch (error) {
-            return rejectWithValue(error.message || 'Failed to mark all notifications as read');
+        } catch (error: unknown) {
+            return rejectWithValue(getErrorMessage(error, 'Failed to mark all notifications as read'));
         }
     }
 );
@@ -78,8 +81,8 @@ export const deleteNotification = createAsyncThunk(
 
             await NotificationService.deleteNotification(notificationId, auth.token);
             return notificationId;
-        } catch (error) {
-            return rejectWithValue(error.message || 'Failed to delete notification');
+        } catch (error: unknown) {
+            return rejectWithValue(getErrorMessage(error, 'Failed to delete notification'));
         }
     }
 );
