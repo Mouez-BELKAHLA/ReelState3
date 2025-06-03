@@ -1,4 +1,14 @@
-﻿/* Add these to your existing CSS file */
+﻿#root {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 2rem;
+    text-align: center;
+}
+
+th, td {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
 
 /* Smooth animation for video shifting */
 .video-shift {
@@ -10,7 +20,7 @@
     transition: transform 400ms cubic-bezier(0.33, 1, 0.68, 1);
 }
 
-/* This is already in your code, just keeping it here for reference */
+/* Animation for fade in elements like notifications */
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -24,14 +34,41 @@
 .animate-fadeIn {
     animation: fadeIn 0.3s ease-in-out;
 }
-#root {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 2rem;
-    text-align: center;
+
+/* Animation for fade out */
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
 }
 
-th, td {
-    padding-left: 1rem;
-    padding-right: 1rem;
+.animate-fadeOut {
+    animation: fadeOut 0.3s ease-in-out;
+}
+
+/* TikTok-like video card animations */
+.video-card-container {
+    transition: transform 0.2s ease-in-out;
+}
+
+    .video-card-container:hover {
+        transform: scale(1.02);
+    }
+
+/* Video overlay animations */
+.video-overlay {
+    transition: all 0.3s ease-in-out;
+}
+
+/* Hover effects for video cards */
+.group:hover .group-hover\:scale-110 {
+    transform: scale(1.1);
+}
+
+.group:hover .group-hover\:opacity-100 {
+    opacity: 1;
 }

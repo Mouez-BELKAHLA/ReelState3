@@ -21,6 +21,7 @@ namespace ReelState.Server.Models
             CreatedAt = DateTime.UtcNow;
             Photos = new List<PropertyPhoto>();
             Status = PropertyStatus.Pending; // Default to pending
+            Views = 0; // Initialize views to 0
         }
 
         [Key]
@@ -55,6 +56,9 @@ namespace ReelState.Server.Models
 
         public DateTime CreatedAt { get; set; }
 
+        // Add Views property
+        public int Views { get; set; } = 0;
+
         // New properties for admin approval
         public PropertyStatus Status { get; set; }
 
@@ -66,8 +70,7 @@ namespace ReelState.Server.Models
         public virtual ICollection<PropertyPhoto> Photos { get; set; }
     }
 
-
-public class PropertyPhoto
+    public class PropertyPhoto
     {
         public PropertyPhoto()
         {

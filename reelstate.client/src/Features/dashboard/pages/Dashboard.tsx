@@ -14,7 +14,7 @@ const Dashboard: React.FC = () => {
         comments,
         likes,
         likedComments,
-        properties,
+        // properties is unused, so we'll remove it from destructuring
         following,
         followers,
         loading,
@@ -26,14 +26,19 @@ const Dashboard: React.FC = () => {
     // State for filter notification message
     const [filterMessage, setFilterMessage] = useState<string | null>(null);
 
+    // Fixed the useEffect hook to properly fetch data once when user id is available
     useEffect(() => {
-        console.log("Dashboard component loaded with state:");
-        console.log("Following:", following);
-        console.log("Followers:", followers);
         if (user?.id) {
             dispatch(fetchUserActivity(user.id));
         }
     }, [dispatch, user]);
+
+    // A separate useEffect just for logging if needed (optional)
+    useEffect(() => {
+        console.log("Dashboard state updated:");
+        console.log("Following:", following);
+        console.log("Followers:", followers);
+    }, [following, followers]); // Properly include dependencies
 
     // Handle filter change
     const handleFilterChange = (filter: FilterType) => {
@@ -80,6 +85,13 @@ const Dashboard: React.FC = () => {
         return <div className="flex justify-center items-center h-screen">Loading...</div>;
     }
 
+    // Calculate total activity count (without using properties)
+    const totalActivityCount = (likes?.total || 0) +
+        (comments?.total || 0) +
+        (likedComments?.total || 0) +
+        (following?.total || 0) +
+        (followers?.total || 0);
+
     return (
         <div className="min-h-screen bg-gray-100">
             <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
@@ -99,8 +111,7 @@ const Dashboard: React.FC = () => {
                                 >
                                     All Activity
                                     <span className="ml-2 py-0.5 px-2.5 text-xs font-medium rounded-full bg-gray-100">
-                                        {(likes?.total || 0) + (comments?.total || 0) + (likedComments?.total || 0) +
-                                            (following?.total || 0) + (followers?.total || 0)}
+                                        {totalActivityCount}
                                     </span>
                                 </button>
 
@@ -143,7 +154,7 @@ const Dashboard: React.FC = () => {
                                     </span>
                                 </button>
 
-                                {/* New: Following filter button */}
+                                {/* Following filter button */}
                                 <button
                                     onClick={() => handleFilterChange('following')}
                                     className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeFilter === 'following'
@@ -157,7 +168,7 @@ const Dashboard: React.FC = () => {
                                     </span>
                                 </button>
 
-                                {/* New: Followers filter button */}
+                                {/* Followers filter button */}
                                 <button
                                     onClick={() => handleFilterChange('followers')}
                                     className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeFilter === 'followers'
@@ -317,7 +328,7 @@ const Dashboard: React.FC = () => {
                                         )
                                     ) : null}
 
-                                    {/* NEW: Following Section */}
+                                    {/* Following Section */}
                                     {activeFilter === 'all' || activeFilter === 'following' ? (
                                         following?.recent?.length > 0 ? (
                                             <div className={activeFilter === 'all' ? "mt-6" : ""}>
@@ -365,7 +376,7 @@ const Dashboard: React.FC = () => {
                                         )
                                     ) : null}
 
-                                    {/* NEW: Followers Section */}
+                                    {/* Followers Section */}
                                     {activeFilter === 'all' || activeFilter === 'followers' ? (
                                         followers?.recent?.length > 0 ? (
                                             <div className={activeFilter === 'all' ? "mt-6" : ""}>

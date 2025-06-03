@@ -5,12 +5,12 @@ import { CommentPanel } from "../../../shared";
 import { PropertyList } from "../../property";
 import { toVideoCardProperties } from "../../../shared/Utils/TypeTransformers";
 import { getErrorMessage } from "../../../shared";
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from "../../../store/hooks";
 import {
     checkLikeStatus,
     toggleLike,
-    setActiveVideoIndex,
+    setActiveVideoIndex as setReduxActiveVideoIndex,
     toggleComments,
     setActiveProperty,
     updatePropertyLike
@@ -24,20 +24,20 @@ export default function UserVideoFeed() {
     const { userId } = useParams<{ userId: string }>();
     const [searchParams] = useSearchParams();
     const propertyIdFromUrl = searchParams.get('property');
+    const navigate = useNavigate();
 
     // Redux
     const dispatch = useAppDispatch();
-    const { isAuthenticated, token } = useAppSelector(state => state.auth);
+    const { isAuthenticated, token, user: authUser } = useAppSelector(state => state.auth);
     const { propertyLikes, likeLoading } = useAppSelector(state => state.property);
-    const authUser = useAppSelector(state => state.auth.user);
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [properties, setProperties] = useState<VideoCardProperty[]>([]);
-    const [activeVideoIndex, setActiveVideoIndex] = useState(0);
+    const [localActiveVideoIndex, setLocalActiveVideoIndex] = useState(0);
     const [userName, setUserName] = useState("");
 
-    // State for comment sidebar - consider moving more of this to Redux
+    // State for comment sidebar
     const [showComments, setShowComments] = useState(false);
     const [activePropertyId, setActivePropertyId] = useState<string | null>(null);
     const [hasLargeLayout, setHasLargeLayout] = useState(false);
@@ -45,6 +45,10 @@ export default function UserVideoFeed() {
 
     // Track if like statuses have been checked
     const [likeStatusChecked, setLikeStatusChecked] = useState(false);
+
+    // Add state to track which videos have already been viewed
+    const [viewedVideos, setViewedVideos] = useState<Set<string>>(new Set());
+    const [viewLoading, setViewLoading] = useState<{ [key: string]: boolean }>({});
 
     // Use refs to track component mount state and prevent race conditions
     const isMounted = useRef(true);
@@ -57,6 +61,36 @@ export default function UserVideoFeed() {
 
     // Breakpoint for large layout
     const LARGE_LAYOUT_BREAKPOINT = 1280;
+
+    // Function to increment view count
+    const incrementViewCount = useCallback(async (propertyId: string) => {
+        if (viewLoading[propertyId] || viewedVideos.has(propertyId)) return;
+
+        try {
+            setViewLoading(prev => ({ ...prev, [propertyId]: true }));
+            console.log(`Incrementing view for property: ${propertyId}`);
+
+            const response = await axios.post(`${API_URL}/api/Property/${propertyId}/view`);
+
+            if (response.data.success) {
+                // Mark this video as viewed
+                setViewedVideos(prev => new Set([...prev, propertyId]));
+
+                // Update local state to reflect the view increment
+                setProperties(prev => prev.map(prop =>
+                    prop.id === propertyId
+                        ? { ...prop, views: response.data.views }
+                        : prop
+                ));
+
+                console.log(`View count updated for property ${propertyId}: ${response.data.views}`);
+            }
+        } catch (error) {
+            console.error('Error incrementing view count:', error);
+        } finally {
+            setViewLoading(prev => ({ ...prev, [propertyId]: false }));
+        }
+    }, [viewLoading, viewedVideos]);
 
     // This ensures proper cleanup on unmount
     useEffect(() => {
@@ -154,6 +188,31 @@ export default function UserVideoFeed() {
         return () => window.removeEventListener('resize', checkLayoutSize);
     }, []);
 
+    // Handle back navigation
+    const handleBackToProfile = useCallback(() => {
+        navigate(`/profile/${userId}`);
+    }, [navigate, userId]);
+
+    // Handle keyboard navigation
+    useEffect(() => {
+        const handleKeyPress = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                handleBackToProfile();
+            } else if (e.key === 'ArrowUp' && localActiveVideoIndex > 0) {
+                const newIndex = localActiveVideoIndex - 1;
+                setLocalActiveVideoIndex(newIndex);
+                dispatch(setReduxActiveVideoIndex(newIndex));
+            } else if (e.key === 'ArrowDown' && localActiveVideoIndex < properties.length - 1) {
+                const newIndex = localActiveVideoIndex + 1;
+                setLocalActiveVideoIndex(newIndex);
+                dispatch(setReduxActiveVideoIndex(newIndex));
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyPress);
+        return () => window.removeEventListener('keydown', handleKeyPress);
+    }, [localActiveVideoIndex, properties.length, handleBackToProfile, dispatch]);
+
     // Fetch properties from the API and filter for this user
     useEffect(() => {
         if (!userId) return;
@@ -179,38 +238,32 @@ export default function UserVideoFeed() {
                 const mappedProperties = toVideoCardProperties(response.data, API_URL);
 
                 // Filter for user properties
-                const userProperties = mappedProperties.filter(prop => {
-                    if (prop.userId === userId) return true;
-                    if (prop.username && authUser &&
-                        (prop.username === authUser.firstName ||
-                            prop.username.includes(authUser.firstName || ''))) {
-                        return true;
-                    }
-                    return false;
-                });
+                const userProperties = mappedProperties.filter(prop => prop.userId === userId);
 
                 if (userProperties.length === 0) {
-                    // Fallback to all properties if no user properties found
-                    setProperties(mappedProperties);
-                    setError("No videos found specifically for this user. Showing all videos.");
-                } else {
-                    setProperties(userProperties);
-                    if (userProperties[0].username) {
-                        setUserName(userProperties[0].username);
-                        document.title = `${userProperties[0].username}'s Videos`;
-                    }
+                    setError("No videos found for this user.");
+                    setIsLoading(false);
+                    return;
+                }
+
+                setProperties(userProperties);
+                if (userProperties[0].username) {
+                    setUserName(userProperties[0].username);
+                    document.title = `${userProperties[0].username}'s Videos`;
                 }
 
                 // Handle specific property from URL after data is loaded
                 if (propertyIdFromUrl) {
-                    const properties = userProperties.length > 0 ? userProperties : mappedProperties;
-                    const index = properties.findIndex(prop => prop.id === propertyIdFromUrl);
+                    const index = userProperties.findIndex(prop => prop.id === propertyIdFromUrl);
                     if (index !== -1) {
-                        setActiveVideoIndex(index);
+                        setLocalActiveVideoIndex(index);
                         setActivePropertyId(propertyIdFromUrl);
                         // Update Redux state too
-                        dispatch(setActiveVideoIndex(index));
+                        dispatch(setReduxActiveVideoIndex(index));
                         dispatch(setActiveProperty(propertyIdFromUrl));
+
+                        // Increment view count for the specific property
+                        incrementViewCount(propertyIdFromUrl);
 
                         // Use RAF to ensure DOM is ready
                         requestAnimationFrame(() => {
@@ -228,6 +281,11 @@ export default function UserVideoFeed() {
                             }, 300);
                         });
                     }
+                } else if (userProperties.length > 0) {
+                    // If no specific property, set the first one as active and increment its view
+                    setActivePropertyId(userProperties[0].id);
+                    dispatch(setActiveProperty(userProperties[0].id));
+                    incrementViewCount(userProperties[0].id);
                 }
             } catch (err) {
                 if (isMounted.current) {
@@ -242,7 +300,7 @@ export default function UserVideoFeed() {
         };
 
         fetchProperties();
-    }, [token, userId, propertyIdFromUrl, authUser, dispatch]);
+    }, [token, userId, propertyIdFromUrl, dispatch, incrementViewCount]);
 
     // Check like status in a separate effect
     useEffect(() => {
@@ -288,20 +346,30 @@ export default function UserVideoFeed() {
 
     const handleVideoInView = useCallback((index: number) => {
         // Only update if it actually changed to avoid race conditions
-        if (index !== activeVideoIndex) {
-            setActiveVideoIndex(index);
+        if (index !== localActiveVideoIndex && index >= 0 && index < properties.length) {
+            setLocalActiveVideoIndex(index);
             // Update Redux state too
-            dispatch(setActiveVideoIndex(index));
+            dispatch(setReduxActiveVideoIndex(index));
+
+            // Update active property
+            const activeProperty = properties[index];
+            if (activeProperty) {
+                setActivePropertyId(activeProperty.id);
+                dispatch(setActiveProperty(activeProperty.id));
+
+                // Increment view count for the new video
+                incrementViewCount(activeProperty.id);
+            }
         }
-    }, [activeVideoIndex, dispatch]);
+    }, [localActiveVideoIndex, properties, dispatch, incrementViewCount]);
 
     // Update UI based on active video
     useEffect(() => {
-        if (properties.length > 0 && activeVideoIndex >= 0 && activeVideoIndex < properties.length) {
-            const activeProperty = properties[activeVideoIndex];
+        if (properties.length > 0 && localActiveVideoIndex >= 0 && localActiveVideoIndex < properties.length) {
+            const activeProperty = properties[localActiveVideoIndex];
             document.title = `${userName || "User"}'s Video - ${activeProperty.caption?.substring(0, 30) || ""}`;
 
-            // Only update URL if property ID changed (prevents unnecessary history updates)
+            // Update URL without full navigation (just update browser history)
             if (typeof window !== 'undefined' && window.history && window.history.replaceState &&
                 activePropertyId !== activeProperty.id) {
                 const newUrl = `/user-videos/${userId}?property=${activeProperty.id}`;
@@ -311,34 +379,33 @@ export default function UserVideoFeed() {
                 dispatch(setActiveProperty(activeProperty.id));
             }
         }
-    }, [activeVideoIndex, properties, userId, userName, activePropertyId, dispatch]);
+    }, [localActiveVideoIndex, properties, userId, userName, activePropertyId, dispatch]);
 
-    // Render code remains the same
     if (isLoading) {
         return (
-            <div className="bg-gray-100 min-h-screen flex items-center justify-center">
+            <div className="bg-black min-h-screen flex items-center justify-center">
                 <div className="text-center">
-                    <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading videos...</p>
+                    <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="mt-4 text-white">Loading videos...</p>
                 </div>
             </div>
         );
     }
 
-    if (properties.length === 0 && !isLoading) {
+    if (error || properties.length === 0) {
         return (
-            <div className="bg-gray-100 min-h-screen flex items-center justify-center">
-                <div className="text-center bg-white p-8 rounded-lg shadow-lg max-w-md mx-auto">
-                    <svg className="w-16 h-16 text-yellow-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-black min-h-screen flex items-center justify-center">
+                <div className="text-center text-white p-8 max-w-md mx-auto">
+                    <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <h2 className="text-2xl font-semibold text-gray-800 mb-2">No Videos Found</h2>
-                    <p className="text-gray-600 mb-4">We couldn't find any videos for this user.</p>
+                    <h2 className="text-2xl font-semibold mb-2">No Videos Found</h2>
+                    <p className="text-gray-400 mb-6">{error || "This user hasn't posted any videos yet."}</p>
                     <button
-                        onClick={() => window.history.back()}
-                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                        onClick={handleBackToProfile}
+                        className="px-6 py-3 bg-white text-black rounded-lg hover:bg-gray-200 transition-colors"
                     >
-                        Go Back
+                        Back to Profile
                     </button>
                 </div>
             </div>
@@ -346,51 +413,41 @@ export default function UserVideoFeed() {
     }
 
     return (
-        <div className="bg-gray-100">
-            {/* User header */}
-            <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center">
+        <div className="bg-black min-h-screen">
+            {/* User header with back button */}
+            <div className="bg-black border-b border-gray-800 px-4 py-3 flex items-center justify-between relative z-50">
                 <div className="flex items-center">
+                    <button
+                        onClick={handleBackToProfile}
+                        className="text-white hover:text-gray-300 mr-4 p-1"
+                    >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                    </button>
                     <img
                         src={properties[0]?.avatarUrl || "/default-avatar.jpg"}
                         alt={`${userName}'s avatar`}
-                        className="w-8 h-8 rounded-full mr-2"
+                        className="w-8 h-8 rounded-full mr-3"
                         onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.onerror = null;
-                            target.src = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgM2MyLjY3IDAgOC0xLjM0IDggNHYyYzAgMi42Ny01LjMzIDQtOCA0cy04LTEuMzMtOC00VjljMC0yLjY2IDUuMzMtNCA4LTR6bTAgMTAuOThjNy42NCAwIDkuMzktMy4zOCA5LjQtMy45OFYxNWMwIC42Ny0zLjEzIDQtOS40IDQtNi4yOCAwLTkuNC0zLjMzLTkuNC00di0yLjk4YzAtLjA3IDEuNzYgMy45OCA5LjQgMy45OHoiLz48L3N2Zz4=";
+                            target.src = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgM2MyLjY3IDAgOC0xLjM0IDgtNHYyYzAgMi42Ny01LjMzIDQtOCA0cy04LTEuMzMtOC00VjljMC0yLjY2IDUuMzMtNCA4LTR6bTAgMTAuOThjNy42NCAwIDkuMzktMy4zOCA5LjQtMy45OFYxNWMwIC42Ny0zLjEzIDQtOS40IDQtNi4yOCAwLTkuNC0zLjMzLTkuNC00di0yLjk4YzAtLjA3IDEuNzYgMy45OCA5LjQgMy45OHoiLz48L3N2Zz4=";
                         }}
                     />
-                    <span className="font-medium">{userName || "User"}'s Videos</span>
+                    <span className="font-medium text-white">{userName || "User"}</span>
                 </div>
-                <span className="mx-2 text-gray-500">•</span>
-                <span className="text-gray-500 text-sm">{properties.length} videos</span>
 
-                {/* Add a back button */}
-                <div className="ml-auto">
-                    <button
-                        onClick={() => window.history.back()}
-                        className="flex items-center text-gray-600 hover:text-gray-900"
-                    >
-                        <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
-                        Back
-                    </button>
+                <div className="flex items-center text-gray-400 text-sm">
+                    <span>{localActiveVideoIndex + 1} of {properties.length}</span>
                 </div>
             </div>
 
-            {/* Display error message as a banner if there is one but we still have properties */}
-            {error && properties.length > 0 && (
-                <div className="bg-yellow-50 border-yellow-400 border-l-4 p-2 text-sm text-yellow-700">
-                    <p>{error}</p>
-                </div>
-            )}
-
             {/* Main container with fixed height and overflow control */}
             <div
-                className="overflow-hidden"
+                className="overflow-hidden bg-black"
                 ref={containerRef}
-                style={{ height: "calc(100vh - 142px)" }}
+                style={{ height: "calc(100vh - 60px)" }}
             >
                 {/* Container with width adjustment for comment panel */}
                 <div
@@ -411,7 +468,7 @@ export default function UserVideoFeed() {
                         onLikeToggle={handleVideoCardLikeToggle}
                         onToggleComments={handleToggleComments}
                         handleLikeToggle={handleLikeToggle}
-                        activeVideoIndex={activeVideoIndex}
+                        activeVideoIndex={localActiveVideoIndex}
                     />
                 </div>
 
@@ -421,11 +478,11 @@ export default function UserVideoFeed() {
                         {/* On large screens: Side panel */}
                         {hasLargeLayout && (
                             <div
-                                className="fixed right-0 bottom-0 z-40 shadow-xl border-l border-gray-200 bg-white comment-panel-slide"
+                                className="fixed right-0 bottom-0 z-40 shadow-xl border-l border-gray-600 bg-gray-900 comment-panel-slide"
                                 style={{
                                     width: `${commentPanelWidth}px`,
                                     transform: showComments ? 'translateX(0)' : 'translateX(100%)',
-                                    top: "87px"
+                                    top: "60px"
                                 }}
                             >
                                 <CommentPanel
@@ -441,9 +498,9 @@ export default function UserVideoFeed() {
 
                         {/* On smaller screens: Modal dialog */}
                         {!hasLargeLayout && showComments && (
-                            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center animate-fadeIn">
+                            <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center animate-fadeIn">
                                 <div
-                                    className="fixed bg-white rounded-xl shadow-2xl overflow-hidden animate-fadeIn"
+                                    className="fixed bg-gray-900 rounded-xl shadow-2xl overflow-hidden animate-fadeIn"
                                     style={{
                                         maxHeight: '90vh',
                                         width: '90%',

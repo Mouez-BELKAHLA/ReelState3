@@ -12,6 +12,8 @@ import {
 import { setShowNavbar } from "../../../store/slices/uiSlice";
 import { CommentPanel } from "../../../shared";
 import { PropertyList } from "..";
+import axios from 'axios';
+import { API_URL } from "../../../shared";
 
 export default function Feed() {
     const dispatch = useAppDispatch();
@@ -34,6 +36,10 @@ export default function Feed() {
     const [previousIndex, setPreviousIndex] = useState(-1);
     const [isMobile, setIsMobile] = useState(false);
 
+    // Add state to track which videos have already been viewed
+    const [viewedVideos, setViewedVideos] = useState<Set<string>>(new Set());
+    const [viewLoading, setViewLoading] = useState<{ [key: string]: boolean }>({});
+
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Comment panel width and animation offset
@@ -45,6 +51,32 @@ export default function Feed() {
     const MEDIUM_LAYOUT_BREAKPOINT = 768;
     const SMALL_LAYOUT_BREAKPOINT = 480;
     const MOBILE_BREAKPOINT = 768; // Define mobile breakpoint
+
+    // Function to increment view count
+    const incrementViewCount = useCallback(async (propertyId: string) => {
+        if (viewLoading[propertyId] || viewedVideos.has(propertyId)) return;
+
+        try {
+            setViewLoading(prev => ({ ...prev, [propertyId]: true }));
+            console.log(`Incrementing view for property: ${propertyId}`);
+
+            const response = await axios.post(`${API_URL}/api/Property/${propertyId}/view`);
+
+            if (response.data.success) {
+                // Mark this video as viewed
+                setViewedVideos(prev => new Set([...prev, propertyId]));
+
+                // Update the properties in Redux store with new view count
+                dispatch(fetchProperties()); // Refetch to get updated view counts
+
+                console.log(`View count updated for property ${propertyId}: ${response.data.views}`);
+            }
+        } catch (error) {
+            console.error('Error incrementing view count:', error);
+        } finally {
+            setViewLoading(prev => ({ ...prev, [propertyId]: false }));
+        }
+    }, [viewLoading, viewedVideos, dispatch]);
 
     // Show navbar by default when entering this component
     useEffect(() => {
@@ -280,7 +312,7 @@ export default function Feed() {
     }, [windowWidth, SMALL_LAYOUT_BREAKPOINT, MEDIUM_LAYOUT_BREAKPOINT]);
 
     // Set active video index when video is in view
-    const handleVideoInView = (index: number) => {
+    const handleVideoInView = useCallback((index: number) => {
         // If we're moving to a new video
         if (index !== previousIndex) {
             // Hide navbar when switching to a new property (only on mobile)
@@ -288,10 +320,15 @@ export default function Feed() {
                 dispatch(setShowNavbar(false));
             }
             setPreviousIndex(index);
+
+            // Increment view count for the new video
+            if (properties[index]) {
+                incrementViewCount(properties[index].id);
+            }
         }
 
         dispatch(setActiveVideoIndex(index));
-    };
+    }, [previousIndex, isMobile, dispatch, properties, incrementViewCount]);
 
     // Update UI based on active video
     useEffect(() => {

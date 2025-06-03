@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using ReelState.Data;
 using ReelState.Server.Models;
-using ReelState.Server.Models.DTOs;  // Add this namespace reference
+using ReelState.Server.Models.DTOs;
 
 namespace ReelState.Server.Controllers
 {
@@ -36,7 +36,6 @@ namespace ReelState.Server.Controllers
             _env = env;
             _logger = logger;
         }
-        
 
         [HttpGet]
         [AllowAnonymous]
@@ -53,7 +52,22 @@ namespace ReelState.Server.Controllers
                     .OrderByDescending(p => p.CreatedAt)
                     .ToListAsync();
 
-                // Clean up circular references before serialization
+                // Get like counts for each property
+                var propertyIds = properties.Select(p => p.Id).ToList();
+                var likeCounts = await _context.Likes
+                    .Where(l => propertyIds.Contains(l.PropertyId))
+                    .GroupBy(l => l.PropertyId)
+                    .Select(g => new { PropertyId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.PropertyId, x => x.Count);
+
+                // Get comment counts for each property
+                var commentCounts = await _context.Comments
+                    .Where(c => propertyIds.Contains(c.PropertyId))
+                    .GroupBy(c => c.PropertyId)
+                    .Select(g => new { PropertyId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.PropertyId, x => x.Count);
+
+                // Clean up circular references before serialization and include like counts + views
                 var propertyDtos = properties.Select(p => new {
                     p.Id,
                     p.Title,
@@ -68,6 +82,11 @@ namespace ReelState.Server.Controllers
                     p.VideoUrl,
                     p.UserId,
                     p.CreatedAt,
+                    p.Views, // Include Views from database
+                    p.Status,
+                    p.RejectionReason,
+                    LikesCount = likeCounts.GetValueOrDefault(p.Id, 0), // Include like count
+                    CommentsCount = commentCounts.GetValueOrDefault(p.Id, 0), // Include comment count
                     User = p.User != null ? new
                     {
                         p.User.Id,
@@ -84,6 +103,7 @@ namespace ReelState.Server.Controllers
                     }).ToList()
                 }).ToList();
 
+                _logger.LogInformation("Retrieved {Count} properties with views", propertyDtos.Count);
                 return Ok(propertyDtos);
             }
             catch (Exception ex)
@@ -92,6 +112,119 @@ namespace ReelState.Server.Controllers
                 return StatusCode(500, new { message = $"Server error: {ex.Message}" });
             }
         }
+
+        [HttpPost("{propertyId}/view")]
+        [AllowAnonymous] // Allow anonymous users to increment views
+        public async Task<IActionResult> IncrementView(string propertyId)
+        {
+            try
+            {
+                _logger.LogInformation("Incrementing view count for property {PropertyId}", propertyId);
+
+                // Find the property first
+                var property = await _context.Properties.FindAsync(propertyId);
+                if (property == null)
+                {
+                    _logger.LogWarning("Property {PropertyId} not found", propertyId);
+                    return NotFound(new { message = "Property not found", success = false });
+                }
+
+                // Increment the view count
+                property.Views += 1;
+
+                // Save changes
+                var result = await _context.SaveChangesAsync();
+
+                if (result > 0)
+                {
+                    _logger.LogInformation("View count incremented for property {PropertyId}. New count: {Views}", propertyId, property.Views);
+
+                    return Ok(new
+                    {
+                        success = true,
+                        views = property.Views,
+                        propertyId = propertyId,
+                        message = "View count updated successfully"
+                    });
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to save view count for property {PropertyId}", propertyId);
+                    return StatusCode(500, new { message = "Failed to save view count", success = false });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error incrementing view count for property {PropertyId}", propertyId);
+                return StatusCode(500, new { message = "Failed to increment view count", success = false });
+            }
+        }
+
+        [HttpGet("{id}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetProperty(string id)
+        {
+            try
+            {
+                var property = await _context.Properties
+                    .Include(p => p.User)
+                    .Include(p => p.Photos)
+                    .FirstOrDefaultAsync(p => p.Id == id);
+
+                if (property == null)
+                {
+                    return NotFound(new { message = "Property not found" });
+                }
+
+                // Get like count for this property
+                var likeCount = await _context.Likes.CountAsync(l => l.PropertyId == id);
+                var commentCount = await _context.Comments.CountAsync(c => c.PropertyId == id);
+
+                var propertyDto = new
+                {
+                    property.Id,
+                    property.Title,
+                    property.Caption,
+                    property.Rooms,
+                    property.PropertyType,
+                    property.Space,
+                    property.Address,
+                    property.City,
+                    property.Latitude,
+                    property.Longitude,
+                    property.VideoUrl,
+                    property.UserId,
+                    property.CreatedAt,
+                    property.Views,
+                    property.Status,
+                    property.RejectionReason,
+                    LikesCount = likeCount,
+                    CommentsCount = commentCount,
+                    User = property.User != null ? new
+                    {
+                        property.User.Id,
+                        property.User.Email,
+                        property.User.FirstName,
+                        property.User.LastName,
+                        property.User.ProfilePictureUrl
+                    } : null,
+                    Photos = property.Photos.Select(photo => new {
+                        photo.Id,
+                        photo.PropertyId,
+                        photo.PhotoUrl,
+                        photo.CreatedAt
+                    }).ToList()
+                };
+
+                return Ok(propertyDto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving property {PropertyId}", id);
+                return StatusCode(500, new { message = $"Server error: {ex.Message}" });
+            }
+        }
+
         [HttpPost("create")]
         public async Task<IActionResult> CreateProperty([FromForm] PropertyCreateDto model)
         {
@@ -193,7 +326,8 @@ namespace ReelState.Server.Controllers
                             Latitude = model.Latitude,
                             Longitude = model.Longitude,
                             VideoUrl = videoFileName,
-                            UserId = userId
+                            UserId = userId,
+                            Views = 0 // Initialize views to 0
                         };
 
                         _logger.LogInformation("Saving property to database: {PropertyId}", property.Id);

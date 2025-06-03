@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { API_URL } from "../../../shared";
-import { VideoCard } from '../../property';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { toVideoCardProperties } from "../../../shared/Utils/TypeTransformers";
 import { getErrorMessage } from "../../../shared";
@@ -10,29 +9,87 @@ import { checkLikeStatus, toggleLike, updatePropertyLike } from "../../../store/
 import { refreshNotifications } from "../../../store/slices/notificationSlice";
 
 // Import property types
-import { Property, VideoCardProperty } from "../types/Property";
+import { Property, VideoCardProperty } from "../../property";
 
-// Import ProfileService
-import {
-    getUserProfile,
-    getUserProperties,
-    getFollowStatus,
-    toggleFollow,
-    UserProfileData,
-    FollowStatusData
-} from '../services/ProfileService';
-
-// Extend VideoCardProperty with optional views property
-interface ExtendedVideoCardProperty extends VideoCardProperty {
-    views?: number;
+// Define interfaces
+interface UserProfileData {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    username?: string;
+    bio?: string;
+    profilePictureUrl?: string;
+    followersCount: number;
+    followingCount: number;
+    totalLikes: number;
+    isVerified: boolean;
 }
 
-// Add interface for follow status
 interface FollowStatusData {
     isFollowing: boolean;
     followersCount: number;
     followingCount: number;
 }
+
+// Extend VideoCardProperty with views property
+interface ExtendedVideoCardProperty extends VideoCardProperty {
+    views: number;
+}
+
+// ProfileService functions (inline)
+const getUserProfile = async (userId: string, token: string): Promise<UserProfileData> => {
+    const response = await axios.get(`${API_URL}/api/User/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data.data;
+};
+
+const getFollowStatus = async (userId: string, token: string): Promise<FollowStatusData> => {
+    const response = await axios.get(`${API_URL}/api/User/${userId}/follow-status`, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+const toggleFollow = async (userId: string, token: string): Promise<FollowStatusData & { isSuccess: boolean }> => {
+    const response = await axios.post(`${API_URL}/api/User/${userId}/follow`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+// Simple Video Player Component for hover functionality
+const SimpleVideoPlayer: React.FC<{
+    videoUrl: string;
+    isPlaying: boolean;
+    onVideoClick: () => void;
+}> = ({ videoUrl, isPlaying, onVideoClick }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+        if (videoRef.current) {
+            if (isPlaying) {
+                videoRef.current.play().catch(console.error);
+            } else {
+                videoRef.current.pause();
+                videoRef.current.currentTime = 0;
+            }
+        }
+    }, [isPlaying]);
+
+    return (
+        <video
+            ref={videoRef}
+            src={videoUrl}
+            className="w-full h-full object-cover cursor-pointer"
+            muted
+            loop
+            playsInline
+            onClick={onVideoClick}
+        />
+    );
+};
 
 const Profile: React.FC = () => {
     // Get auth state from Redux
@@ -46,6 +103,8 @@ const Profile: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [profileData, setProfileData] = useState<UserProfileData | null>(null);
+    const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null);
+    const [viewLoading, setViewLoading] = useState<{ [key: string]: boolean }>({});
 
     // Add state for follow functionality
     const [followData, setFollowData] = useState<FollowStatusData>({
@@ -65,9 +124,38 @@ const Profile: React.FC = () => {
     const targetUserId = userId || (user ? user.id : '');
 
     // Default avatar - data URI for a simple user icon
-    const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgM2MyLjY3IDAgOC0xLjM0IDggNHYyYzAgMi42Ny01LjMzIDQtOCA0cy04LTEuMzMtOC00VjljMC0yLjY2IDUuMzMtNCA4LTR6bTAgMTAuOThjNy42NCAwIDkuMzktMy4zOCA5LjQtMy45OFYxNWMwIC42Ny0zLjEzIDQtOS40IDQtNi4yOCAwLTkuNC0zLjMzLTkuNC00di0yLjk4YzAtLjA3IDEuNzYgMy45OCA5LjQgMy45OHoiLz48L3N2Zz4=";
+    const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgM2MyLjY3IDAgOC0xLjM0IDgtNHYyYzAgMi42Ny01LjMzIDQtOCA0cy04LTEuMzMtOC00VjljMC0yLjY2IDUuMzMtNCA4LTR6bTAgMTAuOThjNy42NCAwIDkuMzktMy4zOCA5LjQtMy45OFYxNWMwIC42Ny0zLjEzIDQtOS40IDQtNi4yOCAwLTkuNC0zLjMzLTkuNC00di0yLjk4YzAtLjA3IDEuNzYgMy45OCA5LjQgMy45OHoiLz48L3N2Zz4=";
 
-    // Function to check like status for properties - using Redux - Fixed the missing function
+    // Function to increment view count when user clicks to view
+    const incrementViewCount = async (propertyId: string) => {
+        if (viewLoading[propertyId]) return; // Prevent double-clicking
+
+        try {
+            setViewLoading(prev => ({ ...prev, [propertyId]: true }));
+            console.log(`Incrementing view for property: ${propertyId}`);
+
+            const response = await axios.post(`${API_URL}/api/Property/${propertyId}/view`);
+
+            console.log(`View increment response:`, response.data);
+
+            if (response.data.success) {
+                // Update local state to reflect the view increment
+                setProperties(prev => prev.map(prop =>
+                    prop.id === propertyId
+                        ? { ...prop, views: response.data.views }
+                        : prop
+                ));
+
+                console.log(`View count updated for property ${propertyId}: ${response.data.views}`);
+            }
+        } catch (error) {
+            console.error('Error incrementing view count:', error);
+        } finally {
+            setViewLoading(prev => ({ ...prev, [propertyId]: false }));
+        }
+    };
+
+    // Function to check like status for properties - using Redux
     const checkAllLikeStatus = async (props: ExtendedVideoCardProperty[]) => {
         if (!isAuthenticated || !props.length) return;
 
@@ -81,7 +169,6 @@ const Profile: React.FC = () => {
         if (!isAuthenticated || !targetUserId || isOwnProfile || !token) return;
 
         try {
-            // Use the service instead of direct axios call
             const response = await getFollowStatus(targetUserId, token);
 
             setFollowData({
@@ -108,11 +195,8 @@ const Profile: React.FC = () => {
 
         try {
             setIsFollowLoading(true);
-            console.log(`Attempting to toggle follow for user: ${targetUserId}`);
 
-            // Use the service to toggle follow
             const response = await toggleFollow(targetUserId, token);
-            console.log('Toggle follow response:', response);
 
             if (response && response.isSuccess) {
                 setFollowData({
@@ -121,7 +205,6 @@ const Profile: React.FC = () => {
                     followingCount: response.followingCount
                 });
 
-                // Update profile data with new follower counts
                 if (profileData) {
                     setProfileData({
                         ...profileData,
@@ -130,15 +213,7 @@ const Profile: React.FC = () => {
                     });
                 }
 
-                // Refresh notifications to show new follow notification
                 dispatch(refreshNotifications());
-
-                console.log(`Successfully ${response.isFollowing ? 'followed' : 'unfollowed'} user ${targetUserId}`);
-            } else {
-                console.error('Toggle follow failed:', response);
-                if (response?.message) {
-                    alert(response.message);
-                }
             }
         } catch (error) {
             console.error('Error toggling follow:', error);
@@ -149,8 +224,10 @@ const Profile: React.FC = () => {
     };
 
     // Handle like toggle using Redux
-    const handleLikeToggle = async (propertyId: string) => {
-        // Check if user is authenticated
+    const handleLikeToggle = async (propertyId: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
         if (!isAuthenticated) {
             alert("Please log in to like this property");
             return;
@@ -159,28 +236,18 @@ const Profile: React.FC = () => {
         dispatch(toggleLike(propertyId));
     };
 
-    // Handle like toggle from VideoCard components
-    const handleVideoCardLikeToggle = (propertyId: string, isLiked: boolean, count: number) => {
-        dispatch(updatePropertyLike({ propertyId, isLiked, count }));
-    };
+    // Replace this function in your Profile component:
+    const navigateToFeedWithProperty = useCallback((propertyId: string) => {
+        console.log(`Opening user video feed for property: ${propertyId}`);
 
-    // Navigate to feed with property ID
-    const navigateToFeedWithProperty = (propertyId: string, e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
+        // Navigate to user-specific video feed instead of main feed
+        const params = new URLSearchParams();
+        params.set('property', propertyId);
+        params.set('t', Date.now().toString());
 
-        // Check that we found the property in our list
-        const property = displayProperties.find(p => p.id === propertyId);
-        if (!property) {
-            console.error(`Property ${propertyId} not found in display properties`);
-            return;
-        }
-
-        console.log(`Navigating to property: ${propertyId} for user: ${targetUserId}`);
-
-        // For a cleaner approach, navigate directly to the Feed page with the property ID
-        window.location.href = `/feed?property=${propertyId}`;
-    };
+        const url = `/user-videos/${targetUserId}?${params.toString()}`;
+        navigate(url);
+    }, [navigate, targetUserId]);
 
     // Fetch follow status on component mount
     useEffect(() => {
@@ -196,12 +263,85 @@ const Profile: React.FC = () => {
                 followingCount: followData.followingCount
             });
         }
-    }, [followData]);
+    }, [followData, profileData]);
+
+    // Add this useEffect to refresh view counts periodically
+    useEffect(() => {
+        // Set up an interval to refresh view counts every 30 seconds
+        const interval = setInterval(() => {
+            if (properties.length > 0) {
+                // Refetch the data to get updated view counts
+                const fetchUpdatedData = async () => {
+                    try {
+                        const response = await axios.get(`${API_URL}/api/Property`, {
+                            headers: token ? { Authorization: `Bearer ${token}` } : {}
+                        });
+
+                        if (response.data && Array.isArray(response.data)) {
+                            // Transform and filter for user properties
+                            const transformedProperties = response.data.map((property: any) => ({
+                                id: property.id,
+                                userId: property.userId,
+                                username: property.user ?
+                                    `${property.user.firstName || ''} ${property.user.lastName || ''}`.trim() ||
+                                    property.user.email :
+                                    'Unknown User',
+                                caption: property.caption,
+                                title: property.title,
+                                videoUrl: property.videoUrl.startsWith('http') ?
+                                    property.videoUrl :
+                                    `${API_URL}${property.videoUrl}`,
+                                likes: property.likesCount || 0,
+                                comments: property.commentsCount || 0,
+                                views: property.views || 0,
+                                avatarUrl: property.user?.profilePictureUrl || defaultAvatar,
+                                rooms: property.rooms,
+                                propertyType: property.propertyType,
+                                space: property.space,
+                                photos: property.photos?.map((photo: any) => ({
+                                    id: photo.id,
+                                    photoUrl: photo.photoUrl.startsWith('http') ?
+                                        photo.photoUrl :
+                                        `${API_URL}${photo.photoUrl}`
+                                })) || [],
+                                location: {
+                                    address: property.address,
+                                    city: property.city,
+                                    coordinates: {
+                                        lat: property.latitude,
+                                        lng: property.longitude
+                                    }
+                                },
+                                status: property.status
+                            }));
+
+                            // Filter for user properties
+                            const userProperties = transformedProperties.filter((prop: any) =>
+                                prop.userId === targetUserId
+                            );
+
+                            // Update only the view counts
+                            setProperties(prev => prev.map(prevProp => {
+                                const updatedProp = userProperties.find((newProp: any) => newProp.id === prevProp.id);
+                                return updatedProp ? { ...prevProp, views: updatedProp.views } : prevProp;
+                            }));
+                        }
+                    } catch (error) {
+                        console.error('Error refreshing view counts:', error);
+                    }
+                };
+
+                fetchUpdatedData();
+            }
+        }, 30000); // Refresh every 30 seconds
+
+        return () => clearInterval(interval);
+    }, [properties.length, targetUserId, token, defaultAvatar]);
 
     useEffect(() => {
         console.log("Profile loading for userId:", userId);
         console.log("Target userId:", targetUserId);
-        // If we have no auth state and no userId, redirect to login
+
         if (!isAuthenticated && !userId) {
             navigate('/login', { state: { from: location.pathname } });
             return;
@@ -230,47 +370,81 @@ const Profile: React.FC = () => {
                         totalLikes: 0,
                         isVerified: false
                     });
-                    console.log('Using auth user data for profile');
                 }
 
                 // Fetch ALL properties from the main endpoint
                 try {
-                    console.log('Fetching all properties');
+                    console.log('Fetching all properties...');
 
-                    const response = await axios.get<Property[]>(`${API_URL}/api/Property`, {
+                    const response = await axios.get(`${API_URL}/api/Property`, {
                         headers: token ? { Authorization: `Bearer ${token}` } : {}
                     });
 
-                    // Use the transformer to convert API data to UI components
-                    const allProperties = toVideoCardProperties(response.data, API_URL) as ExtendedVideoCardProperty[];
+                    console.log('Raw API response:', response.data);
 
-                    // Filter properties to only show those from the target user
-                    const userProperties = allProperties.filter(prop => {
-                        // Check both userId and potential other identifying fields
-                        if (prop.userId && prop.userId === targetUserId) {
-                            return true;
-                        }
+                    if (!response.data || !Array.isArray(response.data)) {
+                        console.error('Invalid API response structure:', response.data);
+                        setError('Invalid response from server');
+                        return;
+                    }
 
-                        // If profileData exists, also check for name match (backup)
-                        if (profileData && prop.username) {
-                            const fullName = `${profileData.firstName || ''} ${profileData.lastName || ''}`.trim();
-                            return prop.username === profileData.username ||
-                                prop.username === fullName;
-                        }
-
-                        return false;
+                    // Transform the data to include views and other necessary fields
+                    const transformedProperties = response.data.map((property: any) => {
+                        const transformed = {
+                            id: property.id,
+                            userId: property.userId,
+                            username: property.user ?
+                                `${property.user.firstName || ''} ${property.user.lastName || ''}`.trim() ||
+                                property.user.email :
+                                'Unknown User',
+                            caption: property.caption,
+                            title: property.title,
+                            videoUrl: property.videoUrl.startsWith('http') ?
+                                property.videoUrl :
+                                `${API_URL}${property.videoUrl}`,
+                            likes: property.likesCount || 0,
+                            comments: property.commentsCount || 0,
+                            views: property.views || 0, // Include views from API
+                            avatarUrl: property.user?.profilePictureUrl || defaultAvatar,
+                            rooms: property.rooms,
+                            propertyType: property.propertyType,
+                            space: property.space,
+                            photos: property.photos?.map((photo: any) => ({
+                                id: photo.id,
+                                photoUrl: photo.photoUrl.startsWith('http') ?
+                                    photo.photoUrl :
+                                    `${API_URL}${photo.photoUrl}`
+                            })) || [],
+                            location: {
+                                address: property.address,
+                                city: property.city,
+                                coordinates: {
+                                    lat: property.latitude,
+                                    lng: property.longitude
+                                }
+                            },
+                            status: property.status
+                        };
+                        return transformed;
                     });
 
-                    console.log(`Found ${userProperties.length} properties for user out of ${allProperties.length} total`);
-                    setProperties(userProperties);
+                    console.log('Transformed properties:', transformedProperties);
+
+                    // Filter properties to only show those from the target user
+                    const userProperties = transformedProperties.filter((prop: any) => {
+                        return prop.userId === targetUserId;
+                    });
+
+                    console.log(`Found ${userProperties.length} properties for user out of ${transformedProperties.length} total`);
+                    setProperties(userProperties as ExtendedVideoCardProperty[]);
 
                     // Check like statuses for authenticated users
                     if (isAuthenticated && userProperties.length > 0) {
-                        await checkAllLikeStatus(userProperties);
+                        await checkAllLikeStatus(userProperties as ExtendedVideoCardProperty[]);
                     }
 
                     // For now, use the same properties for the liked tab
-                    setLikedProperties(userProperties);
+                    setLikedProperties(userProperties as ExtendedVideoCardProperty[]);
                 } catch (err) {
                     console.error('Error fetching properties:', err);
                     setError(getErrorMessage(err, 'Failed to load properties'));
@@ -289,7 +463,6 @@ const Profile: React.FC = () => {
                         }
                     } catch (userErr) {
                         console.error('Error fetching user profile:', userErr);
-                        // We'll still use profile data from auth state
                     }
                 }
 
@@ -302,10 +475,7 @@ const Profile: React.FC = () => {
         };
 
         fetchData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAuthenticated, user, targetUserId, isOwnProfile, navigate, token, userId]);
-    // Important: Still need the eslint-disable comment since we're intentionally 
-    // avoiding some dependencies to prevent loops
 
     // Function to render the appropriate properties based on the active tab
     const getDisplayProperties = () => {
@@ -360,7 +530,7 @@ const Profile: React.FC = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <h2 className="text-2xl font-bold mb-4">Profile Not Found</h2>
-                    <p className="text-gray-600 mb-6">We couldn't find a profile for this user.</p>
+                    <p className="text-gray-600 mb-6">We could not find a profile for this user.</p>
                     <Link to="/" className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
                         Go Home
                     </Link>
@@ -388,7 +558,7 @@ const Profile: React.FC = () => {
                         <div className="relative mb-4 md:mb-0 md:mr-8">
                             <img
                                 src={profileData?.profilePictureUrl || defaultAvatar}
-                                alt={`${displayName}'s profile picture`}
+                                alt={`${displayName} profile picture`}
                                 className="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover border-2 border-gray-200"
                                 onError={(e) => {
                                     (e.target as HTMLImageElement).src = defaultAvatar;
@@ -532,7 +702,7 @@ const Profile: React.FC = () => {
                         )}
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                         {displayProperties.map(property => {
                             // Get the current like state for this property from Redux store
                             const propertyLikeState = propertyLikes[property.id] || {
@@ -540,83 +710,89 @@ const Profile: React.FC = () => {
                                 isLiked: false
                             };
                             const isLikeLoadingState = likeLoading[property.id] || false;
+                            const isViewLoadingState = viewLoading[property.id] || false;
 
                             return (
                                 <div
                                     key={property.id}
-                                    className="relative aspect-[9/16] h-[350px] md:h-[400px] bg-black rounded-lg overflow-hidden cursor-pointer"
-                                    onClick={(e) => navigateToFeedWithProperty(property.id, e)}
+                                    className="relative aspect-[9/16] h-[350px] md:h-[400px] bg-black rounded-lg overflow-hidden cursor-pointer group"
+                                    onMouseEnter={() => setHoveredVideoId(property.id)}
+                                    onMouseLeave={() => setHoveredVideoId(null)}
                                 >
-                                    {/* Use div with onClick instead of Link component */}
-                                    <div className="h-full w-full">
-                                        <VideoCard
-                                            id={property.id}
-                                            userId={property.userId}
-                                            username={property.username || displayName}
-                                            caption={property.caption}
-                                            videoUrl={property.videoUrl}
-                                            likes={propertyLikeState.count}
-                                            comments={property.comments}
-                                            avatarUrl={property.avatarUrl || profileData?.profilePictureUrl || defaultAvatar}
-                                            rooms={property.rooms}
-                                            propertyType={property.propertyType}
-                                            space={property.space}
-                                            photos={property.photos}
-                                            location={property.location}
-                                            title={property.title}
-                                            externalButtons={true}
-                                            onLikeToggle={(isLiked, count) => handleVideoCardLikeToggle(property.id, isLiked, count)}
-                                        />
+                                    {/* Video Player */}
+                                    <SimpleVideoPlayer
+                                        videoUrl={property.videoUrl}
+                                        isPlaying={hoveredVideoId === property.id}
+                                        onVideoClick={() => navigateToFeedWithProperty(property.id)}
+                                    />
+
+                                    {/* Gradient overlay for better text visibility */}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+
+                                    {/* Title - top left */}
+                                    <div className="absolute top-3 left-3 z-20">
+                                        <h3 className="text-white text-sm font-semibold truncate max-w-[200px] bg-black/30 px-2 py-1 rounded backdrop-blur-sm">
+                                            {property.title}
+                                        </h3>
                                     </div>
 
-                                    {/* Video stats overlay */}
-                                    <div className="absolute bottom-2 left-2 z-20 flex items-center text-white text-sm">
-                                        <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                                            <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                                        </svg>
-                                        {property.views || 0}
-                                    </div>
-
-                                    {/* View in Feed button */}
-                                    <div className="absolute top-3 right-3 z-20">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                navigateToFeedWithProperty(property.id, e);
-                                            }}
-                                            className="flex items-center bg-blue-600/80 hover:bg-blue-700 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm"
-                                        >
-                                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                    {/* View count - bottom left */}
+                                    <div className="absolute bottom-3 left-3 z-20 flex items-center text-white text-sm">
+                                        <div className="bg-black/30 px-2 py-1 rounded backdrop-blur-sm flex items-center">
+                                            <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                                                <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
                                             </svg>
-                                            View in Feed
-                                        </button>
+                                            <span className="font-medium">
+                                                {property.views >= 1000 ?
+                                                    `${(property.views / 1000).toFixed(1)}K` :
+                                                    property.views.toString()}
+                                            </span>
+                                        </div>
                                     </div>
 
-                                    {/* Manual like button */}
-                                    <div className="absolute right-3 bottom-20 z-20">
+                                    {/* Like button - bottom right */}
+                                    <div className="absolute right-3 bottom-3 z-20">
                                         <button
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                handleLikeToggle(property.id);
-                                            }}
-                                            className={`flex flex-col items-center ${propertyLikeState.isLiked ? 'text-red-500' : 'text-white'} transition-colors`}
+                                            onClick={(e) => handleLikeToggle(property.id, e)}
+                                            className={`flex flex-col items-center ${propertyLikeState.isLiked ? 'text-red-500' : 'text-white'} transition-all duration-200 transform hover:scale-110`}
                                             disabled={isLikeLoadingState}
                                         >
-                                            <div className="backdrop-blur-lg bg-black/30 rounded-full p-3 hover:bg-white/20 transition-all border border-white/20">
+                                            <div className="backdrop-blur-sm bg-black/30 rounded-full p-2.5 hover:bg-black/50 transition-all border border-white/20">
                                                 {isLikeLoadingState ? (
-                                                    <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"></div>
+                                                    <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin border-current"></div>
                                                 ) : (
-                                                    <svg className="w-6 h-6" fill={propertyLikeState.isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                                                    <svg className="w-5 h-5" fill={propertyLikeState.isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                                                     </svg>
                                                 )}
                                             </div>
-                                            <span className="text-sm mt-1 font-medium">{propertyLikeState.count}</span>
+                                            <span className="text-xs mt-1 font-medium bg-black/30 px-1.5 py-0.5 rounded backdrop-blur-sm">
+                                                {propertyLikeState.count >= 1000 ?
+                                                    `${(propertyLikeState.count / 1000).toFixed(1)}K` :
+                                                    propertyLikeState.count}
+                                            </span>
                                         </button>
                                     </div>
+
+                                    {/* Play button overlay - shows when not hovering */}
+                                    {hoveredVideoId !== property.id && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                            <button
+                                                onClick={() => navigateToFeedWithProperty(property.id)}
+                                                disabled={isViewLoadingState}
+                                                className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition-all"
+                                            >
+                                                {isViewLoadingState ? (
+                                                    <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                                ) : (
+                                                    <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+                                                        <path d="M8 5v14l11-7z" />
+                                                    </svg>
+                                                )}
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}

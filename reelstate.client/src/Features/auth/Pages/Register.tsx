@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { GoogleSignInButton } from '..';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import { registerUser, setAuthError } from '../../../store/slices/authSlice';
-import { isValidationError } from '../../../shared/helpers';
+import { isValidationError, processAuthError } from '../../../shared/helpers';
 
 const Register: React.FC = () => {
     const [firstName, setFirstName] = useState('');
@@ -55,18 +55,24 @@ const Register: React.FC = () => {
             })).unwrap();
 
             // Navigation will happen automatically due to the isAuthenticated effect
-        } catch (err: any) {
-            if (isValidationError(err)) {
+        } catch (err: unknown) {
+            // Process the error with our helper
+            const processedError = processAuthError(err, 'registration');
+
+            if (isValidationError(processedError)) {
                 // Handle field-specific validation errors
                 const newFieldErrors: Record<string, string> = {};
 
-                Object.entries(err.errors).forEach(([field, messages]) => {
+                Object.entries(processedError.errors).forEach(([field, messages]) => {
                     // Convert to camelCase for frontend field matching
                     const fieldName = field.charAt(0).toLowerCase() + field.slice(1);
-                    newFieldErrors[fieldName] = Array.isArray(messages) ? messages[0] : messages;
+                    newFieldErrors[fieldName] = Array.isArray(messages) ? messages[0] : messages as string;
                 });
 
                 setFieldErrors(newFieldErrors);
+            } else {
+                // For other types of errors, set the global error in the auth slice
+                dispatch(setAuthError(processedError.message));
             }
         }
     };
