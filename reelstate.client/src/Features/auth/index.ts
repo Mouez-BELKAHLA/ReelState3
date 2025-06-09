@@ -1,5 +1,7 @@
 // Export components
 export { default as GoogleSignInButton } from './components/GoogleSignInButton';
+export { default as FacebookSignInButton } from './components/FacebookSignInButton';
+
 export { default as ProtectedRoute } from './components/ProtectedRoute';
 
 // Export pages - fixed casing to match actual directory structure

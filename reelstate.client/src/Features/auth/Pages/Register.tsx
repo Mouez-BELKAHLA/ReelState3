@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { GoogleSignInButton } from '..';
+import { GoogleSignInButton, FacebookSignInButton } from '..';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import { registerUser, setAuthError } from '../../../store/slices/authSlice';
 import { isValidationError, processAuthError } from '../../../shared/helpers';
@@ -84,11 +84,9 @@ const Register: React.FC = () => {
         };
     }, [dispatch]);
 
-    // Rest of the component remains the same
     return (
         <div className="min-h-screen bg-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
             <div className="w-full max-w-md mx-auto p-6 bg-white rounded-lg shadow-lg">
-                {/* Form remains the same */}
                 <div className="text-center mb-8">
                     <h2 className="text-3xl font-bold text-gray-900">Create an account</h2>
                     <p className="mt-2 text-sm text-gray-600">
@@ -106,7 +104,6 @@ const Register: React.FC = () => {
                 )}
 
                 <form className="mt-8 space-y-4" onSubmit={handleRegister}>
-                    {/* Form fields remain the same */}
                     <div className="flex gap-4">
                         <div className="flex-1">
                             <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
@@ -142,7 +139,6 @@ const Register: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Rest of the form fields */}
                     <div>
                         <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                         <input
@@ -214,8 +210,9 @@ const Register: React.FC = () => {
                         <div className="flex-grow border-t border-gray-300"></div>
                     </div>
 
-                    <div>
+                    <div className="space-y-3">
                         <GoogleSignInButton variant="signup_with" />
+                        <FacebookSignInButton variant="signup_with" />
                     </div>
                 </form>
             </div>

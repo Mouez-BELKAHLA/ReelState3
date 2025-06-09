@@ -649,21 +649,41 @@ export default function VideoCard({
             {/* Gradient overlay */}
             <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/70 to-transparent pointer-events-none"></div>
 
-            {/* Property info tags */}
-            <PropertyInfoTags
-                rooms={rooms}
-                propertyType={propertyType}
-                space={space}
-            />
+            {/* Property title */}
+            <div className="absolute bottom-16 left-4 right-12 z-10">
+                <p className="text-white text-sm font-medium">{title}</p>
+            </div>
 
-            {/* Caption */}
-            <div className="absolute bottom-20 left-4 right-12 z-10">
+            {/* Caption/Description */}
+            <div className="absolute bottom-10 left-4 right-12 z-10">
                 <p className="text-white text-sm line-clamp-1">{caption}</p>
             </div>
 
-            {/* Property title */}
-            <div className="absolute bottom-2 left-4 right-12 z-10">
-                <p className="text-white text-sm font-medium">{title}</p>
+            {/* Property info tags - custom horizontal layout */}
+            <div className="absolute bottom-2 left-4 z-10 flex flex-wrap gap-2">
+                {/* Rooms tag */}
+                <div className="backdrop-blur-lg bg-black/30 rounded-full px-3 py-1.5 border border-white/20 flex items-center">
+                    <svg className="w-4 h-4 text-white mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    <span className="text-white text-xs font-medium">{rooms} pièces</span>
+                </div>
+
+                {/* Property type tag */}
+                <div className="backdrop-blur-lg bg-black/30 rounded-full px-3 py-1.5 border border-white/20 flex items-center">
+                    <svg className="w-4 h-4 text-white mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M10.5 3L12 2l1.5 1H21l-3 7H6l-3-7h7.5z" />
+                    </svg>
+                    <span className="text-white text-xs font-medium">{propertyType}</span>
+                </div>
+
+                {/* Space tag */}
+                <div className="backdrop-blur-lg bg-black/30 rounded-full px-3 py-1.5 border border-white/20 flex items-center">
+                    <svg className="w-4 h-4 text-white mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                    <span className="text-white text-xs font-medium">{space} m²</span>
+                </div>
             </div>
         </div>
     );

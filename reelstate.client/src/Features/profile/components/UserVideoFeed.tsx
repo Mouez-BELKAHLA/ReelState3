@@ -15,6 +15,7 @@ import {
     setActiveProperty,
     updatePropertyLike
 } from "../../../store/slices/propertySlice";
+import { setShowNavbar } from "../../../store/slices/uiSlice";
 
 // Import types
 import { Property, VideoCardProperty } from "../../property/types/Property";
@@ -30,6 +31,7 @@ export default function UserVideoFeed() {
     const dispatch = useAppDispatch();
     const { isAuthenticated, token, user: authUser } = useAppSelector(state => state.auth);
     const { propertyLikes, likeLoading } = useAppSelector(state => state.property);
+    const { showNavbar } = useAppSelector(state => state.ui);
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -42,12 +44,14 @@ export default function UserVideoFeed() {
     const [activePropertyId, setActivePropertyId] = useState<string | null>(null);
     const [hasLargeLayout, setHasLargeLayout] = useState(false);
     const [windowWidth, setWindowWidth] = useState(0);
+    const [previousIndex, setPreviousIndex] = useState(-1);
+    const [isMobile, setIsMobile] = useState(false);
 
     // Track if like statuses have been checked
     const [likeStatusChecked, setLikeStatusChecked] = useState(false);
 
-    // Add state to track which videos have already been viewed
-    const [viewedVideos, setViewedVideos] = useState<Set<string>>(new Set());
+    // Session-based view tracking - only track when videos actually play
+    const [sessionViewedVideos, setSessionViewedVideos] = useState<Set<string>>(new Set());
     const [viewLoading, setViewLoading] = useState<{ [key: string]: boolean }>({});
 
     // Use refs to track component mount state and prevent race conditions
@@ -59,22 +63,29 @@ export default function UserVideoFeed() {
     const commentPanelWidth = windowWidth < 1400 ? 500 : 580;
     const slideOffset = 75;
 
-    // Breakpoint for large layout
+    // Breakpoints for responsive layout
     const LARGE_LAYOUT_BREAKPOINT = 1280;
+    const MEDIUM_LAYOUT_BREAKPOINT = 768;
+    const SMALL_LAYOUT_BREAKPOINT = 480;
+    const MOBILE_BREAKPOINT = 768;
 
-    // Function to increment view count
+    // Function to increment view count - only called when video actually starts playing
     const incrementViewCount = useCallback(async (propertyId: string) => {
-        if (viewLoading[propertyId] || viewedVideos.has(propertyId)) return;
+        // Check if already viewed in this session or currently loading
+        if (sessionViewedVideos.has(propertyId) || viewLoading[propertyId]) {
+            console.log(`View already counted for property ${propertyId} in this session`);
+            return;
+        }
 
         try {
             setViewLoading(prev => ({ ...prev, [propertyId]: true }));
-            console.log(`Incrementing view for property: ${propertyId}`);
+            console.log(`Incrementing view for property: ${propertyId} (first play)`);
 
             const response = await axios.post(`${API_URL}/api/Property/${propertyId}/view`);
 
             if (response.data.success) {
-                // Mark this video as viewed
-                setViewedVideos(prev => new Set([...prev, propertyId]));
+                // Mark as viewed in this session
+                setSessionViewedVideos(prev => new Set([...prev, propertyId]));
 
                 // Update local state to reflect the view increment
                 setProperties(prev => prev.map(prop =>
@@ -90,7 +101,42 @@ export default function UserVideoFeed() {
         } finally {
             setViewLoading(prev => ({ ...prev, [propertyId]: false }));
         }
-    }, [viewLoading, viewedVideos]);
+    }, [sessionViewedVideos, viewLoading]);
+
+    // Show navbar by default when entering this component
+    useEffect(() => {
+        // Make sure navbar is visible when component mounts
+        dispatch(setShowNavbar(true));
+
+        // Cleanup - ensure navbar is visible when leaving this component
+        return () => {
+            dispatch(setShowNavbar(true));
+        };
+    }, [dispatch]);
+
+    // Add scroll event listener to detect when user scrolls to a new property
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container || !isMobile) return; // Only apply on mobile
+
+        const handleScroll = () => {
+            const scrollPosition = container.scrollTop;
+            const itemHeight = container.clientHeight;
+            const currentIndex = Math.round(scrollPosition / itemHeight);
+
+            // If scrolled to a new item, hide the navbar (only on mobile)
+            if (currentIndex !== previousIndex && currentIndex >= 0 && isMobile) {
+                dispatch(setShowNavbar(false));
+                setPreviousIndex(currentIndex);
+            }
+        };
+
+        container.addEventListener('scroll', handleScroll);
+
+        return () => {
+            container.removeEventListener('scroll', handleScroll);
+        };
+    }, [dispatch, previousIndex, isMobile]);
 
     // This ensures proper cleanup on unmount
     useEffect(() => {
@@ -145,12 +191,28 @@ export default function UserVideoFeed() {
             }
             /* Hide any overflow beyond the current item */
             .property-container {
-                height: calc(100vh - 110px); /* Adjusted for navbar + user header */
+                height: calc(100vh - 55px);
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 position: relative;
                 overflow: hidden;
+            }
+            /* Responsive video container for all screens */
+            .video-container {
+                width: 100%;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: relative;
+            }
+            /* Ensure videos fill their container - cover instead of contain */
+            video {
+                width: 100%;
+                height: 100%;
+                object-fit: cover; /* Fill container and crop if necessary */
+                background-color: black;
             }
             /* Smooth animation for comment panel */
             .comment-panel-slide {
@@ -160,9 +222,100 @@ export default function UserVideoFeed() {
             .video-shift {
                 transition: transform 400ms cubic-bezier(0.33, 1, 0.68, 1), width 400ms cubic-bezier(0.33, 1, 0.68, 1);
             }
-            /* Fix for aborted video playback */
-            video {
-                will-change: transform;
+            
+            /* TikTok-style slim video card */
+            .tiktok-slim-card {
+                aspect-ratio: 9/16 !important;
+                max-width: 360px !important;
+                width: 360px !important;
+                margin: 0 auto;
+                border-radius: 0 !important;
+            }
+            
+            /* Responsive adjustments for different screens */
+            @media (max-width: 480px) {
+                .property-container {
+                    padding: 0;
+                }
+                .tiktok-slim-card {
+                    max-width: 100% !important;
+                    width: 100% !important;
+                }
+            }
+            
+            @media (min-width: 481px) and (max-width: 768px) {
+                .tiktok-slim-card {
+                    max-width: 340px !important;
+                    width: 340px !important;
+                }
+            }
+            
+            /* Property list item styles for TikTok-like appearance */
+            .property-list-item {
+                padding: 0 !important;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #000;
+            }
+            
+            /* Navbar toggle button styles */
+            .navbar-toggle {
+                position: fixed;
+                top: 16px;
+                right: 16px;
+                z-index: 1000;
+                background-color: rgba(0, 0, 0, 0.5);
+                color: white;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                opacity: 0;
+                visibility: hidden;
+            }
+            
+            .navbar-toggle.visible {
+                opacity: 1;
+                visibility: visible;
+            }
+            
+            .navbar-toggle:hover {
+                background-color: rgba(0, 0, 0, 0.7);
+            }
+            
+            /* Only hide navbar on mobile */
+            @media (min-width: 769px) {
+                .navbar-toggle {
+                    display: none !important;
+                }
+            }
+
+            /* Back button styles */
+            .back-button {
+                position: fixed;
+                top: 16px;
+                left: 16px;
+                z-index: 1001;
+                background-color: rgba(0, 0, 0, 0.5);
+                color: white;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                backdrop-filter: blur(10px);
+            }
+            
+            .back-button:hover {
+                background-color: rgba(0, 0, 0, 0.7);
             }
         `;
         document.head.appendChild(style);
@@ -180,13 +333,19 @@ export default function UserVideoFeed() {
             const width = window.innerWidth;
             setWindowWidth(width);
             setHasLargeLayout(width >= LARGE_LAYOUT_BREAKPOINT);
+            setIsMobile(width < MOBILE_BREAKPOINT);
+
+            // On desktop, always show navbar
+            if (width >= MOBILE_BREAKPOINT) {
+                dispatch(setShowNavbar(true));
+            }
         };
 
         checkLayoutSize();
         window.addEventListener('resize', checkLayoutSize);
 
         return () => window.removeEventListener('resize', checkLayoutSize);
-    }, []);
+    }, [dispatch]);
 
     // Handle back navigation
     const handleBackToProfile = useCallback(() => {
@@ -339,12 +498,32 @@ export default function UserVideoFeed() {
         dispatch(updatePropertyLike({ propertyId, isLiked, count }));
     }, [dispatch]);
 
+    // Calculate video width based on screen size - TikTok style slim videos
     const getVideoWidth = useCallback(() => {
-        if (!hasLargeLayout) return '600px';
-        return windowWidth >= 1600 ? '760px' : '680px';
-    }, [hasLargeLayout, windowWidth]);
+        // For TikTok-like videos, we want a narrow width with 9:16 aspect ratio
+        if (windowWidth < SMALL_LAYOUT_BREAKPOINT) {
+            return '100%';  // Full width on small screens but with enforced aspect ratio
+        } else if (windowWidth < MEDIUM_LAYOUT_BREAKPOINT) {
+            return '340px'; // Slim width on medium screens
+        } else {
+            // Even on large screens, we keep it slim
+            return '360px';
+        }
+    }, [windowWidth, SMALL_LAYOUT_BREAKPOINT, MEDIUM_LAYOUT_BREAKPOINT]);
 
+    // Set active video index when video is in view - NO VIEW INCREMENT HERE
     const handleVideoInView = useCallback((index: number) => {
+        // If we're moving to a new video
+        if (index !== previousIndex) {
+            // Hide navbar when switching to a new property (only on mobile)
+            if (isMobile) {
+                dispatch(setShowNavbar(false));
+            }
+            setPreviousIndex(index);
+
+            // NO VIEW INCREMENT HERE - only happens when video actually plays
+        }
+
         // Only update if it actually changed to avoid race conditions
         if (index !== localActiveVideoIndex && index >= 0 && index < properties.length) {
             setLocalActiveVideoIndex(index);
@@ -361,7 +540,7 @@ export default function UserVideoFeed() {
                 incrementViewCount(activeProperty.id);
             }
         }
-    }, [localActiveVideoIndex, properties, dispatch, incrementViewCount]);
+    }, [localActiveVideoIndex, properties, dispatch, incrementViewCount, previousIndex, isMobile]);
 
     // Update UI based on active video
     useEffect(() => {
@@ -380,6 +559,20 @@ export default function UserVideoFeed() {
             }
         }
     }, [localActiveVideoIndex, properties, userId, userName, activePropertyId, dispatch]);
+
+    // Handle navbar toggle
+    const handleShowNavbar = (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent event from bubbling to container
+        dispatch(setShowNavbar(true));
+    };
+
+    // Calculate container height based on navbar visibility - but always subtract navbar height on desktop
+    const getContainerHeight = () => {
+        if (!isMobile) {
+            return 'calc(100vh - 55px)'; // Always leave space for navbar on desktop
+        }
+        return showNavbar ? 'calc(100vh - 55px)' : '100vh'; // Dynamic on mobile
+    };
 
     if (isLoading) {
         return (
@@ -413,43 +606,32 @@ export default function UserVideoFeed() {
     }
 
     return (
-        <div className="bg-black min-h-screen">
-            {/* User header with back button */}
-            <div className="bg-black border-b border-gray-800 px-4 py-3 flex items-center justify-between relative z-50">
-                <div className="flex items-center">
-                    <button
-                        onClick={handleBackToProfile}
-                        className="text-white hover:text-gray-300 mr-4 p-1"
-                    >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
-                    </button>
-                    <img
-                        src={properties[0]?.avatarUrl || "/default-avatar.jpg"}
-                        alt={`${userName}'s avatar`}
-                        className="w-8 h-8 rounded-full mr-3"
-                        onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.onerror = null;
-                            target.src = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgM2MyLjY3IDAgOC0xLjM0IDgtNHYyYzAgMi42Ny01LjMzIDQtOCA0cy04LTEuMzMtOC00VjljMC0yLjY2IDUuMzMtNCA4LTR6bTAgMTAuOThjNy42NCAwIDkuMzktMy4zOCA5LjQtMy45OFYxNWMwIC42Ny0zLjEzIDQtOS40IDQtNi4yOCAwLTkuNC0zLjMzLTkuNC00di0yLjk4YzAtLjA3IDEuNzYgMy45OCA5LjQgMy45OHoiLz48L3N2Zz4=";
-                        }}
-                    />
-                    <span className="font-medium text-white">{userName || "User"}</span>
-                </div>
-
-                <div className="flex items-center text-gray-400 text-sm">
-                    <span>{localActiveVideoIndex + 1} of {properties.length}</span>
-                </div>
+        <div className="bg-black h-screen overflow-hidden">
+            {/* Back button - floating overlay style */}
+            <div
+                className="back-button"
+                onClick={handleBackToProfile}
+            >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
             </div>
 
-            {/* Main container with fixed height and overflow control */}
+            {/* Navbar toggle button - only visible when navbar is hidden on mobile */}
             <div
-                className="overflow-hidden bg-black"
-                ref={containerRef}
-                style={{ height: "calc(100vh - 60px)" }}
+                className={`navbar-toggle ${!showNavbar && isMobile ? 'visible' : ''}`}
+                onClick={handleShowNavbar}
             >
-                {/* Container with width adjustment for comment panel */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </div>
+
+            <div
+                className="overflow-hidden snap-y snap-mandatory"
+                style={{ height: getContainerHeight(), transition: 'height 0.3s ease' }}
+                ref={containerRef}
+            >
                 <div
                     className="h-full video-shift"
                     style={{
@@ -469,6 +651,7 @@ export default function UserVideoFeed() {
                         onToggleComments={handleToggleComments}
                         handleLikeToggle={handleLikeToggle}
                         activeVideoIndex={localActiveVideoIndex}
+                        onVideoPlay={incrementViewCount}
                     />
                 </div>
 
@@ -478,11 +661,12 @@ export default function UserVideoFeed() {
                         {/* On large screens: Side panel */}
                         {hasLargeLayout && (
                             <div
-                                className="fixed right-0 bottom-0 z-40 shadow-xl border-l border-gray-600 bg-gray-900 comment-panel-slide"
+                                className="fixed right-0 bottom-0 z-40 shadow-xl border-l border-gray-600 bg-white comment-panel-slide"
                                 style={{
                                     width: `${commentPanelWidth}px`,
+                                    top: '55px', // Always account for navbar on desktop
                                     transform: showComments ? 'translateX(0)' : 'translateX(100%)',
-                                    top: "60px"
+                                    transition: 'transform 400ms cubic-bezier(0.33, 1, 0.68, 1)'
                                 }}
                             >
                                 <CommentPanel
@@ -498,12 +682,12 @@ export default function UserVideoFeed() {
 
                         {/* On smaller screens: Modal dialog */}
                         {!hasLargeLayout && showComments && (
-                            <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center animate-fadeIn">
+                            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center animate-fadeIn">
                                 <div
-                                    className="fixed bg-gray-900 rounded-xl shadow-2xl overflow-hidden animate-fadeIn"
+                                    className="fixed bg-white rounded-xl shadow-2xl overflow-hidden animate-fadeIn"
                                     style={{
-                                        maxHeight: '90vh',
-                                        width: '90%',
+                                        maxHeight: windowWidth < MEDIUM_LAYOUT_BREAKPOINT ? '85vh' : '90vh',
+                                        width: windowWidth < MEDIUM_LAYOUT_BREAKPOINT ? '95%' : '90%',
                                         maxWidth: '480px',
                                         top: '50%',
                                         left: '50%',

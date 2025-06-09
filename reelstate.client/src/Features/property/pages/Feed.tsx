@@ -36,8 +36,8 @@ export default function Feed() {
     const [previousIndex, setPreviousIndex] = useState(-1);
     const [isMobile, setIsMobile] = useState(false);
 
-    // Add state to track which videos have already been viewed
-    const [viewedVideos, setViewedVideos] = useState<Set<string>>(new Set());
+    // Session-based view tracking - only track views when videos actually play
+    const [sessionViewedVideos, setSessionViewedVideos] = useState<Set<string>>(new Set());
     const [viewLoading, setViewLoading] = useState<{ [key: string]: boolean }>({});
 
     const containerRef = useRef<HTMLDivElement>(null);
@@ -52,22 +52,26 @@ export default function Feed() {
     const SMALL_LAYOUT_BREAKPOINT = 480;
     const MOBILE_BREAKPOINT = 768; // Define mobile breakpoint
 
-    // Function to increment view count
+    // Function to increment view count - only called when video actually starts playing
     const incrementViewCount = useCallback(async (propertyId: string) => {
-        if (viewLoading[propertyId] || viewedVideos.has(propertyId)) return;
+        // Check if already viewed in this session or currently loading
+        if (sessionViewedVideos.has(propertyId) || viewLoading[propertyId]) {
+            console.log(`View already counted for property ${propertyId} in this session`);
+            return;
+        }
 
         try {
             setViewLoading(prev => ({ ...prev, [propertyId]: true }));
-            console.log(`Incrementing view for property: ${propertyId}`);
+            console.log(`Incrementing view for property: ${propertyId} (first play)`);
 
             const response = await axios.post(`${API_URL}/api/Property/${propertyId}/view`);
 
             if (response.data.success) {
-                // Mark this video as viewed
-                setViewedVideos(prev => new Set([...prev, propertyId]));
+                // Mark as viewed in this session
+                setSessionViewedVideos(prev => new Set([...prev, propertyId]));
 
-                // Update the properties in Redux store with new view count
-                dispatch(fetchProperties()); // Refetch to get updated view counts
+                // Refresh properties to get updated view counts
+                dispatch(fetchProperties());
 
                 console.log(`View count updated for property ${propertyId}: ${response.data.views}`);
             }
@@ -76,7 +80,7 @@ export default function Feed() {
         } finally {
             setViewLoading(prev => ({ ...prev, [propertyId]: false }));
         }
-    }, [viewLoading, viewedVideos, dispatch]);
+    }, [sessionViewedVideos, viewLoading, dispatch]);
 
     // Show navbar by default when entering this component
     useEffect(() => {
@@ -311,7 +315,7 @@ export default function Feed() {
         }
     }, [windowWidth, SMALL_LAYOUT_BREAKPOINT, MEDIUM_LAYOUT_BREAKPOINT]);
 
-    // Set active video index when video is in view
+    // Set active video index when video is in view - NO VIEW INCREMENT HERE
     const handleVideoInView = useCallback((index: number) => {
         // If we're moving to a new video
         if (index !== previousIndex) {
@@ -321,14 +325,11 @@ export default function Feed() {
             }
             setPreviousIndex(index);
 
-            // Increment view count for the new video
-            if (properties[index]) {
-                incrementViewCount(properties[index].id);
-            }
+            // NO VIEW INCREMENT HERE - only happens when video actually plays
         }
 
         dispatch(setActiveVideoIndex(index));
-    }, [previousIndex, isMobile, dispatch, properties, incrementViewCount]);
+    }, [previousIndex, isMobile, dispatch]);
 
     // Update UI based on active video
     useEffect(() => {
@@ -449,6 +450,7 @@ export default function Feed() {
                         onToggleComments={handleToggleComments}
                         handleLikeToggle={handleLikeToggle}
                         activeVideoIndex={activeVideoIndex}
+                        onVideoPlay={incrementViewCount} // Pass the function to PropertyList
                     />
                 </div>
 

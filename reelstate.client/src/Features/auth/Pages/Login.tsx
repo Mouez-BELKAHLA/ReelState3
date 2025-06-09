@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { GoogleSignInButton } from '..'; // Import from barrel file
+import { GoogleSignInButton, FacebookSignInButton } from '..'; // Import from barrel file
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import { loginUser, setAuthError } from '../../../store/slices/authSlice';
 import { LoginCredentials } from '../types/Auth';
@@ -120,8 +120,9 @@ const Login: React.FC = () => {
                         <div className="flex-grow border-t border-gray-300"></div>
                     </div>
 
-                    <div>
+                    <div className="space-y-3">
                         <GoogleSignInButton />
+                        <FacebookSignInButton />
                     </div>
                 </form>
             </div>

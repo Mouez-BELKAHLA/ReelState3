@@ -59,13 +59,16 @@ const toggleFollow = async (userId: string, token: string): Promise<FollowStatus
     return response.data;
 };
 
-// Simple Video Player Component for hover functionality
+// Enhanced Video Player Component with proper play tracking
 const SimpleVideoPlayer: React.FC<{
     videoUrl: string;
     isPlaying: boolean;
     onVideoClick: () => void;
-}> = ({ videoUrl, isPlaying, onVideoClick }) => {
+    onVideoPlay?: (propertyId: string) => void;
+    propertyId: string;
+}> = ({ videoUrl, isPlaying, onVideoClick, onVideoPlay, propertyId }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const [hasPlayedOnce, setHasPlayedOnce] = useState(false);
 
     useEffect(() => {
         if (videoRef.current) {
@@ -78,6 +81,14 @@ const SimpleVideoPlayer: React.FC<{
         }
     }, [isPlaying]);
 
+    const handlePlay = useCallback(() => {
+        // Only increment view on the first play event for this video instance
+        if (!hasPlayedOnce && onVideoPlay) {
+            setHasPlayedOnce(true);
+            onVideoPlay(propertyId);
+        }
+    }, [hasPlayedOnce, onVideoPlay, propertyId]);
+
     return (
         <video
             ref={videoRef}
@@ -87,6 +98,7 @@ const SimpleVideoPlayer: React.FC<{
             loop
             playsInline
             onClick={onVideoClick}
+            onPlay={handlePlay}
         />
     );
 };
@@ -104,6 +116,9 @@ const Profile: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [profileData, setProfileData] = useState<UserProfileData | null>(null);
     const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null);
+
+    // Session-based view tracking
+    const [sessionViewedVideos, setSessionViewedVideos] = useState<Set<string>>(new Set());
     const [viewLoading, setViewLoading] = useState<{ [key: string]: boolean }>({});
 
     // Add state for follow functionality
@@ -126,19 +141,26 @@ const Profile: React.FC = () => {
     // Default avatar - data URI for a simple user icon
     const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgM2MyLjY3IDAgOC0xLjM0IDgtNHYyYzAgMi42Ny01LjMzIDQtOCA0cy04LTEuMzMtOC00VjljMC0yLjY2IDUuMzMtNCA4LTR6bTAgMTAuOThjNy42NCAwIDkuMzktMy4zOCA5LjQtMy45OFYxNWMwIC42Ny0zLjEzIDQtOS40IDQtNi4yOCAwLTkuNC0zLjMzLTkuNC00di0yLjk4YzAtLjA3IDEuNzYgMy45OCA5LjQgMy45OHoiLz48L3N2Zz4=";
 
-    // Function to increment view count when user clicks to view
-    const incrementViewCount = async (propertyId: string) => {
-        if (viewLoading[propertyId]) return; // Prevent double-clicking
+    // Function to increment view count - only called when video actually plays
+    const incrementViewCount = useCallback(async (propertyId: string) => {
+        // Check if already viewed in this session or currently loading
+        if (sessionViewedVideos.has(propertyId) || viewLoading[propertyId]) {
+            console.log(`View already counted for property ${propertyId} in this session`);
+            return;
+        }
 
         try {
             setViewLoading(prev => ({ ...prev, [propertyId]: true }));
-            console.log(`Incrementing view for property: ${propertyId}`);
+            console.log(`Incrementing view for property: ${propertyId} (first play)`);
 
             const response = await axios.post(`${API_URL}/api/Property/${propertyId}/view`);
 
             console.log(`View increment response:`, response.data);
 
             if (response.data.success) {
+                // Mark as viewed in this session
+                setSessionViewedVideos(prev => new Set([...prev, propertyId]));
+
                 // Update local state to reflect the view increment
                 setProperties(prev => prev.map(prop =>
                     prop.id === propertyId
@@ -153,7 +175,7 @@ const Profile: React.FC = () => {
         } finally {
             setViewLoading(prev => ({ ...prev, [propertyId]: false }));
         }
-    };
+    }, [sessionViewedVideos, viewLoading]);
 
     // Function to check like status for properties - using Redux
     const checkAllLikeStatus = async (props: ExtendedVideoCardProperty[]) => {
@@ -236,11 +258,11 @@ const Profile: React.FC = () => {
         dispatch(toggleLike(propertyId));
     };
 
-    // Replace this function in your Profile component:
+    // Navigate to user feed - no view increment here
     const navigateToFeedWithProperty = useCallback((propertyId: string) => {
         console.log(`Opening user video feed for property: ${propertyId}`);
 
-        // Navigate to user-specific video feed instead of main feed
+        // Navigate to user-specific video feed
         const params = new URLSearchParams();
         params.set('property', propertyId);
         params.set('t', Date.now().toString());
@@ -265,12 +287,10 @@ const Profile: React.FC = () => {
         }
     }, [followData, profileData]);
 
-    // Add this useEffect to refresh view counts periodically
+    // Periodic refresh of view counts (optional - for real-time updates)
     useEffect(() => {
-        // Set up an interval to refresh view counts every 30 seconds
         const interval = setInterval(() => {
             if (properties.length > 0) {
-                // Refetch the data to get updated view counts
                 const fetchUpdatedData = async () => {
                     try {
                         const response = await axios.get(`${API_URL}/api/Property`, {
@@ -278,7 +298,6 @@ const Profile: React.FC = () => {
                         });
 
                         if (response.data && Array.isArray(response.data)) {
-                            // Transform and filter for user properties
                             const transformedProperties = response.data.map((property: any) => ({
                                 id: property.id,
                                 userId: property.userId,
@@ -315,12 +334,11 @@ const Profile: React.FC = () => {
                                 status: property.status
                             }));
 
-                            // Filter for user properties
                             const userProperties = transformedProperties.filter((prop: any) =>
                                 prop.userId === targetUserId
                             );
 
-                            // Update only the view counts
+                            // Only update view counts without overriding session tracking
                             setProperties(prev => prev.map(prevProp => {
                                 const updatedProp = userProperties.find((newProp: any) => newProp.id === prevProp.id);
                                 return updatedProp ? { ...prevProp, views: updatedProp.views } : prevProp;
@@ -404,7 +422,7 @@ const Profile: React.FC = () => {
                                 `${API_URL}${property.videoUrl}`,
                             likes: property.likesCount || 0,
                             comments: property.commentsCount || 0,
-                            views: property.views || 0, // Include views from API
+                            views: property.views || 0,
                             avatarUrl: property.user?.profilePictureUrl || defaultAvatar,
                             rooms: property.rooms,
                             propertyType: property.propertyType,
@@ -710,7 +728,6 @@ const Profile: React.FC = () => {
                                 isLiked: false
                             };
                             const isLikeLoadingState = likeLoading[property.id] || false;
-                            const isViewLoadingState = viewLoading[property.id] || false;
 
                             return (
                                 <div
@@ -724,6 +741,8 @@ const Profile: React.FC = () => {
                                         videoUrl={property.videoUrl}
                                         isPlaying={hoveredVideoId === property.id}
                                         onVideoClick={() => navigateToFeedWithProperty(property.id)}
+                                        onVideoPlay={incrementViewCount}
+                                        propertyId={property.id}
                                     />
 
                                     {/* Gradient overlay for better text visibility */}
@@ -780,16 +799,11 @@ const Profile: React.FC = () => {
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                             <button
                                                 onClick={() => navigateToFeedWithProperty(property.id)}
-                                                disabled={isViewLoadingState}
                                                 className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition-all"
                                             >
-                                                {isViewLoadingState ? (
-                                                    <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                                ) : (
-                                                    <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
-                                                        <path d="M8 5v14l11-7z" />
-                                                    </svg>
-                                                )}
+                                                <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M8 5v14l11-7z" />
+                                                </svg>
                                             </button>
                                         </div>
                                     )}
