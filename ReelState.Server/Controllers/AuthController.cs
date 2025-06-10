@@ -1,17 +1,14 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using ReelState.Models;
-using ReelState.Models.DTOs;
-using ReelState.Services;
 using ReelState.Server.Models;
-
+using ReelState.Server.Models.DTOs;
+using ReelState.Server.Services;
 
 namespace ReelState.Server.Controllers
 {
@@ -68,31 +65,18 @@ namespace ReelState.Server.Controllers
             // Add user to standard User role
             await _userManager.AddToRoleAsync(user, "User");
 
-            // Get user roles
+            // Get user roles once
             var userRoles = await _userManager.GetRolesAsync(user);
 
-            // Generate tokens
-            var token = await _jwtService.GenerateJwtToken(user);
-            var refreshToken = _jwtService.GenerateRefreshToken();
+            // Generate auth response with tokens
+            var authResponse = await _jwtService.GenerateTokenAsync(user, userRoles, "User created successfully!");
 
             // Store refresh token
-            user.RefreshToken = refreshToken;
+            user.RefreshToken = authResponse.RefreshToken;
             user.RefreshTokenExpiryTime = DateTime.Now.AddDays(7);
             await _userManager.UpdateAsync(user);
 
-            return Ok(new AuthResponseDto
-            {
-                IsSuccess = true,
-                Token = token,
-                RefreshToken = refreshToken,
-                Expiration = DateTime.Now.AddMinutes(120),
-                UserId = user.Id,
-                Email = user.Email,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                Message = "User created successfully!",
-                Roles = userRoles.ToList()
-            });
+            return Ok(authResponse);
         }
 
         [HttpPost("login")]
@@ -121,34 +105,18 @@ namespace ReelState.Server.Controllers
             user.LastLogin = DateTime.UtcNow;
             await _userManager.UpdateAsync(user);
 
-            // Get user roles
+            // Get user roles once
             var userRoles = await _userManager.GetRolesAsync(user);
 
-            // Log roles to debug
-            Console.WriteLine($"User {user.Email} has the following roles: {string.Join(", ", userRoles)}");
-
-            // Generate tokens
-            var token = await _jwtService.GenerateJwtToken(user);
-            var refreshToken = _jwtService.GenerateRefreshToken();
+            // Generate auth response with tokens
+            var authResponse = await _jwtService.GenerateTokenAsync(user, userRoles);
 
             // Store refresh token
-            user.RefreshToken = refreshToken;
+            user.RefreshToken = authResponse.RefreshToken;
             user.RefreshTokenExpiryTime = DateTime.Now.AddDays(7);
             await _userManager.UpdateAsync(user);
 
-            return Ok(new AuthResponseDto
-            {
-                IsSuccess = true,
-                Token = token,
-                RefreshToken = refreshToken,
-                Expiration = DateTime.Now.AddMinutes(120),
-                UserId = user.Id,
-                Email = user.Email ?? string.Empty,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                ProfilePictureUrl = user.ProfilePictureUrl,
-                Roles = userRoles.ToList() // Include roles in the response
-            });
+            return Ok(authResponse);
         }
 
         [HttpPost("google-login")]
@@ -198,39 +166,24 @@ namespace ReelState.Server.Controllers
                     user.Provider = "Google";
                     user.ProviderId = payload.Subject;
                     user.ProfilePictureUrl = payload.Picture;
-                    await _userManager.UpdateAsync(user);
                 }
             }
 
-            // Get user roles
-            var userRoles = await _userManager.GetRolesAsync(user);
-
             // Update last login
             user.LastLogin = DateTime.UtcNow;
-            await _userManager.UpdateAsync(user);
 
-            // Generate tokens
-            var token = await _jwtService.GenerateJwtToken(user);
-            var refreshToken = _jwtService.GenerateRefreshToken();
+            // Get user roles once
+            var userRoles = await _userManager.GetRolesAsync(user);
+
+            // Generate auth response with tokens
+            var authResponse = await _jwtService.GenerateTokenAsync(user, userRoles);
 
             // Store refresh token
-            user.RefreshToken = refreshToken;
+            user.RefreshToken = authResponse.RefreshToken;
             user.RefreshTokenExpiryTime = DateTime.Now.AddDays(7);
             await _userManager.UpdateAsync(user);
 
-            return Ok(new AuthResponseDto
-            {
-                IsSuccess = true,
-                Token = token,
-                RefreshToken = refreshToken,
-                Expiration = DateTime.Now.AddMinutes(120),
-                UserId = user.Id,
-                Email = user.Email ?? string.Empty,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                ProfilePictureUrl = user.ProfilePictureUrl,
-                Roles = userRoles.ToList() // Include roles in the response
-            });
+            return Ok(authResponse);
         }
 
         [HttpPost("refreshToken")]
@@ -252,28 +205,18 @@ namespace ReelState.Server.Controllers
             if (user == null || user.RefreshToken != model.RefreshToken || user.RefreshTokenExpiryTime <= DateTime.Now)
                 return BadRequest("Invalid refresh token or token expired");
 
-            // Get user roles
+            // Get user roles once
             var userRoles = await _userManager.GetRolesAsync(user);
 
-            var newToken = await _jwtService.GenerateJwtToken(user);
-            var newRefreshToken = _jwtService.GenerateRefreshToken();
+            // Generate auth response with new tokens
+            var authResponse = await _jwtService.GenerateTokenAsync(user, userRoles);
 
-            user.RefreshToken = newRefreshToken;
+            // Store new refresh token
+            user.RefreshToken = authResponse.RefreshToken;
+            user.RefreshTokenExpiryTime = DateTime.Now.AddDays(7);
             await _userManager.UpdateAsync(user);
 
-            return Ok(new AuthResponseDto
-            {
-                IsSuccess = true,
-                Token = newToken,
-                RefreshToken = newRefreshToken,
-                Expiration = DateTime.Now.AddMinutes(120),
-                UserId = user.Id,
-                Email = user.Email ?? string.Empty,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                ProfilePictureUrl = user.ProfilePictureUrl,
-                Roles = userRoles.ToList() // Include roles in the response
-            });
+            return Ok(authResponse);
         }
 
         [Authorize]
@@ -323,7 +266,7 @@ namespace ReelState.Server.Controllers
                 ProfilePictureUrl = user.ProfilePictureUrl,
                 Provider = user.Provider,
                 LastLogin = user.LastLogin,
-                Roles = userRoles.ToList() // Include roles in the response
+                Roles = userRoles.ToList()
             });
         }
 

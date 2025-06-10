@@ -4,8 +4,8 @@ import { fetchUserActivity } from "../../../store/slices/userActivitySlice";
 import { ActivityItem } from "..";
 import { Link } from 'react-router-dom';
 
-// Updated to include follow-related filter types
-type FilterType = 'all' | 'liked-properties' | 'comments' | 'liked-comments' | 'following' | 'followers';
+// Updated to remove follow-related filter types
+type FilterType = 'all' | 'liked-properties' | 'comments' | 'liked-comments';
 
 const Dashboard: React.FC = () => {
     const dispatch = useAppDispatch();
@@ -14,9 +14,7 @@ const Dashboard: React.FC = () => {
         comments,
         likes,
         likedComments,
-        // properties is unused, so we'll remove it from destructuring
-        following,
-        followers,
+        // removed following and followers from destructuring
         loading,
         error
     } = useAppSelector(state => state.userActivity);
@@ -36,9 +34,7 @@ const Dashboard: React.FC = () => {
     // A separate useEffect just for logging if needed (optional)
     useEffect(() => {
         console.log("Dashboard state updated:");
-        console.log("Following:", following);
-        console.log("Followers:", followers);
-    }, [following, followers]); // Properly include dependencies
+    }, []); // Removed following and followers dependencies
 
     // Handle filter change
     const handleFilterChange = (filter: FilterType) => {
@@ -54,12 +50,6 @@ const Dashboard: React.FC = () => {
                 break;
             case 'liked-comments':
                 setFilterMessage("Showing only your liked comments");
-                break;
-            case 'following':
-                setFilterMessage("Showing users you follow");
-                break;
-            case 'followers':
-                setFilterMessage("Showing your followers");
                 break;
             default:
                 setFilterMessage("Showing all activity");
@@ -85,12 +75,10 @@ const Dashboard: React.FC = () => {
         return <div className="flex justify-center items-center h-screen">Loading...</div>;
     }
 
-    // Calculate total activity count (without using properties)
+    // Calculate total activity count (without following and followers)
     const totalActivityCount = (likes?.total || 0) +
         (comments?.total || 0) +
-        (likedComments?.total || 0) +
-        (following?.total || 0) +
-        (followers?.total || 0);
+        (likedComments?.total || 0);
 
     return (
         <div className="min-h-screen bg-gray-100">
@@ -153,34 +141,6 @@ const Dashboard: React.FC = () => {
                                         {likedComments?.total || 0}
                                     </span>
                                 </button>
-
-                                {/* Following filter button */}
-                                <button
-                                    onClick={() => handleFilterChange('following')}
-                                    className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeFilter === 'following'
-                                        ? 'border-blue-500 text-blue-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                        }`}
-                                >
-                                    Following
-                                    <span className="ml-2 py-0.5 px-2.5 text-xs font-medium rounded-full bg-gray-100">
-                                        {following?.total || 0}
-                                    </span>
-                                </button>
-
-                                {/* Followers filter button */}
-                                <button
-                                    onClick={() => handleFilterChange('followers')}
-                                    className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeFilter === 'followers'
-                                        ? 'border-blue-500 text-blue-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                        }`}
-                                >
-                                    Followers
-                                    <span className="ml-2 py-0.5 px-2.5 text-xs font-medium rounded-full bg-gray-100">
-                                        {followers?.total || 0}
-                                    </span>
-                                </button>
                             </nav>
                         </div>
 
@@ -200,11 +160,7 @@ const Dashboard: React.FC = () => {
                                         ? 'Liked Properties'
                                         : activeFilter === 'comments'
                                             ? 'Your Comments'
-                                            : activeFilter === 'liked-comments'
-                                                ? 'Liked Comments'
-                                                : activeFilter === 'following'
-                                                    ? 'Users You Follow'
-                                                    : 'Your Followers'
+                                            : 'Liked Comments'
                                 }
                             </h2>
 
@@ -328,109 +284,11 @@ const Dashboard: React.FC = () => {
                                         )
                                     ) : null}
 
-                                    {/* Following Section */}
-                                    {activeFilter === 'all' || activeFilter === 'following' ? (
-                                        following?.recent?.length > 0 ? (
-                                            <div className={activeFilter === 'all' ? "mt-6" : ""}>
-                                                {activeFilter === 'all' && <h3 className="text-lg font-medium mb-2">People You Follow</h3>}
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    {following.recent.map(follow => (
-                                                        <div key={follow.id} className="flex items-center p-4 bg-white rounded-lg shadow hover:bg-blue-50 border border-gray-100">
-                                                            <div className="flex-shrink-0 mr-3">
-                                                                <img
-                                                                    src={follow.followedProfilePicture || defaultAvatar}
-                                                                    alt={follow.followedUsername}
-                                                                    className="w-12 h-12 rounded-full object-cover"
-                                                                    onError={(e) => {
-                                                                        (e.target as HTMLImageElement).src = defaultAvatar;
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <Link to={`/profile/${follow.followedUserId}`} className="text-sm font-medium text-gray-900 hover:underline">
-                                                                    {follow.followedUsername}
-                                                                </Link>
-                                                                <p className="text-xs text-gray-500">
-                                                                    Followed on {new Date(follow.createdAt).toLocaleDateString()}
-                                                                </p>
-                                                            </div>
-                                                            <Link
-                                                                to={`/profile/${follow.followedUserId}`}
-                                                                className="ml-2 px-3 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full hover:bg-blue-200"
-                                                            >
-                                                                View Profile
-                                                            </Link>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            activeFilter === 'following' && (
-                                                <div className="text-center py-8 bg-gray-50 rounded-lg">
-                                                    <p className="text-gray-500">You're not following anyone yet.</p>
-                                                    <Link to="/feed" className="mt-4 inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
-                                                        Discover People to Follow
-                                                    </Link>
-                                                </div>
-                                            )
-                                        )
-                                    ) : null}
-
-                                    {/* Followers Section */}
-                                    {activeFilter === 'all' || activeFilter === 'followers' ? (
-                                        followers?.recent?.length > 0 ? (
-                                            <div className={activeFilter === 'all' ? "mt-6" : ""}>
-                                                {activeFilter === 'all' && <h3 className="text-lg font-medium mb-2">Your Followers</h3>}
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    {followers.recent.map(follower => (
-                                                        <div key={follower.id} className="flex items-center p-4 bg-white rounded-lg shadow hover:bg-green-50 border border-gray-100">
-                                                            <div className="flex-shrink-0 mr-3">
-                                                                <img
-                                                                    src={follower.followerProfilePicture || defaultAvatar}
-                                                                    alt={follower.followerUsername}
-                                                                    className="w-12 h-12 rounded-full object-cover"
-                                                                    onError={(e) => {
-                                                                        (e.target as HTMLImageElement).src = defaultAvatar;
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <Link to={`/profile/${follower.followerUserId}`} className="text-sm font-medium text-gray-900 hover:underline">
-                                                                    {follower.followerUsername}
-                                                                </Link>
-                                                                <p className="text-xs text-gray-500">
-                                                                    Started following you on {new Date(follower.createdAt).toLocaleDateString()}
-                                                                </p>
-                                                            </div>
-                                                            <Link
-                                                                to={`/profile/${follower.followerUserId}`}
-                                                                className="ml-2 px-3 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full hover:bg-green-200"
-                                                            >
-                                                                View Profile
-                                                            </Link>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            activeFilter === 'followers' && (
-                                                <div className="text-center py-8 bg-gray-50 rounded-lg">
-                                                    <p className="text-gray-500">You don't have any followers yet.</p>
-                                                    <Link to="/feed" className="mt-4 inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
-                                                        Create Content to Get Followers
-                                                    </Link>
-                                                </div>
-                                            )
-                                        )
-                                    ) : null}
-
                                     {/* Show message if no activity for all filter */}
                                     {activeFilter === 'all' &&
                                         comments.recent.length === 0 &&
                                         likes.recent.length === 0 &&
-                                        likedComments?.recent?.length === 0 &&
-                                        following?.recent?.length === 0 &&
-                                        followers?.recent?.length === 0 && (
+                                        likedComments?.recent?.length === 0 && (
                                             <div className="text-center py-10 bg-gray-50 rounded-lg">
                                                 <p className="text-gray-500">No recent activity to display.</p>
                                                 <p className="text-gray-500 mt-2">Start exploring properties to like or comment!</p>

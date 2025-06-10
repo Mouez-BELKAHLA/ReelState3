@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Threading.Tasks;
 
-namespace ReelState.Services
+namespace ReelState.Server.Services
 {
     public interface IGoogleAuthService
     {

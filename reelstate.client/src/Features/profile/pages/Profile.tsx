@@ -184,7 +184,7 @@ const Profile: React.FC = () => {
     const { propertyLikes, likeLoading } = useAppSelector(state => state.property);
     const { following, followers, loading: userActivityLoading } = useAppSelector(state => state.userActivity);
 
-    const [activeTab, setActiveTab] = useState<'videos' | 'liked' | 'followers' | 'following'>('videos');
+    const [activeTab, setActiveTab] = useState<'videos' | 'followers' | 'following'>('videos');
     const [properties, setProperties] = useState<ExtendedVideoCardProperty[]>([]);
     const [likedProperties, setLikedProperties] = useState<ExtendedVideoCardProperty[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -215,6 +215,11 @@ const Profile: React.FC = () => {
 
     // Default avatar - data URI for a simple user icon
     const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgM2MyLjY3IDAgOC0xLjM0IDgtNHYyYzAgMi42Ny01LjMzIDQtOCA0cy04LTEuMzMtOC00VjljMC0yLjY2IDUuMzMtNCA4LTR6bTAgMTAuOThjNy42NCAwIDkuMzktMy4zOCA5LjQtMy45OFYxNWMwIC42Ny0zLjEzIDQtOS40IDQtNi4yOCAwLTkuNC0zLjMzLTkuNC00di0yLjk4YzAtLjA3IDEuNzYgMy45OCA5LjQgMy45OHoiLz48L3N2Zz4=";
+
+    // Function to handle property count click
+    const handlePropertiesClick = () => {
+        setActiveTab('videos');
+    };
 
     // Function to increment view count - only called when video actually plays
     const incrementViewCount = useCallback(async (propertyId: string) => {
@@ -594,8 +599,6 @@ const Profile: React.FC = () => {
         switch (activeTab) {
             case 'videos':
                 return renderPropertiesGrid(properties);
-            case 'liked':
-                return renderPropertiesGrid(likedProperties);
             case 'followers':
                 return (
                     <UserListComponent
@@ -638,19 +641,6 @@ const Profile: React.FC = () => {
                             )}
                         </>
                     )}
-
-                    {activeTab === 'liked' && (
-                        <>
-                            <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                            </svg>
-                            <h3 className="text-xl font-semibold">No liked properties</h3>
-                            <p className="text-gray-500 mt-2">Properties you like will appear here</p>
-                            <Link to="/feed" className="mt-4 inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg">
-                                Discover Properties
-                            </Link>
-                        </>
-                    )}
                 </div>
             );
         }
@@ -666,84 +656,86 @@ const Profile: React.FC = () => {
                     const isLikeLoadingState = likeLoading[property.id] || false;
 
                     return (
-                        <div
+                        <Link
+                            to={`/user-videos/${targetUserId}?property=${property.id}`}
                             key={property.id}
-                            className="relative aspect-[9/16] h-[350px] md:h-[400px] bg-black rounded-lg overflow-hidden cursor-pointer group"
-                            onMouseEnter={() => setHoveredVideoId(property.id)}
-                            onMouseLeave={() => setHoveredVideoId(null)}
+                            className="block"
                         >
-                            {/* Video Player */}
-                            <SimpleVideoPlayer
-                                videoUrl={property.videoUrl}
-                                isPlaying={hoveredVideoId === property.id}
-                                onVideoClick={() => navigateToFeedWithProperty(property.id)}
-                                onVideoPlay={incrementViewCount}
-                                propertyId={property.id}
-                            />
+                            <div
+                                className="relative aspect-[9/16] h-[350px] md:h-[400px] bg-black rounded-lg overflow-hidden cursor-pointer group"
+                                onMouseEnter={() => setHoveredVideoId(property.id)}
+                                onMouseLeave={() => setHoveredVideoId(null)}
+                            >
+                                {/* Video Player */}
+                                <SimpleVideoPlayer
+                                    videoUrl={property.videoUrl}
+                                    isPlaying={hoveredVideoId === property.id}
+                                    onVideoClick={() => navigateToFeedWithProperty(property.id)}
+                                    onVideoPlay={incrementViewCount}
+                                    propertyId={property.id}
+                                />
 
-                            {/* Gradient overlay for better text visibility */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                                {/* Gradient overlay for better text visibility */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
 
-                            {/* Title - top left */}
-                            <div className="absolute top-3 left-3 z-20">
-                                <h3 className="text-white text-sm font-semibold truncate max-w-[200px] bg-black/30 px-2 py-1 rounded backdrop-blur-sm">
-                                    {property.title}
-                                </h3>
-                            </div>
-
-                            {/* View count - bottom left */}
-                            <div className="absolute bottom-3 left-3 z-20 flex items-center text-white text-sm">
-                                <div className="bg-black/30 px-2 py-1 rounded backdrop-blur-sm flex items-center">
-                                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                                        <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                                    </svg>
-                                    <span className="font-medium">
-                                        {property.views >= 1000 ?
-                                            `${(property.views / 1000).toFixed(1)}K` :
-                                            property.views.toString()}
-                                    </span>
+                                {/* Title - top left */}
+                                <div className="absolute top-3 left-3 z-20">
+                                    <h3 className="text-white text-sm font-semibold truncate max-w-[200px] bg-black/30 px-2 py-1 rounded backdrop-blur-sm">
+                                        {property.title}
+                                    </h3>
                                 </div>
-                            </div>
 
-                            {/* Like button - bottom right */}
-                            <div className="absolute right-3 bottom-3 z-20">
-                                <button
-                                    onClick={(e) => handleLikeToggle(property.id, e)}
-                                    className={`flex flex-col items-center ${propertyLikeState.isLiked ? 'text-red-500' : 'text-white'} transition-all duration-200 transform hover:scale-110`}
-                                    disabled={isLikeLoadingState}
-                                >
-                                    <div className="backdrop-blur-sm bg-black/30 rounded-full p-2.5 hover:bg-black/50 transition-all border border-white/20">
-                                        {isLikeLoadingState ? (
-                                            <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin border-current"></div>
-                                        ) : (
-                                            <svg className="w-5 h-5" fill={propertyLikeState.isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                                            </svg>
-                                        )}
-                                    </div>
-                                    <span className="text-xs mt-1 font-medium bg-black/30 px-1.5 py-0.5 rounded backdrop-blur-sm">
-                                        {propertyLikeState.count >= 1000 ?
-                                            `${(propertyLikeState.count / 1000).toFixed(1)}K` :
-                                            propertyLikeState.count}
-                                    </span>
-                                </button>
-                            </div>
-
-                            {/* Play button overlay - shows when not hovering */}
-                            {hoveredVideoId !== property.id && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                    <button
-                                        onClick={() => navigateToFeedWithProperty(property.id)}
-                                        className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition-all"
-                                    >
-                                        <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M8 5v14l11-7z" />
+                                {/* View count - bottom left */}
+                                <div className="absolute bottom-3 left-3 z-20 flex items-center text-white text-sm">
+                                    <div className="bg-black/30 px-2 py-1 rounded backdrop-blur-sm flex items-center">
+                                        <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                                            <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
                                         </svg>
+                                        <span className="font-medium">
+                                            {property.views >= 1000 ?
+                                                `${(property.views / 1000).toFixed(1)}K` :
+                                                property.views.toString()}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Like button - bottom right */}
+                                <div className="absolute right-3 bottom-3 z-20">
+                                    <button
+                                        onClick={(e) => handleLikeToggle(property.id, e)}
+                                        className={`flex flex-col items-center ${propertyLikeState.isLiked ? 'text-red-500' : 'text-white'} transition-all duration-200 transform hover:scale-110`}
+                                        disabled={isLikeLoadingState}
+                                    >
+                                        <div className="backdrop-blur-sm bg-black/30 rounded-full p-2.5 hover:bg-black/50 transition-all border border-white/20">
+                                            {isLikeLoadingState ? (
+                                                <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin border-current"></div>
+                                            ) : (
+                                                <svg className="w-5 h-5" fill={propertyLikeState.isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                                </svg>
+                                            )}
+                                        </div>
+                                        <span className="text-xs mt-1 font-medium bg-black/30 px-1.5 py-0.5 rounded backdrop-blur-sm">
+                                            {propertyLikeState.count >= 1000 ?
+                                                `${(propertyLikeState.count / 1000).toFixed(1)}K` :
+                                                propertyLikeState.count}
+                                        </span>
                                     </button>
                                 </div>
-                            )}
-                        </div>
+
+                                {/* Play button overlay - shows when not hovering */}
+                                {hoveredVideoId !== property.id && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                        <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition-all">
+                                            <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M8 5v14l11-7z" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </Link>
                     );
                 })}
             </div>
@@ -857,10 +849,13 @@ const Profile: React.FC = () => {
                                     <p className="font-bold text-lg">{profileData?.followersCount || followData.followersCount || followers?.total || 0}</p>
                                     <p className="text-gray-600 text-sm">Followers</p>
                                 </button>
-                                <div className="text-center min-w-[80px] p-3">
+                                <button
+                                    onClick={handlePropertiesClick}
+                                    className="text-center hover:bg-gray-100 rounded-lg p-3 transition-colors min-w-[80px]"
+                                >
                                     <p className="font-bold text-lg">{properties.length || 0}</p>
                                     <p className="text-gray-600 text-sm">Properties</p>
-                                </div>
+                                </button>
                             </div>
                         </div>
 
@@ -918,14 +913,6 @@ const Profile: React.FC = () => {
                         >
                             Properties
                         </button>
-                        {isOwnProfile && (
-                            <button
-                                className={`px-6 py-3 font-medium ${activeTab === 'liked' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                                onClick={() => setActiveTab('liked')}
-                            >
-                                Liked
-                            </button>
-                        )}
                         <button
                             className={`px-6 py-3 font-medium ${activeTab === 'followers' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
                             onClick={() => setActiveTab('followers')}

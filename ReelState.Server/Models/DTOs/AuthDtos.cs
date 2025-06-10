@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
-namespace ReelState.Models.DTOs
+namespace ReelState.Server.Models.DTOs
 {
     public class LoginDto
     {
@@ -45,8 +45,8 @@ namespace ReelState.Models.DTOs
         public string Email { get; set; } = string.Empty;
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
-        public string? ProfilePictureUrl { get; set; } // Optional, can be null
-        public List<string> Roles { get; set; } = new List<string>(); // Add roles property
+        public string? ProfilePictureUrl { get; set; }
+        public List<string> Roles { get; set; } = new List<string>();
     }
 
     public class TokenRequestDto

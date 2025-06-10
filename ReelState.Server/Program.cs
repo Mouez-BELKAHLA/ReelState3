@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using ReelState.Data;
-using ReelState.Services;
+using ReelState.Server.Services;
 using System.Text;
 using ReelState.Server.Models;
 using System.Text.Json;
@@ -14,7 +14,6 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.FileProviders;
 using System.Text.Json.Serialization.Metadata;
-using ReelState.Server.Services;
 using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -180,7 +179,7 @@ builder.Services.AddScoped<IGoogleAuthService, GoogleAuthService>();
 builder.Services.AddScoped<ReelState.Server.Services.NotificationService>();
 // Configure static files to serve uploaded files
 builder.Services.AddDirectoryBrowser();
-builder.Services.AddScoped<NotificationService>();
+//builder.Services.AddScoped<NotificationService>(); Duplicated
 
 var app = builder.Build();
 

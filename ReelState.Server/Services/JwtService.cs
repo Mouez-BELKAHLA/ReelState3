@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Collections.Generic;
@@ -10,47 +9,25 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using ReelState.Server.Models;
+using ReelState.Server.Models.DTOs;
 
-namespace ReelState.Services
+namespace ReelState.Server.Services
 {
-    public interface IJwtService
-    {
-        Task<string> GenerateJwtToken(ApplicationUser user);
-        string GenerateRefreshToken();
-        ClaimsPrincipal? GetPrincipalFromExpiredToken(string token);
-    }
-
-    // JWT Response to include roles
-    public class JwtResponse
-    {
-        public bool IsSuccess { get; set; }
-        public string Message { get; set; } = string.Empty;
-        public string Token { get; set; } = string.Empty;
-        public string RefreshToken { get; set; } = string.Empty;
-        public DateTime Expiration { get; set; }
-        public string UserId { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public string FirstName { get; set; } = string.Empty;
-        public string LastName { get; set; } = string.Empty;
-        public string? ProfilePictureUrl { get; set; }
-        public List<string> Roles { get; set; } = new List<string>();
-    }
-
     public class JwtService : IJwtService
     {
         private readonly IConfiguration _configuration;
-        private readonly UserManager<ApplicationUser> _userManager;
 
-        public JwtService(IConfiguration configuration, UserManager<ApplicationUser> userManager)
+        public JwtService(IConfiguration configuration)
         {
             _configuration = configuration;
-            _userManager = userManager;
         }
 
-        public async Task<string> GenerateJwtToken(ApplicationUser user)
+        public async Task<AuthResponseDto> GenerateTokenAsync(
+            ApplicationUser user,
+            IList<string> userRoles,
+            string? message = null)
         {
-            var userRoles = await _userManager.GetRolesAsync(user);
-
+            // Create claims
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id),
@@ -63,11 +40,13 @@ namespace ReelState.Services
                 claims.Add(new Claim(ClaimTypes.Name, user.UserName));
             }
 
+            // Add roles as claims
             foreach (var userRole in userRoles)
             {
                 claims.Add(new Claim(ClaimTypes.Role, userRole));
             }
 
+            // Get configuration values
             var secret = _configuration["JWT:Secret"] ??
                 throw new InvalidOperationException("JWT:Secret configuration is missing");
 
@@ -80,9 +59,11 @@ namespace ReelState.Services
 
             var issuer = _configuration["JWT:ValidIssuer"] ??
                 throw new InvalidOperationException("JWT:ValidIssuer is missing");
+
             var audience = _configuration["JWT:ValidAudience"] ??
                 throw new InvalidOperationException("JWT:ValidAudience is missing");
 
+            // Create token
             var token = new JwtSecurityToken(
                 issuer: issuer,
                 audience: audience,
@@ -91,21 +72,17 @@ namespace ReelState.Services
                 signingCredentials: creds
             );
 
-            return new JwtSecurityTokenHandler().WriteToken(token);
-        }
-
-        public async Task<JwtResponse> GenerateTokenResponseAsync(ApplicationUser user)
-        {
-            var userRoles = await _userManager.GetRolesAsync(user);
-            var token = await GenerateJwtToken(user);
+            var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
             var refreshToken = GenerateRefreshToken();
 
-            return new JwtResponse
+            // Return complete response object
+            return new AuthResponseDto
             {
                 IsSuccess = true,
-                Token = token,
+                Message = message ?? "Authentication successful",
+                Token = tokenString,
                 RefreshToken = refreshToken,
-                Expiration = DateTime.Now.AddMinutes(60),
+                Expiration = expires,
                 UserId = user.Id,
                 Email = user.Email ?? string.Empty,
                 FirstName = user.FirstName,
