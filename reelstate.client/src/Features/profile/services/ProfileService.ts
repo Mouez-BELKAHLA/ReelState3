@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { API_URL } from '../../../shared';
+import { API_URL } from '../shared';
 
 // Types for user profile data
 export interface UserProfileData {

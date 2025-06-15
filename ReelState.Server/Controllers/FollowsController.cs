@@ -108,6 +108,7 @@ namespace ReelState.Server.Controllers
         }
 
         // POST: api/Follows/toggle
+        // POST: api/Follows/toggle
         [HttpPost("toggle")]
         public async Task<ActionResult<FollowStatusDto>> ToggleFollow([FromBody] FollowRequestDto request)
         {
@@ -159,6 +160,8 @@ namespace ReelState.Server.Controllers
                 var existingFollow = await _context.UserFollows
                     .FirstOrDefaultAsync(f => f.FollowerId == currentUserId && f.FollowedId == request.UserId);
 
+                bool isNowFollowing = false;
+
                 if (existingFollow == null)
                 {
                     // Follow: create new follow relationship
@@ -167,6 +170,7 @@ namespace ReelState.Server.Controllers
 
                     _context.UserFollows.Add(follow);
                     await _context.SaveChangesAsync();
+                    isNowFollowing = true;
 
                     // Create notification
                     try
@@ -181,6 +185,14 @@ namespace ReelState.Server.Controllers
                         // Continue - notifications are non-critical
                     }
                 }
+                else
+                {
+                    // Unfollow: remove existing follow relationship
+                    _logger.LogInformation($"Removing follow relationship: {currentUserId} -> {request.UserId}");
+                    _context.UserFollows.Remove(existingFollow);
+                    await _context.SaveChangesAsync();
+                    isNowFollowing = false;
+                }
 
                 // Get updated counts
                 var followersCount = await _context.UserFollows
@@ -191,11 +203,11 @@ namespace ReelState.Server.Controllers
 
                 _logger.LogInformation($"Updated follower count: {followersCount}, Following count: {followingCount}");
 
-                // Create dto object
+                // Create dto object with correct following state
                 var statusDto = new FollowStatusDto
                 {
                     IsSuccess = true,
-                    IsFollowing = existingFollow == null, // If we deleted a follow, we're not following anymore
+                    IsFollowing = isNowFollowing,
                     FollowersCount = followersCount,
                     FollowingCount = followingCount
                 };

@@ -5,9 +5,11 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { toVideoCardProperties } from "../../../shared/Utils/TypeTransformers";
 import { getErrorMessage } from "../../../shared";
 import { useAppSelector, useAppDispatch } from "../../../store/hooks";
-import { checkLikeStatus, toggleLike, updatePropertyLike } from "../../../store/slices/propertySlice";
+import { checkLikeStatus, toggleLike } from "../../../store/slices/propertySlice";
 import { refreshNotifications } from "../../../store/slices/notificationSlice";
 import { fetchUserActivity } from "../../../store/slices/userActivitySlice";
+import { toggleFollow as toggleFollowService } from '../services/ProfileService';
+
 
 // Import property types
 import { Property, VideoCardProperty } from "../../property";
@@ -37,28 +39,6 @@ interface FollowStatusData {
 interface ExtendedVideoCardProperty extends VideoCardProperty {
     views: number;
 }
-
-// ProfileService functions (inline)
-const getUserProfile = async (userId: string, token: string): Promise<UserProfileData> => {
-    const response = await axios.get(`${API_URL}/api/User/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-    });
-    return response.data.data;
-};
-
-const getFollowStatus = async (userId: string, token: string): Promise<FollowStatusData> => {
-    const response = await axios.get(`${API_URL}/api/User/${userId}/follow-status`, {
-        headers: { Authorization: `Bearer ${token}` }
-    });
-    return response.data;
-};
-
-const toggleFollow = async (userId: string, token: string): Promise<FollowStatusData & { isSuccess: boolean }> => {
-    const response = await axios.post(`${API_URL}/api/User/${userId}/follow`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-    });
-    return response.data;
-};
 
 // Enhanced Video Player Component with proper play tracking
 const SimpleVideoPlayer: React.FC<{
@@ -177,6 +157,36 @@ const UserListComponent: React.FC<{
     );
 };
 
+// ProfileService functions
+const getUserProfile = async (userId: string, token: string): Promise<UserProfileData> => {
+    const response = await axios.get(`${API_URL}/api/User/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data.data;
+};
+
+// Updated to use the correct API endpoint
+const getFollowStatus = async (userId: string, token: string): Promise<FollowStatusData> => {
+    console.log(`Getting follow status for user: ${userId}`);
+    const response = await axios.get(`${API_URL}/api/Follows/status/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    console.log("Follow status response:", response.data);
+    return response.data;
+};
+
+// Updated to use the correct API endpoint and request body structure
+const toggleFollow = async (userId: string, token: string): Promise<FollowStatusData & { isSuccess: boolean }> => {
+    console.log(`Toggling follow for user: ${userId}`);
+    const response = await axios.post(
+        `${API_URL}/api/Follows/toggle`,
+        { userId: userId }, // Match the FollowRequestDto structure
+        { headers: { Authorization: `Bearer ${token}` } }
+    );
+    console.log("Toggle follow response:", response.data);
+    return response.data;
+};
+
 const Profile: React.FC = () => {
     // Get auth state from Redux
     const dispatch = useAppDispatch();
@@ -204,6 +214,9 @@ const Profile: React.FC = () => {
     });
     const [isFollowLoading, setIsFollowLoading] = useState(false);
 
+    // Add a flag to control when to refresh user activity
+    const [shouldRefreshActivity, setShouldRefreshActivity] = useState(false);
+
     const navigate = useNavigate();
 
     // Get userId from URL params, or use logged in user
@@ -220,6 +233,22 @@ const Profile: React.FC = () => {
     const handlePropertiesClick = () => {
         setActiveTab('videos');
     };
+
+    // Check token validity
+    const checkTokenValidity = useCallback(() => {
+        if (!token) {
+            console.error("No token available");
+            return false;
+        }
+
+        const parts = token.split('.');
+        if (parts.length !== 3) {
+            console.error("Token doesn't appear to be a valid JWT");
+            return false;
+        }
+
+        return true;
+    }, [token]);
 
     // Function to increment view count - only called when video actually plays
     const incrementViewCount = useCallback(async (propertyId: string) => {
@@ -271,17 +300,27 @@ const Profile: React.FC = () => {
         if (!isAuthenticated || !targetUserId || isOwnProfile || !token) return;
 
         try {
+            // Validate token first
+            if (!checkTokenValidity()) {
+                console.error("Invalid token format, aborting follow status check");
+                return;
+            }
+
+            console.log("Fetching follow status for user:", targetUserId);
             const response = await getFollowStatus(targetUserId, token);
 
-            setFollowData({
-                isFollowing: response.isFollowing,
-                followersCount: response.followersCount,
-                followingCount: response.followingCount
-            });
+            if (response && response.isSuccess !== false) {
+                console.log("Setting follow data:", response);
+                setFollowData({
+                    isFollowing: response.isFollowing,
+                    followersCount: response.followersCount,
+                    followingCount: response.followingCount
+                });
+            }
         } catch (error) {
             console.error('Error fetching follow status:', error);
         }
-    }, [isAuthenticated, targetUserId, isOwnProfile, token]);
+    }, [isAuthenticated, targetUserId, isOwnProfile, token, checkTokenValidity]);
 
     // Function to toggle follow status
     const handleToggleFollow = async () => {
@@ -292,32 +331,39 @@ const Profile: React.FC = () => {
         }
 
         if (isOwnProfile || !token) {
+            console.error("Can't follow yourself or missing token");
+            return;
+        }
+
+        // Validate token first
+        if (!checkTokenValidity()) {
+            console.error("Invalid token format, aborting follow toggle");
+            alert("Authentication issue. Please log in again.");
+            navigate('/login');
             return;
         }
 
         try {
             setIsFollowLoading(true);
+            console.log(`Attempting to toggle follow for user: ${targetUserId}`);
 
             const response = await toggleFollow(targetUserId, token);
 
+            console.log("Follow toggle response:", response);
+
             if (response && response.isSuccess) {
+                // Update follow data state
                 setFollowData({
                     isFollowing: response.isFollowing,
                     followersCount: response.followersCount,
                     followingCount: response.followingCount
                 });
 
-                if (profileData) {
-                    setProfileData({
-                        ...profileData,
-                        followersCount: response.followersCount,
-                        followingCount: response.followingCount
-                    });
-                }
-
-                // Refresh user activity data to get updated followers/following
-                dispatch(fetchUserActivity(targetUserId));
-                dispatch(refreshNotifications());
+                // Flag to refresh user activity data
+                setShouldRefreshActivity(true);
+            } else {
+                console.error("Follow toggle failed:", response?.message || "Unknown error");
+                alert(response?.message || "Failed to follow/unfollow user.");
             }
         } catch (error) {
             console.error('Error toggling follow:', error);
@@ -365,28 +411,45 @@ const Profile: React.FC = () => {
 
     // Fetch follow status on component mount
     useEffect(() => {
-        fetchFollowStatus();
-    }, [fetchFollowStatus]);
+        if (targetUserId && !isOwnProfile) {
+            fetchFollowStatus();
+        }
+    }, [fetchFollowStatus, targetUserId, isOwnProfile]);
+
+    // Effect to refresh user activity when flag is set
+    useEffect(() => {
+        if (shouldRefreshActivity && targetUserId) {
+            console.log("Refreshing user activity data");
+            dispatch(fetchUserActivity(targetUserId));
+            dispatch(refreshNotifications());
+            setShouldRefreshActivity(false);
+        }
+    }, [shouldRefreshActivity, dispatch, targetUserId]);
+
+    // Effect to update profileData when followData changes - fixed to prevent infinite loop
+    useEffect(() => {
+        if (profileData && (followData.followersCount > 0 || followData.followingCount > 0)) {
+            const needsUpdate = profileData.followersCount !== followData.followersCount ||
+                profileData.followingCount !== followData.followingCount;
+
+            if (needsUpdate) {
+                setProfileData(prevData => ({
+                    ...prevData,
+                    followersCount: followData.followersCount,
+                    followingCount: followData.followingCount
+                }));
+            }
+        }
+    }, [followData, profileData?.id]); // Only depend on followData and profileData.id, not the entire profileData
 
     // Fetch user activity data when targetUserId changes
     useEffect(() => {
-        if (targetUserId) {
+        if (targetUserId && isAuthenticated) {
             dispatch(fetchUserActivity(targetUserId));
         }
-    }, [dispatch, targetUserId]);
+    }, [dispatch, targetUserId, isAuthenticated]);
 
-    // Update profileData with follow counts when they change
-    useEffect(() => {
-        if (profileData && (followData.followersCount > 0 || followData.followingCount > 0)) {
-            setProfileData({
-                ...profileData,
-                followersCount: followData.followersCount,
-                followingCount: followData.followingCount
-            });
-        }
-    }, [followData, profileData]);
-
-    // Periodic refresh of view counts (optional - for real-time updates)
+    // Periodic refresh of view counts
     useEffect(() => {
         const interval = setInterval(() => {
             if (properties.length > 0) {
@@ -455,6 +518,7 @@ const Profile: React.FC = () => {
         return () => clearInterval(interval);
     }, [properties.length, targetUserId, token, defaultAvatar]);
 
+    // Main data fetching effect
     useEffect(() => {
         console.log("Profile loading for userId:", userId);
         console.log("Target userId:", targetUserId);
