@@ -46,7 +46,7 @@ namespace ReelState.Server.Controllers
                 _logger.LogInformation("Fetching all properties");
 
                 var properties = await _context.Properties
-                    .Where(p => p.Status == PropertyStatus.Approved) // Only return approved properties
+                    .Where(p => p.Status == PropertyStatus.Approved)
                     .Include(p => p.User)
                     .Include(p => p.Photos)
                     .OrderByDescending(p => p.CreatedAt)
@@ -67,6 +67,23 @@ namespace ReelState.Server.Controllers
                     .Select(g => new { PropertyId = g.Key, Count = g.Count() })
                     .ToDictionaryAsync(x => x.PropertyId, x => x.Count);
 
+                // Helper method to parse JSON strings to arrays
+                List<string> ParseJsonArray(string? jsonString)
+                {
+                    if (string.IsNullOrEmpty(jsonString))
+                        return new List<string>();
+
+                    try
+                    {
+                        return System.Text.Json.JsonSerializer.Deserialize<List<string>>(jsonString) ?? new List<string>();
+                    }
+                    catch
+                    {
+                        // If it's not valid JSON, try to split by comma
+                        return jsonString.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList();
+                    }
+                }
+
                 // Clean up circular references before serialization and include like counts + views
                 var propertyDtos = properties.Select(p => new {
                     p.Id,
@@ -82,11 +99,18 @@ namespace ReelState.Server.Controllers
                     p.VideoUrl,
                     p.UserId,
                     p.CreatedAt,
-                    p.Views, // Include Views from database
+                    p.Views,
                     p.Status,
                     p.RejectionReason,
-                    LikesCount = likeCounts.GetValueOrDefault(p.Id, 0), // Include like count
-                    CommentsCount = commentCounts.GetValueOrDefault(p.Id, 0), // Include comment count
+                    // Parse JSON strings to arrays
+                    PropertyPreferences = ParseJsonArray(p.PropertyPreferences),
+                    PropertyFeatures = ParseJsonArray(p.PropertyFeatures),
+                    p.UploadToYouTube,
+                    p.UploadToTikTok,
+                    p.UploadToInstagram,
+                    p.UploadToFacebook,
+                    LikesCount = likeCounts.GetValueOrDefault(p.Id, 0),
+                    CommentsCount = commentCounts.GetValueOrDefault(p.Id, 0),
                     User = p.User != null ? new
                     {
                         p.User.Id,
@@ -198,6 +222,12 @@ namespace ReelState.Server.Controllers
                     property.Views,
                     property.Status,
                     property.RejectionReason,
+                    property.PropertyPreferences,
+                    property.PropertyFeatures,
+                    property.UploadToYouTube,
+                    property.UploadToTikTok,
+                    property.UploadToInstagram,
+                    property.UploadToFacebook,
                     LikesCount = likeCount,
                     CommentsCount = commentCount,
                     User = property.User != null ? new
@@ -327,7 +357,15 @@ namespace ReelState.Server.Controllers
                             Longitude = model.Longitude,
                             VideoUrl = videoFileName,
                             UserId = userId,
-                            Views = 0 // Initialize views to 0
+                            Views = 0, // Initialize views to 0
+
+                            // Add the new properties
+                            PropertyPreferences = model.PropertyPreferences,
+                            PropertyFeatures = model.PropertyFeatures,
+                            UploadToYouTube = model.UploadToYouTube,
+                            UploadToTikTok = model.UploadToTikTok,
+                            UploadToInstagram = model.UploadToInstagram,
+                            UploadToFacebook = model.UploadToFacebook
                         };
 
                         _logger.LogInformation("Saving property to database: {PropertyId}", property.Id);
@@ -413,6 +451,184 @@ namespace ReelState.Server.Controllers
             {
                 _logger.LogError(ex, "Error saving file");
                 throw; // Rethrow to handle in the calling method
+            }
+        }
+
+        // Add a new endpoint for search with preferences and features
+        [HttpGet("search")]
+        [AllowAnonymous]
+        public async Task<IActionResult> SearchProperties(
+            [FromQuery] string? query,
+            [FromQuery] string? propertyType,
+            [FromQuery] int? minRooms,
+            [FromQuery] int? maxRooms,
+            [FromQuery] int? minSpace,
+            [FromQuery] int? maxSpace,
+            [FromQuery] string? city,
+            [FromQuery] string? preferences,
+            [FromQuery] string? features,
+            [FromQuery] string sortBy = "newest",
+            [FromQuery] int page = 1,
+            [FromQuery] int limit = 20)
+        {
+            try
+            {
+                _logger.LogInformation("Searching properties with query: {Query}", query);
+
+                // Start with all approved properties
+                var propertiesQuery = _context.Properties
+                    .Where(p => p.Status == PropertyStatus.Approved)
+                    .Include(p => p.User)
+                    .Include(p => p.Photos)
+                    .AsQueryable();
+
+                // Apply text search if provided
+                if (!string.IsNullOrWhiteSpace(query))
+                {
+                    query = query.ToLower();
+                    propertiesQuery = propertiesQuery.Where(p =>
+                        p.Title.ToLower().Contains(query) ||
+                        p.Caption.ToLower().Contains(query) ||
+                        p.Address.ToLower().Contains(query) ||
+                        p.City.ToLower().Contains(query) ||
+                        p.PropertyType.ToLower().Contains(query));
+                }
+
+                // Apply filters
+                if (!string.IsNullOrWhiteSpace(propertyType))
+                {
+                    propertiesQuery = propertiesQuery.Where(p => p.PropertyType == propertyType);
+                }
+
+                if (minRooms.HasValue)
+                {
+                    propertiesQuery = propertiesQuery.Where(p => p.Rooms >= minRooms.Value);
+                }
+
+                if (maxRooms.HasValue)
+                {
+                    propertiesQuery = propertiesQuery.Where(p => p.Rooms <= maxRooms.Value);
+                }
+
+                if (minSpace.HasValue)
+                {
+                    propertiesQuery = propertiesQuery.Where(p => p.Space >= minSpace.Value);
+                }
+
+                if (maxSpace.HasValue)
+                {
+                    propertiesQuery = propertiesQuery.Where(p => p.Space <= maxSpace.Value);
+                }
+
+                if (!string.IsNullOrWhiteSpace(city))
+                {
+                    propertiesQuery = propertiesQuery.Where(p => p.City.ToLower().Contains(city.ToLower()));
+                }
+
+                // Filter by preferences if provided (check if JSON strings contain any of the specified preferences)
+                if (!string.IsNullOrWhiteSpace(preferences))
+                {
+                    var preferenceList = preferences.Split(',').Select(p => p.Trim());
+                    foreach (var preference in preferenceList)
+                    {
+                        propertiesQuery = propertiesQuery.Where(p => p.PropertyPreferences != null &&
+                                                                 p.PropertyPreferences.Contains(preference));
+                    }
+                }
+
+                // Filter by features if provided
+                if (!string.IsNullOrWhiteSpace(features))
+                {
+                    var featureList = features.Split(',').Select(f => f.Trim());
+                    foreach (var feature in featureList)
+                    {
+                        propertiesQuery = propertiesQuery.Where(p => p.PropertyFeatures != null &&
+                                                                 p.PropertyFeatures.Contains(feature));
+                    }
+                }
+
+                // Apply sorting
+                propertiesQuery = sortBy switch
+                {
+                    "popular" => propertiesQuery.OrderByDescending(p => p.Views),
+                    "price_asc" => propertiesQuery.OrderBy(p => p.Space), // Using space as a price proxy
+                    "price_desc" => propertiesQuery.OrderByDescending(p => p.Space),
+                    _ => propertiesQuery.OrderByDescending(p => p.CreatedAt) // Default is newest
+                };
+
+                // Count total matches
+                var totalCount = await propertiesQuery.CountAsync();
+
+                // Apply pagination
+                var paginatedProperties = await propertiesQuery
+                    .Skip((page - 1) * limit)
+                    .Take(limit)
+                    .ToListAsync();
+
+                // Get like counts and comment counts
+                var propertyIds = paginatedProperties.Select(p => p.Id).ToList();
+                var likeCounts = await _context.Likes
+                    .Where(l => propertyIds.Contains(l.PropertyId))
+                    .GroupBy(l => l.PropertyId)
+                    .Select(g => new { PropertyId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.PropertyId, x => x.Count);
+
+                var commentCounts = await _context.Comments
+                    .Where(c => propertyIds.Contains(c.PropertyId))
+                    .GroupBy(c => c.PropertyId)
+                    .Select(g => new { PropertyId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.PropertyId, x => x.Count);
+
+                // Transform to DTOs
+                var propertyDtos = paginatedProperties.Select(p => new
+                {
+                    p.Id,
+                    p.Title,
+                    p.Caption,
+                    p.Rooms,
+                    p.PropertyType,
+                    p.Space,
+                    p.Address,
+                    p.City,
+                    p.Latitude,
+                    p.Longitude,
+                    p.VideoUrl,
+                    p.UserId,
+                    p.CreatedAt,
+                    p.Views,
+                    p.PropertyPreferences,
+                    p.PropertyFeatures,
+                    LikesCount = likeCounts.GetValueOrDefault(p.Id, 0),
+                    CommentsCount = commentCounts.GetValueOrDefault(p.Id, 0),
+                    User = p.User != null ? new
+                    {
+                        p.User.Id,
+                        p.User.FirstName,
+                        p.User.LastName,
+                        p.User.Email,
+                        p.User.ProfilePictureUrl
+                    } : null,
+                    Photos = p.Photos.Select(photo => new
+                    {
+                        photo.Id,
+                        photo.PhotoUrl
+                    }).ToList()
+                }).ToList();
+
+                // Return search results with metadata
+                return Ok(new
+                {
+                    properties = propertyDtos,
+                    total = totalCount,
+                    page,
+                    pages = (int)Math.Ceiling((double)totalCount / limit),
+                    hasMore = (page * limit) < totalCount
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error searching properties");
+                return StatusCode(500, new { message = $"Server error: {ex.Message}" });
             }
         }
     }

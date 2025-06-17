@@ -73,6 +73,10 @@ namespace ReelState.Server.Controllers
                         }
                     },
                     title = p.Title,
+                    // Add the missing propertyPreferences and propertyFeatures
+                    propertyPreferences = p.PropertyPreferences,
+                    propertyFeatures = p.PropertyFeatures,
+                    status = p.Status.ToString(),
                     createdAt = p.CreatedAt
                 }).ToList();
 

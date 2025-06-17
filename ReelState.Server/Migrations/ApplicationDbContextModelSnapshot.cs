@@ -412,6 +412,12 @@ namespace ReelState.Server.Migrations
                     b.Property<double>("Longitude")
                         .HasColumnType("float");
 
+                    b.Property<string>("PropertyFeatures")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PropertyPreferences")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("PropertyType")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -431,6 +437,18 @@ namespace ReelState.Server.Migrations
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("UploadToFacebook")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("UploadToInstagram")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("UploadToTikTok")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("UploadToYouTube")
+                        .HasColumnType("bit");
 
                     b.Property<string>("UserId")
                         .IsRequired()

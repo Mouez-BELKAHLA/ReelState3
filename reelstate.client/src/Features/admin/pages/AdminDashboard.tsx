@@ -20,6 +20,24 @@ const AdminDashboard: React.FC = () => {
     const [showRejectModal, setShowRejectModal] = useState<boolean>(false);
     const [showReportsMessage, setShowReportsMessage] = useState<boolean>(false);
 
+    // Helper function to parse property tags safely
+    const parsePropertyTags = (value: string | string[] | undefined): string[] => {
+        if (!value) return [];
+        if (Array.isArray(value)) return value;
+
+        if (typeof value === 'string') {
+            try {
+                const parsed = JSON.parse(value);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch {
+                // If JSON parsing fails, try comma separation
+                return value.split(',').map(item => item.trim()).filter(Boolean);
+            }
+        }
+
+        return [];
+    };
+
     // Check if user is admin
     useEffect(() => {
         if (!isAuthenticated) {
@@ -36,11 +54,22 @@ const AdminDashboard: React.FC = () => {
         }
     }, [dispatch, isAuthenticated, user]);
 
+    // Debug effect to log the data structure
+    useEffect(() => {
+        if (pendingVideos.length > 0) {
+            console.log('Pending videos data:', pendingVideos);
+            console.log('Active video data:', pendingVideos[activeVideoIndex]);
+            console.log('Raw preferences:', pendingVideos[activeVideoIndex]?.propertyPreferences);
+            console.log('Raw features:', pendingVideos[activeVideoIndex]?.propertyFeatures);
+            console.log('Parsed preferences:', parsePropertyTags(pendingVideos[activeVideoIndex]?.propertyPreferences));
+            console.log('Parsed features:', parsePropertyTags(pendingVideos[activeVideoIndex]?.propertyFeatures));
+        }
+    }, [pendingVideos, activeVideoIndex]);
+
     const handleApprove = (videoId: string) => {
         dispatch(approveVideo(videoId))
             .unwrap()
             .then(() => {
-                // Show success notification
                 alert('Video approved successfully!');
             })
             .catch(error => {
@@ -55,7 +84,6 @@ const AdminDashboard: React.FC = () => {
             .then(() => {
                 setShowRejectModal(false);
                 setRejectionReason('');
-                // Show success notification
                 alert('Video rejected successfully');
             })
             .catch(error => {
@@ -75,6 +103,11 @@ const AdminDashboard: React.FC = () => {
             </div>
         );
     }
+
+    // Get current video data safely
+    const currentVideo = pendingVideos[activeVideoIndex];
+    const parsedPreferences = currentVideo ? parsePropertyTags(currentVideo.propertyPreferences) : [];
+    const parsedFeatures = currentVideo ? parsePropertyTags(currentVideo.propertyFeatures) : [];
 
     return (
         <div className="min-h-screen bg-gray-100 p-6">
@@ -101,8 +134,8 @@ const AdminDashboard: React.FC = () => {
                             <button
                                 onClick={() => setActiveTab('pending-videos')}
                                 className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'pending-videos'
-                                        ? 'border-blue-500 text-blue-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    ? 'border-blue-500 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                     }`}
                             >
                                 <div className="flex items-center">
@@ -122,8 +155,8 @@ const AdminDashboard: React.FC = () => {
                                     handleReportsClick();
                                 }}
                                 className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'reports'
-                                        ? 'border-red-500 text-red-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    ? 'border-red-500 text-red-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                     }`}
                             >
                                 <div className="flex items-center">
@@ -159,7 +192,7 @@ const AdminDashboard: React.FC = () => {
                                 <p className="mt-2 text-lg">No videos pending approval</p>
                                 <p className="text-sm">All submissions have been reviewed</p>
                             </div>
-                        ) : (
+                        ) : currentVideo ? (
                             <div className="grid grid-cols-1 gap-6">
                                 {/* Active video for review */}
                                 <div className="border border-gray-200 rounded-lg p-4">
@@ -167,20 +200,23 @@ const AdminDashboard: React.FC = () => {
                                         {/* Video preview */}
                                         <div className="w-full md:w-1/2 h-[600px] bg-black rounded-lg overflow-hidden">
                                             <VideoCard
-                                                id={pendingVideos[activeVideoIndex].id}
-                                                userId={pendingVideos[activeVideoIndex].userId}
-                                                username={pendingVideos[activeVideoIndex].username}
-                                                caption={pendingVideos[activeVideoIndex].caption}
-                                                videoUrl={pendingVideos[activeVideoIndex].videoUrl}
-                                                likes={pendingVideos[activeVideoIndex].likes}
-                                                comments={pendingVideos[activeVideoIndex].comments}
-                                                avatarUrl={pendingVideos[activeVideoIndex].avatarUrl}
-                                                rooms={pendingVideos[activeVideoIndex].rooms}
-                                                propertyType={pendingVideos[activeVideoIndex].propertyType}
-                                                space={pendingVideos[activeVideoIndex].space}
-                                                photos={pendingVideos[activeVideoIndex].photos}
-                                                location={pendingVideos[activeVideoIndex].location}
-                                                title={pendingVideos[activeVideoIndex].title}
+                                                id={currentVideo.id}
+                                                userId={currentVideo.userId}
+                                                username={currentVideo.username}
+                                                caption={currentVideo.caption}
+                                                videoUrl={currentVideo.videoUrl}
+                                                likes={currentVideo.likes}
+                                                comments={currentVideo.comments}
+                                                avatarUrl={currentVideo.avatarUrl}
+                                                rooms={currentVideo.rooms}
+                                                propertyType={currentVideo.propertyType}
+                                                space={currentVideo.space}
+                                                photos={currentVideo.photos}
+                                                location={currentVideo.location}
+                                                title={currentVideo.title}
+                                                propertyPreferences={parsedPreferences}
+                                                propertyFeatures={parsedFeatures}
+                                                status={currentVideo.status || 'pending'}
                                                 externalButtons={true}
                                                 isActive={true}
                                             />
@@ -188,50 +224,83 @@ const AdminDashboard: React.FC = () => {
 
                                         {/* Property details and action buttons */}
                                         <div className="w-full md:w-1/2">
-                                            <h3 className="text-lg font-semibold mb-3">{pendingVideos[activeVideoIndex].title}</h3>
+                                            <h3 className="text-lg font-semibold mb-3">{currentVideo.title}</h3>
 
                                             <div className="mb-4">
                                                 <h4 className="font-medium text-gray-700">Property Details</h4>
                                                 <ul className="mt-2 space-y-2 text-sm">
                                                     <li className="flex">
                                                         <span className="text-gray-500 w-28">Property Type:</span>
-                                                        <span className="font-medium">{pendingVideos[activeVideoIndex].propertyType}</span>
+                                                        <span className="font-medium">{currentVideo.propertyType}</span>
                                                     </li>
                                                     <li className="flex">
                                                         <span className="text-gray-500 w-28">Rooms:</span>
-                                                        <span className="font-medium">{pendingVideos[activeVideoIndex].rooms}</span>
+                                                        <span className="font-medium">{currentVideo.rooms}</span>
                                                     </li>
                                                     <li className="flex">
                                                         <span className="text-gray-500 w-28">Area:</span>
-                                                        <span className="font-medium">{pendingVideos[activeVideoIndex].space} m²</span>
+                                                        <span className="font-medium">{currentVideo.space} m²</span>
                                                     </li>
                                                     <li className="flex">
                                                         <span className="text-gray-500 w-28">Location:</span>
-                                                        <span className="font-medium">{pendingVideos[activeVideoIndex].location?.city || 'N/A'}</span>
+                                                        <span className="font-medium">{currentVideo.location?.city || 'N/A'}</span>
                                                     </li>
                                                 </ul>
                                             </div>
 
+                                            {/* Property Tags Display */}
+                                            {(parsedPreferences.length > 0 || parsedFeatures.length > 0) && (
+                                                <div className="mb-4">
+                                                    <h4 className="font-medium text-gray-700">Property Tags</h4>
+                                                    <div className="mt-2">
+                                                        {parsedPreferences.length > 0 && (
+                                                            <div className="mb-2">
+                                                                <span className="text-xs text-gray-500 uppercase tracking-wide">Preferences:</span>
+                                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                                    {parsedPreferences.map((pref: string, index: number) => (
+                                                                        <span key={`pref-${index}`} className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+                                                                            {pref}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {parsedFeatures.length > 0 && (
+                                                            <div>
+                                                                <span className="text-xs text-gray-500 uppercase tracking-wide">Features:</span>
+                                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                                    {parsedFeatures.map((feature: string, index: number) => (
+                                                                        <span key={`feat-${index}`} className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
+                                                                            {feature}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             <div className="mb-4">
                                                 <h4 className="font-medium text-gray-700">Description</h4>
-                                                <p className="mt-2 text-sm text-gray-600">{pendingVideos[activeVideoIndex].caption}</p>
+                                                <p className="mt-2 text-sm text-gray-600">{currentVideo.caption}</p>
                                             </div>
 
                                             <div className="mb-4">
                                                 <h4 className="font-medium text-gray-700">Submitter</h4>
                                                 <div className="mt-2 flex items-center">
                                                     <img
-                                                        src={pendingVideos[activeVideoIndex].avatarUrl || "https://via.placeholder.com/40"}
-                                                        alt={pendingVideos[activeVideoIndex].username}
+                                                        src={currentVideo.avatarUrl || "https://via.placeholder.com/40"}
+                                                        alt={currentVideo.username}
                                                         className="w-8 h-8 rounded-full mr-3"
                                                     />
-                                                    <span className="text-sm">{pendingVideos[activeVideoIndex].username}</span>
+                                                    <span className="text-sm">{currentVideo.username}</span>
                                                 </div>
                                             </div>
 
                                             <div className="flex space-x-4 mt-6">
                                                 <button
-                                                    onClick={() => handleApprove(pendingVideos[activeVideoIndex].id)}
+                                                    onClick={() => handleApprove(currentVideo.id)}
                                                     className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg font-medium transition"
                                                 >
                                                     Approve
@@ -272,33 +341,43 @@ const AdminDashboard: React.FC = () => {
                                 <div className="mt-6">
                                     <h3 className="text-lg font-semibold mb-3">All Pending Videos</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {pendingVideos.map((video, index) => (
-                                            <div
-                                                key={video.id}
-                                                onClick={() => setActiveVideoIndex(index)}
-                                                className={`p-4 border ${index === activeVideoIndex ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'} rounded-lg cursor-pointer transition-colors`}
-                                            >
-                                                <div className="flex items-start">
-                                                    <div className="w-24 h-16 bg-gray-200 rounded overflow-hidden mr-3">
-                                                        {/* Video thumbnail - could be first frame or generated thumbnail */}
-                                                        <img
-                                                            src={video.photos?.[0]?.photoUrl || "https://via.placeholder.com/96x64?text=Video"}
-                                                            alt={video.title}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="font-medium text-sm line-clamp-1">{video.title}</h4>
-                                                        <p className="text-xs text-gray-500 mt-1">By {video.username}</p>
-                                                        <p className="text-xs text-gray-500 mt-1">{video.propertyType} • {video.rooms} rooms</p>
+                                        {pendingVideos.map((video, index) => {
+                                            const videoPrefs = parsePropertyTags(video.propertyPreferences);
+                                            const videoFeats = parsePropertyTags(video.propertyFeatures);
+                                            const totalTags = videoPrefs.length + videoFeats.length;
+
+                                            return (
+                                                <div
+                                                    key={video.id}
+                                                    onClick={() => setActiveVideoIndex(index)}
+                                                    className={`p-4 border ${index === activeVideoIndex ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'} rounded-lg cursor-pointer transition-colors`}
+                                                >
+                                                    <div className="flex items-start">
+                                                        <div className="w-24 h-16 bg-gray-200 rounded overflow-hidden mr-3">
+                                                            <img
+                                                                src={video.photos?.[0]?.photoUrl || "https://via.placeholder.com/96x64?text=Video"}
+                                                                alt={video.title}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-medium text-sm line-clamp-1">{video.title}</h4>
+                                                            <p className="text-xs text-gray-500 mt-1">By {video.username}</p>
+                                                            <p className="text-xs text-gray-500 mt-1">{video.propertyType} • {video.rooms} rooms</p>
+                                                            {totalTags > 0 && (
+                                                                <p className="text-xs text-blue-600 mt-1">
+                                                                    {totalTags} tag{totalTags !== 1 ? 's' : ''}
+                                                                </p>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             </div>
-                        )}
+                        ) : null}
                     </div>
                 )}
 
@@ -358,7 +437,7 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Rejection Modal */}
-            {showRejectModal && (
+            {showRejectModal && currentVideo && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-lg max-w-md w-full p-6">
                         <h3 className="text-xl font-bold mb-4">Reject Video</h3>
@@ -380,7 +459,7 @@ const AdminDashboard: React.FC = () => {
                                 Cancel
                             </button>
                             <button
-                                onClick={() => handleReject(pendingVideos[activeVideoIndex].id)}
+                                onClick={() => handleReject(currentVideo.id)}
                                 disabled={!rejectionReason.trim()}
                                 className={`px-4 py-2 rounded-md text-white ${rejectionReason.trim() ? 'bg-red-600 hover:bg-red-700' : 'bg-red-400 cursor-not-allowed'}`}
                             >

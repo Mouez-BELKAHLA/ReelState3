@@ -64,6 +64,20 @@ namespace ReelState.Server.Models
 
         public string? RejectionReason { get; set; }
 
+        // New properties for preferences and features (stored as JSON strings)
+        public string? PropertyPreferences { get; set; }
+
+        public string? PropertyFeatures { get; set; }
+
+        // Social media integrations
+        public bool UploadToYouTube { get; set; }
+
+        public bool UploadToTikTok { get; set; }
+
+        public bool UploadToInstagram { get; set; }
+
+        public bool UploadToFacebook { get; set; }
+
         [ForeignKey("UserId")]
         public virtual ApplicationUser? User { get; set; }
 

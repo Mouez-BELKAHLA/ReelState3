@@ -31,5 +31,19 @@ namespace ReelState.Server.Models.DTOs
         public IFormFile? VideoFile { get; set; }
 
         public List<IFormFile>? PhotoFiles { get; set; }
+
+        // New properties for preferences and features
+        public string? PropertyPreferences { get; set; }
+
+        public string? PropertyFeatures { get; set; }
+
+        // Social media integrations
+        public bool UploadToYouTube { get; set; }
+
+        public bool UploadToTikTok { get; set; }
+
+        public bool UploadToInstagram { get; set; }
+
+        public bool UploadToFacebook { get; set; }
     }
 }

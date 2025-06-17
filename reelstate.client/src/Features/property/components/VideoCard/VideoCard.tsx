@@ -15,6 +15,9 @@ import {
 // Import from shared
 import { ShareButton } from "../../../../shared";
 
+// Import the dynamic tags component
+import DynamicPropertyTags from './DynamicPropertyTags';
+
 // Import types
 import { VideoCardProperty } from '../../types/Property';
 
@@ -27,37 +30,39 @@ type VideoCardProps = VideoCardProperty & {
     isActive?: boolean; // Mark if this card is active
 };
 
+// Helper to capitalize first letter
+const capitalize = (str: string) => {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
 export default function VideoCard({
     id,
     userId,
     username,
     caption,
     videoUrl,
-    likes = 0, // Default value if undefined
-    comments = 0, // Default value if undefined
+    likes = 0,
+    comments = 0,
+    views = 0,
     avatarUrl = '',
     rooms = 2,
-    propertyType = "appartement",
+    propertyType = "apartment",
     space = 75,
-    photos = [ // Default photos if none provided
-        { id: "default1", photoUrl: "https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1287&q=80" },
-        { id: "default2", photoUrl: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1770&q=80" },
-        { id: "default3", photoUrl: "https://images.unsplash.com/photo-1600585154526-990dced4db0d?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1287&q=80" }
-    ],
+    photos = [],
     location = {
         address: "123 Avenue des Champs-Élysées",
         city: "Paris",
-        coordinates: {
-            lat: 48.8566,
-            lng: 2.3522
-        }
+        coordinates: { lat: 48.8566, lng: 2.3522 }
     },
     onCommentClick,
     externalButtons = false,
     onLikeToggle,
     title = "Magnifique appartement lumineux au cœur de Lyon",
-    videoRef, // External ref for video element
-    isActive = false // Whether this video is the active one
+    videoRef,
+    isActive = false,
+    propertyPreferences = [],
+    propertyFeatures = [],
+    status = 'approved',
 }: VideoCardProps) {
     // Redux hooks
     const dispatch = useAppDispatch();
@@ -67,6 +72,7 @@ export default function VideoCard({
     // Component state
     const [activeIndex, setActiveIndex] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [userPaused, setUserPaused] = useState(false);
     const [isAnimating, setIsAnimating] = useState(false);
     const [commentsCount] = useState(comments);
 
@@ -107,44 +113,21 @@ export default function VideoCard({
     useEffect(() => {
         if (!internalVideoRef.current) return;
 
-        if (isActive) {
-            // When this card becomes active
-            if (activeIndex === 0) { // Only auto-play if in video mode
-                // Try to play video when active
-                const playPromise = internalVideoRef.current.play();
-                if (playPromise !== undefined) {
-                    playPromise
-                        .then(() => {
-                            setIsPlaying(true);
-                        })
-                        .catch(() => {
-                            setIsPlaying(false);
-                        });
-                }
+        if (isActive && activeIndex === 0 && !userPaused) {
+            const playPromise = internalVideoRef.current.play();
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => setIsPlaying(true))
+                    .catch(() => setIsPlaying(false));
             }
         } else {
-            // When this card becomes inactive, FORCE pause and update state
             internalVideoRef.current.pause();
-            internalVideoRef.current.muted = true; // Ensure muted when inactive
             setIsPlaying(false);
-        }
-    }, [isActive, activeIndex]);
-
-    // Make sure video is paused when the carousel is not showing the video
-    useEffect(() => {
-        if (!internalVideoRef.current) return;
-
-        if (activeIndex === 0) {
-            // In video mode, we can play if active
-            if (isActive && isPlaying) {
-                internalVideoRef.current.play();
+            if (!isActive) {
+                internalVideoRef.current.muted = true;
             }
-        } else {
-            // Not in video mode, always pause
-            internalVideoRef.current.pause();
-            setIsPlaying(false);
         }
-    }, [activeIndex, isActive, isPlaying]);
+    }, [isActive, activeIndex, userPaused]);
 
     // Handle like toggle using Redux
     const handleLikeToggle = async (e: React.MouseEvent) => {
@@ -176,20 +159,18 @@ export default function VideoCard({
         if (!internalVideoRef.current) return;
 
         if (internalVideoRef.current.paused) {
-            // Try to play the video
+            setUserPaused(false);
             const playPromise = internalVideoRef.current.play();
             if (playPromise !== undefined) {
                 playPromise
-                    .then(() => {
-                        setIsPlaying(true);
-                    })
+                    .then(() => setIsPlaying(true))
                     .catch(error => {
                         console.error("Failed to play video:", error);
                         setIsPlaying(false);
                     });
             }
         } else {
-            // Pause the video
+            setUserPaused(true);
             internalVideoRef.current.pause();
             setIsPlaying(false);
         }
@@ -203,9 +184,7 @@ export default function VideoCard({
 
         if (currentType !== newType) {
             setIsAnimating(true);
-            setTimeout(() => {
-                setIsAnimating(false);
-            }, 400);
+            setTimeout(() => setIsAnimating(false), 400);
         }
 
         // Always ensure video is paused when navigating away from video
@@ -334,28 +313,47 @@ export default function VideoCard({
     // Handle more options click
     const handleMoreOptionsClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        // Add your implementation for more options here
-        // For example, you could show a dropdown or a modal
         alert("More options clicked");
     };
 
-    // Handle direct video events to ensure state synchronization
-    const handleVideoPlay = () => {
-        setIsPlaying(true);
-    };
+    // Helper function to parse property tags safely
+    const parsePropertyTags = (value: string | string[] | undefined): string[] => {
+        if (!value) return [];
+        if (Array.isArray(value)) return value;
 
-    const handleVideoPause = () => {
-        setIsPlaying(false);
-    };
-
-    const handleVideoEnded = () => {
-        // Video reached the end, restart it (since loop is enabled)
-        if (internalVideoRef.current && isActive) {
-            internalVideoRef.current.play().catch(() => {
-                setIsPlaying(false);
-            });
+        if (typeof value === 'string') {
+            try {
+                const parsed = JSON.parse(value);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch {
+                // If JSON parsing fails, try comma separation
+                return value.split(',').map(item => item.trim()).filter(Boolean);
+            }
         }
+
+        return [];
     };
+
+    // Parse preferences and features
+    const parsedPreferences = parsePropertyTags(propertyPreferences);
+    const parsedFeatures = parsePropertyTags(propertyFeatures);
+
+    // Create property data for tags component
+    const propertyData = {
+        id,
+        title,
+        caption,
+        rooms,
+        propertyType,
+        space,
+        videoUrl,
+        photos,
+        propertyPreferences: parsedPreferences,
+        propertyFeatures: parsedFeatures
+    };
+
+    // Check if we have any preference or feature tags to show
+    const hasPreferenceOrFeatureTags = parsedPreferences.length > 0 || parsedFeatures.length > 0;
 
     return (
         <div className={`relative h-full rounded-xl overflow-hidden bg-black shadow-lg ${isActive ? 'ring-1 ring-blue-500' : ''}`}>
@@ -378,43 +376,31 @@ export default function VideoCard({
                 {/* Video item */}
                 <div className="min-w-full w-full h-full flex-shrink-0 snap-center relative">
                     <video
-                        // Using a callback ref to handle both internal and external refs
                         ref={(el) => {
-                            // Set internal ref first
                             internalVideoRef.current = el;
-
-                            // Then handle external ref based on its type
                             if (typeof videoRef === 'function') {
-                                videoRef(el);  // Function ref
+                                videoRef(el);
                             } else if (videoRef && 'current' in videoRef) {
-                                videoRef.current = el;  // Object ref
+                                videoRef.current = el;
                             }
                         }}
                         src={videoUrl}
                         className="w-full h-full object-cover"
                         loop
-                        muted={!isActive} // Only unmute if active
+                        muted={!isActive}
                         playsInline
                         preload="metadata"
                         onClick={togglePlay}
-                        onPlay={handleVideoPlay}
-                        onPause={handleVideoPause}
-                        onEnded={handleVideoEnded}
                     />
-                    {/* Play/Pause overlay button */}
-                    <div
-                        className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${isPlaying ? 'opacity-0' : 'opacity-100'}`}
-                        onClick={e => {
-                            e.stopPropagation();
-                            togglePlay();
-                        }}
-                    >
-                        <div className="bg-black bg-opacity-40 rounded-full p-4">
-                            <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M8 5v14l11-7z" />
-                            </svg>
+                    {!isPlaying && (
+                        <div className="absolute inset-0 flex items-center justify-center" onClick={togglePlay}>
+                            <div className="bg-black bg-opacity-40 rounded-full p-4">
+                                <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z" />
+                                </svg>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Photo items */}
@@ -439,8 +425,6 @@ export default function VideoCard({
                             alt="Property location map"
                             className="w-full h-full object-cover opacity-80"
                         />
-
-                        {/* Location info overlay */}
                         <div className="absolute inset-0 flex flex-col justify-center items-center text-white p-8">
                             <div className="backdrop-blur-lg bg-black/30 rounded-xl p-6 w-full max-w-md text-center">
                                 <svg className="w-12 h-12 mx-auto mb-4 text-red-500" fill="currentColor" viewBox="0 0 24 24">
@@ -449,7 +433,6 @@ export default function VideoCard({
                                 <h2 className="text-xl font-bold mb-2">Localisation</h2>
                                 <p className="text-lg mb-1">{location.address}</p>
                                 <p className="text-md text-gray-300">{location.city}</p>
-
                                 <button className="mt-4 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg flex items-center justify-center mx-auto transition-colors">
                                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -517,7 +500,7 @@ export default function VideoCard({
                 </>
             )}
 
-            {/* Left side */}
+            {/* Left side with dummy buttons for symmetry */}
             <div className="absolute left-4 bottom-24 flex flex-col items-center space-y-4 z-10">
                 {/* Left arrow - using same wrapper structure as right side */}
                 <div className="relative flex items-center justify-center" style={{ height: '34px', width: '34px' }}>
@@ -591,8 +574,8 @@ export default function VideoCard({
                     <UserProfile
                         avatarUrl={avatarUrl}
                         username={username || ''}
-                        userId={userId} // Pass the userId 
-                        linkToProfile={true} // Enable profile linking
+                        userId={userId}
+                        linkToProfile={true}
                     />
 
                     {/* Like button - Now using Redux state */}
@@ -614,12 +597,9 @@ export default function VideoCard({
                         id={id}
                         title="Check out this property!"
                         text={`${caption.substring(0, 50)}${caption.length > 50 ? '...' : ''}`}
-                        className="backdrop-blur-lg bg-transparent rounded-full p-1.5 hover:bg-green-500/30 transition-all border border-white/20 flex items-center justify-center"
-                        iconClassName="w-5 h-5 text-white"
-                        textClassName="text-white text-xs font-medium mt-2"
                     />
 
-                    {/* More Options button (new) */}
+                    {/* More Options button */}
                     <button
                         onClick={handleMoreOptionsClick}
                         className="backdrop-blur-lg bg-transparent rounded-full p-1.5 hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center"
@@ -649,42 +629,68 @@ export default function VideoCard({
             {/* Gradient overlay */}
             <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/70 to-transparent pointer-events-none"></div>
 
+            {/* Top right info */}
+            <div className="absolute top-4 right-4 z-30 flex space-x-2">
+                {location.city && (
+                    <div className="backdrop-blur-lg bg-black/30 rounded-full px-3 py-1.5 border border-white/20 flex items-center">
+                        <svg className="w-3.5 h-3.5 text-amber-400 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 616 0z" />
+                        </svg>
+                        <span className="text-white text-xs font-medium">{location.city}</span>
+                    </div>
+                )}
+                <div className="backdrop-blur-lg bg-black/30 rounded-full px-3 py-1.5 border border-white/20 flex items-center space-x-1">
+                    <svg className="w-3.5 h-3.5 text-blue-300" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                        <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-white text-xs font-medium">{views}</span>
+                </div>
+            </div>
+
+            {/* Top banner */}
+            <div className="absolute top-16 left-4 right-4 z-30 flex justify-center">
+                <div className="flex space-x-2 backdrop-blur-lg bg-white/10 rounded-full px-3 py-1.5 border border-white/20">
+                    <div className="flex items-center text-white text-xs font-medium">
+                        <svg className="w-3.5 h-3.5 mr-1 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        <span>{capitalize(propertyType)}</span>
+                    </div>
+                    <span className="text-gray-400">|</span>
+                    <div className="flex items-center text-white text-xs font-medium">
+                        <svg className="w-3.5 h-3.5 mr-1 text-pink-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
+                        <span>{rooms} room{rooms !== 1 ? 's' : ''}</span>
+                    </div>
+                    <span className="text-gray-400">|</span>
+                    <div className="flex items-center text-white text-xs font-medium">
+                        <svg className="w-3.5 h-3.5 mr-1 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                        </svg>
+                        <span>{space} m²</span>
+                    </div>
+                </div>
+            </div>
+
             {/* Property title */}
-            <div className="absolute bottom-16 left-4 right-12 z-10">
-                <p className="text-white text-sm font-medium">{title}</p>
+            <div className={`absolute ${hasPreferenceOrFeatureTags ? 'bottom-24' : 'bottom-16'} left-4 right-12 z-10`}>
+                <p className="text-white text-base font-semibold">{title}</p>
             </div>
 
-            {/* Caption/Description */}
-            <div className="absolute bottom-10 left-4 right-12 z-10">
-                <p className="text-white text-sm line-clamp-1">{caption}</p>
+            {/* Caption */}
+            <div className={`absolute ${hasPreferenceOrFeatureTags ? 'bottom-18' : 'bottom-10'} left-4 right-12 z-10`}>
+                <p className="text-white/80 text-sm line-clamp-1">{caption}</p>
             </div>
 
-            {/* Property info tags - custom horizontal layout */}
-            <div className="absolute bottom-2 left-4 z-10 flex flex-wrap gap-2">
-                {/* Rooms tag */}
-                <div className="backdrop-blur-lg bg-black/30 rounded-full px-3 py-1.5 border border-white/20 flex items-center">
-                    <svg className="w-4 h-4 text-white mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                    <span className="text-white text-xs font-medium">{rooms} pièces</span>
+            {/* Bottom tags using DynamicPropertyTags component - only show if we have preference/feature tags */}
+            {hasPreferenceOrFeatureTags && (
+                <div className="absolute bottom-2 left-4 right-4 z-20">
+                    <DynamicPropertyTags property={propertyData} maxTagsToShow={5} />
                 </div>
-
-                {/* Property type tag */}
-                <div className="backdrop-blur-lg bg-black/30 rounded-full px-3 py-1.5 border border-white/20 flex items-center">
-                    <svg className="w-4 h-4 text-white mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M10.5 3L12 2l1.5 1H21l-3 7H6l-3-7h7.5z" />
-                    </svg>
-                    <span className="text-white text-xs font-medium">{propertyType}</span>
-                </div>
-
-                {/* Space tag */}
-                <div className="backdrop-blur-lg bg-black/30 rounded-full px-3 py-1.5 border border-white/20 flex items-center">
-                    <svg className="w-4 h-4 text-white mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                    </svg>
-                    <span className="text-white text-xs font-medium">{space} m²</span>
-                </div>
-            </div>
+            )}
         </div>
     );
 }

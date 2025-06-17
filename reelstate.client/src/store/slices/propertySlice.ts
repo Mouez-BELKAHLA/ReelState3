@@ -43,7 +43,28 @@ export const fetchProperties = createAsyncThunk(
             }
 
             const response = await axios.get(`${API_URL}/api/Property`, { headers });
-            return toVideoCardProperties(response.data, API_URL);
+
+            // DEBUG LOGGING - Remove after fixing
+            console.log('=== API RESPONSE DEBUG ===');
+            console.log('Raw API response:', response.data);
+            if (response.data && response.data.length > 0) {
+                console.log('First property from API:', response.data[0]);
+                console.log('API PropertyPreferences:', response.data[0]?.PropertyPreferences || response.data[0]?.propertyPreferences);
+                console.log('API PropertyFeatures:', response.data[0]?.PropertyFeatures || response.data[0]?.propertyFeatures);
+            }
+
+            const transformedData = toVideoCardProperties(response.data, API_URL);
+
+            console.log('=== TRANSFORMED DATA DEBUG ===');
+            console.log('Transformed data:', transformedData);
+            if (transformedData && transformedData.length > 0) {
+                console.log('First transformed property:', transformedData[0]);
+                console.log('Transformed propertyPreferences:', transformedData[0]?.propertyPreferences);
+                console.log('Transformed propertyFeatures:', transformedData[0]?.propertyFeatures);
+            }
+            console.log('============================');
+
+            return transformedData;
         } catch (error: unknown) {
             return rejectWithValue(getErrorMessage(error, 'Failed to fetch properties'));
         }

@@ -31,16 +31,32 @@ export function toVideoCardProperty(property: Property, apiBaseUrl: string): Vid
         property.user.email || 'Unknown User' :
         'Unknown User';
 
+    // Helper function to safely parse preferences and features
+    const parsePropertyTags = (value: string[] | string | undefined): string[] => {
+        if (!value) return [];
+        if (Array.isArray(value)) return value;
+        if (typeof value === 'string') {
+            try {
+                const parsed = JSON.parse(value);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch {
+                // If JSON parsing fails, try comma separation
+                return value.split(',').map(item => item.trim()).filter(Boolean);
+            }
+        }
+        return [];
+    };
+
     return {
         id: property.id,
-        userId: property.userId, // Add userId here
+        userId: property.userId,
         username: username,
         caption: property.caption,
-        title: property.title, // Add title field
+        title: property.title,
         videoUrl: videoUrl,
         likes: property.likesCount || 0,
         comments: property.commentsCount || 0,
-        views: property.views || 0, // ✅ Add views field - this was missing!
+        views: property.views || 0,
         avatarUrl: property.user?.profilePictureUrl || defaultAvatar,
         rooms: property.rooms,
         propertyType: property.propertyType,
@@ -54,8 +70,11 @@ export function toVideoCardProperty(property: Property, apiBaseUrl: string): Vid
                 lng: property.longitude
             }
         },
-        status: property.status, // ✅ Add status field
-        statusReason: property.statusReason // ✅ Add statusReason field
+        // ADD THESE MISSING FIELDS
+        propertyPreferences: parsePropertyTags(property.propertyPreferences),
+        propertyFeatures: parsePropertyTags(property.propertyFeatures),
+        status: property.status,
+        statusReason: property.statusReason
     };
 }
 

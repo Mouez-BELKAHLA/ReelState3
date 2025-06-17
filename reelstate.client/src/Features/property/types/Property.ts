@@ -16,6 +16,14 @@ export interface PropertyCreateDto {
     longitude: number;
     videoFile?: File | null;
     photoFiles?: File[] | null;
+    // New fields for preferences and features
+    propertyPreferences?: string[];
+    propertyFeatures?: string[];
+    // Social media sharing options
+    uploadToYouTube?: boolean;
+    uploadToTikTok?: boolean;
+    uploadToInstagram?: boolean;
+    uploadToFacebook?: boolean;
 }
 
 /**
@@ -38,6 +46,9 @@ export interface Property {
     createdAt: string;
     user?: ApplicationUser;     // Matching the navigation property in C#
     photos?: PropertyPhoto[];    // Matching the navigation property in C#
+    // New fields for preferences and features
+    propertyPreferences?: string[] | string;  // Can be array or JSON string from backend
+    propertyFeatures?: string[] | string;     // Can be array or JSON string from backend
 
     // These fields will be populated by the API but aren't in the C# model directly
     likesCount?: number;
@@ -45,6 +56,7 @@ export interface Property {
     isLiked?: boolean;
     status: 'pending' | 'approved' | 'rejected';
     statusReason?: string; // For storing rejection reasons
+    views?: number;        // Add view count field
 }
 
 /**
@@ -63,12 +75,13 @@ export interface PropertyPhoto {
  */
 export interface VideoCardProperty {
     id: string;
-    userId: string; // Add this field
+    userId: string;
     username?: string;
     caption: string;
     videoUrl: string;
     likes?: number;
     comments?: number;
+    views?: number;
     avatarUrl?: string;
     rooms?: number;
     propertyType?: string;
@@ -83,10 +96,31 @@ export interface VideoCardProperty {
         };
     };
     title?: string;
-    // Other fields...
-    // Add status field
+    // New fields for preferences and features - always arrays in UI
+    propertyPreferences?: string[];
+    propertyFeatures?: string[];
+    // Status field
     status?: 'pending' | 'approved' | 'rejected';
     statusReason?: string;
+}
+
+/**
+ * Interface for search filters
+ */
+export interface SearchFilters {
+    propertyType?: string;
+    minRooms?: number;
+    maxRooms?: number;
+    minSpace?: number;
+    maxSpace?: number;
+    minPrice?: number;
+    maxPrice?: number;
+    city?: string;
+    sortBy?: 'newest' | 'popular' | 'price_asc' | 'price_desc';
+    preferences?: string[];
+    features?: string[];
+    page?: number;
+    limit?: number;
 }
 
 /**
@@ -105,3 +139,23 @@ export interface PropertyLikeState {
 export interface PropertyLoadingState {
     [propertyId: string]: boolean;
 }
+
+/**
+ * Constants for property preferences and features
+ * Using const arrays makes these reusable across components
+ */
+export const propertyPreferences = [
+    'Modern', 'Traditional', 'Spacious', 'Compact', 'Urban', 'Rural',
+    'Near amenities', 'Quiet location', 'Family-friendly', 'Investment',
+    'Luxury', 'Budget-friendly', 'Renovation potential', 'Move-in ready'
+];
+
+export const propertyFeatures = [
+    'Parking', 'Garden', 'Balcony', 'Pool', 'Elevator',
+    'Air conditioning', 'Heating', 'Furnished', 'Pet friendly',
+    'Security system', 'Storage room', 'Gym', 'Laundry'
+];
+
+export const propertyTypes = [
+    "apartment", "house", "studio", "villa", "loft", "land"
+];

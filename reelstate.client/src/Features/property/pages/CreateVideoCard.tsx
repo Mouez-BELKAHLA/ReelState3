@@ -7,6 +7,20 @@ import { getErrorMessage } from "../../../shared/helpers"; // Import error helpe
 import { useAppSelector } from "../../../store/hooks"; // Import Redux hooks
 import NotImplementedMessage from "../../../shared/components/Common/NotImplementedMessage";
 
+// Define property preferences array
+const propertyPreferences = [
+    'Modern', 'Traditional', 'Spacious', 'Compact', 'Urban', 'Rural',
+    'Near amenities', 'Quiet location', 'Family-friendly', 'Investment',
+    'Luxury', 'Budget-friendly', 'Renovation potential', 'Move-in ready'
+];
+
+// Define property features array
+const propertyFeatures = [
+    'Parking', 'Garden', 'Balcony', 'Pool', 'Elevator',
+    'Air conditioning', 'Heating', 'Furnished', 'Pet friendly',
+    'Security system', 'Storage room', 'Gym', 'Laundry'
+];
+
 const CreateVideoCard: React.FC = () => {
     // Get auth state from Redux
     const { user, token } = useAppSelector(state => state.auth);
@@ -24,6 +38,9 @@ const CreateVideoCard: React.FC = () => {
         lng: 0,
         video: null as File | null,
         photos: [] as File[],
+        // Add property preferences and features
+        propertyPreferences: [] as string[],
+        propertyFeatures: [] as string[],
         // Social media platforms
         socialPlatforms: {
             youtube: false,
@@ -66,6 +83,40 @@ const CreateVideoCard: React.FC = () => {
                 ? parseFloat(value)
                 : value
         }));
+    };
+
+    // Function to toggle preference selection
+    const togglePreference = (preference: string) => {
+        setFormData(prev => {
+            if (prev.propertyPreferences.includes(preference)) {
+                return {
+                    ...prev,
+                    propertyPreferences: prev.propertyPreferences.filter(p => p !== preference)
+                };
+            } else {
+                return {
+                    ...prev,
+                    propertyPreferences: [...prev.propertyPreferences, preference]
+                };
+            }
+        });
+    };
+
+    // Function to toggle feature selection
+    const toggleFeature = (feature: string) => {
+        setFormData(prev => {
+            if (prev.propertyFeatures.includes(feature)) {
+                return {
+                    ...prev,
+                    propertyFeatures: prev.propertyFeatures.filter(f => f !== feature)
+                };
+            } else {
+                return {
+                    ...prev,
+                    propertyFeatures: [...prev.propertyFeatures, feature]
+                };
+            }
+        });
     };
 
     // Handle social media platform checkbox changes
@@ -170,6 +221,10 @@ const CreateVideoCard: React.FC = () => {
             submitData.append('Latitude', formData.lat.toString());
             submitData.append('Longitude', formData.lng.toString());
 
+            // Add preferences and features as JSON strings
+            submitData.append('PropertyPreferences', JSON.stringify(formData.propertyPreferences));
+            submitData.append('PropertyFeatures', JSON.stringify(formData.propertyFeatures));
+
             // Add social media platform preferences
             submitData.append('UploadToYouTube', formData.socialPlatforms.youtube.toString());
             submitData.append('UploadToTikTok', formData.socialPlatforms.tiktok.toString());
@@ -193,6 +248,8 @@ const CreateVideoCard: React.FC = () => {
                 caption: formData.caption,
                 videoSize: formData.video?.size || 0,
                 photosCount: formData.photos.length,
+                preferences: formData.propertyPreferences,
+                features: formData.propertyFeatures,
                 socialPlatforms: formData.socialPlatforms
             });
 
@@ -226,6 +283,8 @@ const CreateVideoCard: React.FC = () => {
                     lng: 0,
                     video: null,
                     photos: [],
+                    propertyPreferences: [],
+                    propertyFeatures: [],
                     socialPlatforms: {
                         youtube: false,
                         tiktok: false,
@@ -462,6 +521,56 @@ const CreateVideoCard: React.FC = () => {
                                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             placeholder="2.3522"
                                         />
+                                    </div>
+                                </div>
+
+                                {/* Property Preferences Section - NEW */}
+                                <div className="border-t pt-6">
+                                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                                        Property Style & Preferences
+                                        <span className="text-gray-500 text-xs block mt-1">
+                                            Select all that apply to help buyers find your property
+                                        </span>
+                                    </label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {propertyPreferences.map(preference => (
+                                            <button
+                                                key={preference}
+                                                type="button"
+                                                onClick={() => togglePreference(preference)}
+                                                className={`px-3 py-1 text-sm rounded-full ${formData.propertyPreferences.includes(preference)
+                                                        ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                                                        : 'bg-gray-100 text-gray-800 border border-gray-200 hover:bg-gray-200'
+                                                    } transition-colors`}
+                                            >
+                                                {preference}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Property Features Section - NEW */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                                        Property Features & Amenities
+                                        <span className="text-gray-500 text-xs block mt-1">
+                                            Select all features this property offers
+                                        </span>
+                                    </label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {propertyFeatures.map(feature => (
+                                            <button
+                                                key={feature}
+                                                type="button"
+                                                onClick={() => toggleFeature(feature)}
+                                                className={`px-3 py-1 text-sm rounded-full ${formData.propertyFeatures.includes(feature)
+                                                        ? 'bg-green-100 text-green-800 border border-green-300'
+                                                        : 'bg-gray-100 text-gray-800 border border-gray-200 hover:bg-gray-200'
+                                                    } transition-colors`}
+                                            >
+                                                {feature}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
 
