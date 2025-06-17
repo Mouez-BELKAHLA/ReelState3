@@ -9,10 +9,11 @@ import { ProtectedRoute, Login, Register } from './Features/auth';
 import { Dashboard } from './Features/dashboard';
 import { NotFound } from './Features/core';
 import { Feed, CreateVideoCard, UserVideoFeed } from './Features/property';
+import SearchResults from './Features/property/pages/SearchResults';
 import { Profile } from './Features/profile';
 import { Notification } from './Features/notification';
-import { AdminDashboard } from './Features/admin'; // Import AdminDashboard
-import UnauthorizedPage from './Features/auth/pages/UnauthorizedPage'; // Import using default import
+import { AdminDashboard } from './Features/admin';
+import UnauthorizedPage from './Features/auth/pages/UnauthorizedPage';
 
 // Shared component imports
 import { Layout } from './shared';
@@ -62,6 +63,7 @@ const App: React.FC = () => {
                 {/* Routes with navbar */}
                 <Route element={<Layout />}>
                     <Route path="/feed" element={<Feed />} />
+                    <Route path="/search" element={<SearchResults />} />
                     <Route path="/user-videos/:userId" element={<UserVideoFeed />} />
                     <Route path="/profile/:userId" element={<Profile />} />
                     <Route path="/unauthorized" element={<UnauthorizedPage />} />

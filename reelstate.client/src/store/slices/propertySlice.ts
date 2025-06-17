@@ -2,32 +2,55 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { API_URL } from '../../shared';
 import { toVideoCardProperties } from '../../shared/Utils/TypeTransformers';
-import { VideoCardProperty } from '../../Features/property/types/Property';
+import { VideoCardProperty, SearchFilters } from '../../Features/property/types/Property';
 import { PropertyLikeState, PropertyLoadingState } from '../../Features/property/types/Property';
 import { LikeService } from '../../Features/property';
+import { SearchService, SearchResponse } from '../../Features/property/services/SearchService';
 import { getErrorMessage } from '../../shared/helpers';
 
 // Define the property state interface
 interface PropertyState {
     properties: VideoCardProperty[];
+    searchResults: VideoCardProperty[];
     propertyLikes: PropertyLikeState;
     likeLoading: PropertyLoadingState;
     activeVideoIndex: number;
     activePropertyId: string | null;
     isLoading: boolean;
+    isSearching: boolean;
     error: string | null;
     showComments: boolean;
+    currentFilters: SearchFilters;
+    searchQuery: string;
+    pagination: {
+        currentPage: number;
+        totalPages: number;
+        totalCount: number;
+        hasNextPage: boolean;
+        hasPreviousPage: boolean;
+    };
 }
 
 const initialState: PropertyState = {
     properties: [],
+    searchResults: [],
     propertyLikes: {},
     likeLoading: {},
     activeVideoIndex: 0,
     activePropertyId: null,
     isLoading: false,
+    isSearching: false,
     error: null,
-    showComments: false
+    showComments: false,
+    currentFilters: {},
+    searchQuery: '',
+    pagination: {
+        currentPage: 1,
+        totalPages: 1,
+        totalCount: 0,
+        hasNextPage: false,
+        hasPreviousPage: false,
+    },
 };
 
 // Async thunks for property actions
@@ -71,6 +94,45 @@ export const fetchProperties = createAsyncThunk(
     }
 );
 
+// New search thunk
+export const searchProperties = createAsyncThunk(
+    'property/searchProperties',
+    async ({ query, filters }: { query: string; filters: SearchFilters }, { rejectWithValue }) => {
+        try {
+            const searchFilters: SearchFilters = {
+                ...filters,
+                page: filters.page || 1,
+                limit: filters.limit || 20,
+            };
+
+            // If there's a query, add it to the city filter (you can modify this logic)
+            if (query.trim()) {
+                searchFilters.city = query.trim();
+            }
+
+            const response: SearchResponse = await SearchService.searchProperties(searchFilters);
+
+            // Transform the properties
+            const transformedProperties = toVideoCardProperties(response.properties, API_URL);
+
+            return {
+                properties: transformedProperties,
+                pagination: {
+                    currentPage: response.currentPage,
+                    totalPages: response.totalPages,
+                    totalCount: response.totalCount,
+                    hasNextPage: response.hasNextPage,
+                    hasPreviousPage: response.hasPreviousPage,
+                },
+                query,
+                filters: searchFilters,
+            };
+        } catch (error: unknown) {
+            return rejectWithValue(getErrorMessage(error, 'Failed to search properties'));
+        }
+    }
+);
+
 // Export the check like status function that's being imported by components
 export const checkLikeStatus = createAsyncThunk(
     'property/checkLikeStatus',
@@ -78,7 +140,6 @@ export const checkLikeStatus = createAsyncThunk(
         try {
             const response = await LikeService.checkLikeStatus(propertyId);
             if (!response.isSuccess) {
-                // Use a fallback message since response.message might not exist
                 return rejectWithValue('Failed to check like status');
             }
             return {
@@ -98,16 +159,23 @@ export const checkAllLikeStatuses = createAsyncThunk(
         try {
             const { auth, property } = getState() as {
                 auth: { token: string | null, isAuthenticated: boolean },
-                property: { properties: VideoCardProperty[] }
+                property: { properties: VideoCardProperty[], searchResults: VideoCardProperty[] }
             };
 
-            if (!auth.isAuthenticated || !auth.token || property.properties.length === 0) {
+            if (!auth.isAuthenticated || !auth.token) {
+                return {};
+            }
+
+            // Check likes for either search results or regular properties
+            const propertiesToCheck = property.searchResults.length > 0 ? property.searchResults : property.properties;
+
+            if (propertiesToCheck.length === 0) {
                 return {};
             }
 
             const propertyLikes: PropertyLikeState = {};
 
-            for (const prop of property.properties) {
+            for (const prop of propertiesToCheck) {
                 try {
                     const response = await LikeService.checkLikeStatus(prop.id);
                     if (response.isSuccess) {
@@ -129,14 +197,12 @@ export const checkAllLikeStatuses = createAsyncThunk(
     }
 );
 
-// Removed unused getState parameter
 export const toggleLike = createAsyncThunk(
     'property/toggleLike',
     async (propertyId: string, { rejectWithValue }) => {
         try {
             const response = await LikeService.toggleLike(propertyId);
             if (!response.isSuccess) {
-                // Use a fallback message since response.message might not exist
                 return rejectWithValue('Failed to toggle like');
             }
             return {
@@ -156,8 +222,9 @@ const propertySlice = createSlice({
     reducers: {
         setActiveVideoIndex: (state, action: PayloadAction<number>) => {
             state.activeVideoIndex = action.payload;
-            if (state.properties.length > action.payload) {
-                state.activePropertyId = state.properties[action.payload].id;
+            const currentProperties = state.searchResults.length > 0 ? state.searchResults : state.properties;
+            if (currentProperties.length > action.payload) {
+                state.activePropertyId = currentProperties[action.payload].id;
             }
         },
         toggleComments: (state, action: PayloadAction<boolean | undefined>) => {
@@ -173,6 +240,15 @@ const propertySlice = createSlice({
         }>) => {
             const { propertyId, isLiked, count } = action.payload;
             state.propertyLikes[propertyId] = { isLiked, count };
+        },
+        clearSearchResults: (state) => {
+            state.searchResults = [];
+            state.searchQuery = '';
+            state.currentFilters = {};
+            state.pagination = initialState.pagination;
+        },
+        setSearchFilters: (state, action: PayloadAction<SearchFilters>) => {
+            state.currentFilters = action.payload;
         },
     },
     extraReducers: (builder) => {
@@ -204,6 +280,39 @@ const propertySlice = createSlice({
             .addCase(fetchProperties.rejected, (state, action) => {
                 state.isLoading = false;
                 state.error = action.payload as string || 'Failed to fetch properties';
+            })
+
+            // Search properties cases
+            .addCase(searchProperties.pending, (state) => {
+                state.isSearching = true;
+                state.error = null;
+            })
+            .addCase(searchProperties.fulfilled, (state, action) => {
+                state.isSearching = false;
+                state.searchResults = action.payload.properties;
+                state.pagination = action.payload.pagination;
+                state.searchQuery = action.payload.query;
+                state.currentFilters = action.payload.filters;
+
+                // Initialize like state for search results
+                action.payload.properties.forEach(prop => {
+                    if (!state.propertyLikes[prop.id]) {
+                        state.propertyLikes[prop.id] = {
+                            count: prop.likes || 0,
+                            isLiked: false
+                        };
+                    }
+                });
+
+                // Reset active video index when new search results come in
+                state.activeVideoIndex = 0;
+                if (action.payload.properties.length > 0) {
+                    state.activePropertyId = action.payload.properties[0].id;
+                }
+            })
+            .addCase(searchProperties.rejected, (state, action) => {
+                state.isSearching = false;
+                state.error = action.payload as string || 'Failed to search properties';
             })
 
             // Check like status cases
@@ -250,7 +359,9 @@ export const {
     setActiveVideoIndex,
     toggleComments,
     setActiveProperty,
-    updatePropertyLike
+    updatePropertyLike,
+    clearSearchResults,
+    setSearchFilters
 } = propertySlice.actions;
 
 export default propertySlice.reducer;

@@ -4,8 +4,8 @@ import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import { logoutUser } from '../../../store/slices/authSlice';
 import { NotificationBadge } from '../../../Features/notification';
 import { markNotificationAsRead } from '../../../store/slices/notificationSlice';
-import NotImplementedMessage from '../Common/NotImplementedMessage';
 import { NotificationType } from '../../../Features/notification/types/NotificationTypes';
+import SearchBar from './SearchBar';
 
 const Navbar: React.FC = () => {
     const navigate = useNavigate();
@@ -20,10 +20,6 @@ const Navbar: React.FC = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [profileMenuOpen, setProfileMenuOpen] = useState(false);
     const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
-    const [searchValue, setSearchValue] = useState('');
-    const [showSearchMessage, setShowSearchMessage] = useState(false);
-    const [showFilterMessage, setShowFilterMessage] = useState(false);
-    const [showAIMessage, setShowAIMessage] = useState(false);
 
     // Refs for handling click outside dropdowns
     const notificationRef = useRef<HTMLDivElement>(null);
@@ -73,20 +69,6 @@ const Navbar: React.FC = () => {
         navigate('/notifications');
     };
 
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        // Only show message when search is attempted with content or empty
-        setShowSearchMessage(true);
-    };
-
-    const handleFilterClick = () => {
-        setShowFilterMessage(true);
-    };
-
-    const handleAIClick = () => {
-        setShowAIMessage(true);
-    };
-
     // Helper function to get notification type string for comparison
     const getNotificationTypeString = (type: NotificationType): string => {
         switch (type) {
@@ -113,27 +95,6 @@ const Navbar: React.FC = () => {
 
     return (
         <nav className="bg-white shadow-md sticky top-0 z-50">
-            {showSearchMessage && (
-                <NotImplementedMessage
-                    message="Search functionality coming soon!"
-                    onClose={() => setShowSearchMessage(false)}
-                />
-            )}
-
-            {showFilterMessage && (
-                <NotImplementedMessage
-                    message="Advanced filters will be available soon!"
-                    onClose={() => setShowFilterMessage(false)}
-                />
-            )}
-
-            {showAIMessage && (
-                <NotImplementedMessage
-                    message="AI recommendations and opinions feature coming soon!"
-                    onClose={() => setShowAIMessage(false)}
-                />
-            )}
-
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between h-16">
                     {/* Logo */}
@@ -147,60 +108,7 @@ const Navbar: React.FC = () => {
                     </div>
 
                     {/* Search Bar - Desktop */}
-                    <div className="hidden md:flex flex-1 items-center justify-center px-2 lg:ml-6 lg:mr-6">
-                        <div className="max-w-lg w-full">
-                            <form onSubmit={handleSearch} className="relative flex items-center">
-                                <div className="relative flex-1">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                            <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                                        </svg>
-                                    </div>
-                                    <input
-                                        type="text"
-                                        name="search"
-                                        id="search"
-                                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-l-full text-sm placeholder-gray-500 focus:outline-none focus:text-gray-900 focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                        placeholder="Search for properties, locations..."
-                                        value={searchValue}
-                                        onChange={(e) => setSearchValue(e.target.value)}
-                                    />
-                                </div>
-
-                                {/* Filter Button */}
-                                <button
-                                    type="button"
-                                    onClick={handleFilterClick}
-                                    className="px-3 py-2 border-t border-b border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-600 transition-colors"
-                                    title="Advanced Filters"
-                                >
-                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                                    </svg>
-                                </button>
-
-                                {/* AI Button */}
-                                <button
-                                    type="button"
-                                    onClick={handleAIClick}
-                                    className="px-3 py-2 border-t border-b border-r border-gray-300 bg-purple-50 hover:bg-purple-100 text-purple-600 transition-colors"
-                                    title="AI Recommendations"
-                                >
-                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                                    </svg>
-                                </button>
-
-                                {/* Search Button */}
-                                <button
-                                    type="submit"
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-r-full hover:bg-blue-700 transition-colors"
-                                >
-                                    <span className="text-sm font-medium">Search</span>
-                                </button>
-                            </form>
-                        </div>
-                    </div>
+                    <SearchBar />
 
                     {/* Desktop Navigation */}
                     <div className="hidden md:flex items-center space-x-4">
@@ -271,11 +179,11 @@ const Navbar: React.FC = () => {
                                                             >
                                                                 {/* Notification Icon based on type */}
                                                                 <div className={`flex-shrink-0 rounded-full p-2 mr-3 ${typeString === 'like' ? 'bg-red-100 text-red-600' :
-                                                                        typeString === 'comment' ? 'bg-blue-100 text-blue-600' :
-                                                                            typeString === 'follow' ? 'bg-purple-100 text-purple-600' :
-                                                                                typeString === 'property_approved' ? 'bg-green-100 text-green-600' :
-                                                                                    typeString === 'property_rejected' ? 'bg-yellow-100 text-yellow-600' :
-                                                                                        'bg-gray-100 text-gray-600'
+                                                                    typeString === 'comment' ? 'bg-blue-100 text-blue-600' :
+                                                                        typeString === 'follow' ? 'bg-purple-100 text-purple-600' :
+                                                                            typeString === 'property_approved' ? 'bg-green-100 text-green-600' :
+                                                                                typeString === 'property_rejected' ? 'bg-yellow-100 text-yellow-600' :
+                                                                                    'bg-gray-100 text-gray-600'
                                                                     }`}>
                                                                     {typeString === 'like' && (
                                                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -481,56 +389,7 @@ const Navbar: React.FC = () => {
             {/* Mobile menu */}
             <div className={`${isMenuOpen ? 'block' : 'hidden'} md:hidden`}>
                 {/* Mobile search bar with buttons */}
-                <div className="px-4 pt-2 pb-3">
-                    <form onSubmit={handleSearch} className="space-y-3">
-                        {/* Search input */}
-                        <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                                </svg>
-                            </div>
-                            <input
-                                type="text"
-                                name="search"
-                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="Search for properties, locations..."
-                                value={searchValue}
-                                onChange={(e) => setSearchValue(e.target.value)}
-                            />
-                        </div>
-
-                        {/* Button row */}
-                        <div className="flex space-x-2">
-                            <button
-                                type="submit"
-                                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                            >
-                                Search
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleFilterClick}
-                                className="px-4 py-2 border border-gray-300 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-                                title="Filters"
-                            >
-                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                                </svg>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleAIClick}
-                                className="px-4 py-2 border border-purple-300 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors"
-                                title="AI Assistant"
-                            >
-                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                                </svg>
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                <SearchBar isMobile={true} />
 
                 <div className="pt-1 pb-3 space-y-1">
                     <Link
