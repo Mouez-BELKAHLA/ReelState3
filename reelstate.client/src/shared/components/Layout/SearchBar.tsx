@@ -24,7 +24,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
     const searchInputRef = useRef<HTMLInputElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
 
-    // Debounced search suggestions
     useEffect(() => {
         const timeoutId = setTimeout(async () => {
             if (searchValue.length > 2) {
@@ -47,7 +46,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
         return () => clearTimeout(timeoutId);
     }, [searchValue]);
 
-    // Close suggestions when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (
@@ -102,13 +100,12 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
     const handleFiltersApply = (newFilters: SearchFilters) => {
         setFilters(newFilters);
-        // Auto-trigger search when filters are applied
         navigateToSearch(searchValue, newFilters);
     };
 
+    // Modified to navigate directly to AI search page
     const handleAIClick = () => {
-        // TODO: Implement AI recommendations
-        alert('AI recommendations feature coming soon!');
+        navigate(`/search?ai=true&aiQuery=${encodeURIComponent(searchValue || '')}`);
     };
 
     const getActiveFiltersCount = () => {
@@ -130,7 +127,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
                 <div className={`px-4 pt-2 pb-3 ${className}`}>
                     <form onSubmit={handleSearch} className="space-y-3">
-                        {/* Search input */}
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                 <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -147,7 +143,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
                                 onChange={(e) => setSearchValue(e.target.value)}
                             />
 
-                            {/* Mobile Suggestions */}
                             {showSuggestions && suggestions.length > 0 && (
                                 <div
                                     ref={suggestionsRef}
@@ -170,7 +165,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
                             )}
                         </div>
 
-                        {/* Button row */}
                         <div className="flex space-x-2">
                             <button
                                 type="submit"
@@ -199,7 +193,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
                                 className="px-4 py-2 border border-purple-300 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors"
                                 title="AI Assistant"
                             >
-                                {/* Fixed SVG path */}
                                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                                 </svg>
@@ -211,7 +204,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
         );
     }
 
-    // Desktop version
     return (
         <>
             <FilterModal
@@ -241,7 +233,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
                                 onChange={(e) => setSearchValue(e.target.value)}
                             />
 
-                            {/* Desktop Suggestions */}
                             {showSuggestions && suggestions.length > 0 && (
                                 <div
                                     ref={suggestionsRef}
@@ -264,7 +255,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
                             )}
                         </div>
 
-                        {/* Filter Button */}
                         <button
                             type="button"
                             onClick={handleFilterClick}
@@ -281,20 +271,17 @@ const SearchBar: React.FC<SearchBarProps> = ({
                             )}
                         </button>
 
-                        {/* AI Button */}
                         <button
                             type="button"
                             onClick={handleAIClick}
                             className="px-3 py-2 border-t border-b border-r border-gray-300 bg-purple-50 hover:bg-purple-100 text-purple-600 transition-colors"
-                            title="AI Recommendations"
+                            title="AI Property Assistant"
                         >
-                            {/* Fixed SVG path */}
                             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                             </svg>
                         </button>
 
-                        {/* Search Button */}
                         <button
                             type="submit"
                             className="px-4 py-2 bg-blue-600 text-white rounded-r-full hover:bg-blue-700 transition-colors"

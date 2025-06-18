@@ -94,26 +94,37 @@ export const fetchProperties = createAsyncThunk(
     }
 );
 
-// New search thunk
+// FIXED search thunk - use 'q' parameter instead of 'city'
 export const searchProperties = createAsyncThunk(
     'property/searchProperties',
     async ({ query, filters }: { query: string; filters: SearchFilters }, { rejectWithValue }) => {
         try {
+            console.log('=== PROPERTY SLICE SEARCH DEBUG ===');
+            console.log('Input query:', query);
+            console.log('Input filters:', filters);
+
             const searchFilters: SearchFilters = {
                 ...filters,
                 page: filters.page || 1,
                 limit: filters.limit || 20,
             };
 
-            // If there's a query, add it to the city filter (you can modify this logic)
+            // FIXED: Add query as 'q' parameter, not 'city'
             if (query.trim()) {
-                searchFilters.city = query.trim();
+                searchFilters.q = query.trim();
+                console.log('Added q parameter:', query.trim());
             }
+
+            console.log('Final search filters being sent:', searchFilters);
 
             const response: SearchResponse = await SearchService.searchProperties(searchFilters);
 
+            console.log('Search service response:', response);
+
             // Transform the properties
             const transformedProperties = toVideoCardProperties(response.properties, API_URL);
+
+            console.log('Transformed search results:', transformedProperties);
 
             return {
                 properties: transformedProperties,
@@ -128,6 +139,7 @@ export const searchProperties = createAsyncThunk(
                 filters: searchFilters,
             };
         } catch (error: unknown) {
+            console.error('Property slice search error:', error);
             return rejectWithValue(getErrorMessage(error, 'Failed to search properties'));
         }
     }

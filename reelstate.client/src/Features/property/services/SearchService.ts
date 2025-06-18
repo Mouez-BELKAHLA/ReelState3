@@ -19,9 +19,19 @@ export class SearchService {
 
     static async searchProperties(filters: SearchFilters): Promise<SearchResponse> {
         try {
+            console.log('=== SEARCH SERVICE DEBUG ===');
+            console.log('API_URL:', API_URL);
+            console.log('Input filters:', filters);
+
             const params = new URLSearchParams();
 
-            // Add search parameters
+            // IMPORTANT: Add the 'q' parameter for text search
+            if (filters.q) {
+                params.append('q', filters.q);
+                console.log('Added q parameter:', filters.q);
+            }
+
+            // Add other search parameters
             if (filters.propertyType) params.append('propertyType', filters.propertyType);
             if (filters.minRooms) params.append('minRooms', filters.minRooms.toString());
             if (filters.maxRooms) params.append('maxRooms', filters.maxRooms.toString());
@@ -40,25 +50,38 @@ export class SearchService {
                 params.append('features', filters.features.join(','));
             }
 
-            const response = await axios.get(
-                `${API_URL}/api/Property/search?${params.toString()}`,
-                { headers: this.getAuthHeaders() }
-            );
+            const url = `${API_URL}/api/Property/search?${params.toString()}`;
+            console.log('Final search URL:', url);
+
+            const response = await axios.get(url, {
+                headers: this.getAuthHeaders()
+            });
+
+            console.log('Search response received:', response.data);
+            console.log('Response status:', response.status);
 
             return response.data;
         } catch (error) {
+            console.error('=== SEARCH SERVICE ERROR ===');
             console.error('Search error:', error);
+            if (axios.isAxiosError(error)) {
+                console.error('Error response:', error.response?.data);
+                console.error('Error status:', error.response?.status);
+                console.error('Error URL:', error.config?.url);
+            }
             throw error;
         }
     }
 
     static async quickSearch(query: string): Promise<Property[]> {
         try {
+            console.log('Quick search for:', query);
             const response = await axios.get(
                 `${API_URL}/api/Property/quick-search?q=${encodeURIComponent(query)}`,
                 { headers: this.getAuthHeaders() }
             );
 
+            console.log('Quick search response:', response.data);
             return response.data;
         } catch (error) {
             console.error('Quick search error:', error);
@@ -68,11 +91,13 @@ export class SearchService {
 
     static async getSearchSuggestions(query: string): Promise<string[]> {
         try {
+            console.log('Getting suggestions for:', query);
             const response = await axios.get(
                 `${API_URL}/api/Property/search-suggestions?q=${encodeURIComponent(query)}`,
                 { headers: this.getAuthHeaders() }
             );
 
+            console.log('Suggestions response:', response.data);
             return response.data;
         } catch (error) {
             console.error('Search suggestions error:', error);

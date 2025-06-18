@@ -8,6 +8,7 @@ import { authMiddleware } from './middleware/authMiddleware';
 import notificationReducer from './slices/notificationSlice';
 import adminReducer from './slices/adminSlice';
 import uiReducer from './slices/uiSlice';
+import aiReducer from './slices/aiSlice'; // Add this import
 
 // Root reducer configuration
 const rootReducer = combineReducers({
@@ -16,7 +17,8 @@ const rootReducer = combineReducers({
     userActivity: userActivityReducer,
     notifications: notificationReducer,
     admin: adminReducer,
-    ui: uiReducer, // Added UI reducer
+    ui: uiReducer,
+    ai: aiReducer, // Add the AI reducer
 });
 
 // Redux persist configuration

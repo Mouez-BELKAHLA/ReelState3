@@ -14,6 +14,7 @@ using ReelState.Data;
 using ReelState.Server.Models;
 using ReelState.Server.Models.DTOs;
 
+
 namespace ReelState.Server.Controllers
 {
     [Authorize]
@@ -454,25 +455,69 @@ namespace ReelState.Server.Controllers
             }
         }
 
-        // Add a new endpoint for search with preferences and features
+        // Helper method to parse JSON arrays for searching
+        private List<string> ParseJsonArrayForSearch(string? jsonString)
+        {
+            if (string.IsNullOrEmpty(jsonString))
+                return new List<string>();
+
+            try
+            {
+                // Try to parse as JSON array
+                return System.Text.Json.JsonSerializer.Deserialize<List<string>>(jsonString) ?? new List<string>();
+            }
+            catch
+            {
+                // Fallback to simple comma-separated handling
+                return jsonString.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList();
+            }
+        }
+
+        // Updated search endpoint with proper query parameter handling
         [HttpGet("search")]
         [AllowAnonymous]
         public async Task<ActionResult<SearchResponse>> SearchProperties(
-        [FromQuery] string? propertyType = null,
-        [FromQuery] int? minRooms = null,
-        [FromQuery] int? maxRooms = null,
-        [FromQuery] int? minSpace = null,
-        [FromQuery] int? maxSpace = null,
-        [FromQuery] string? city = null,
-        [FromQuery] string? sortBy = "newest",
-        [FromQuery] string? preferences = null,
-        [FromQuery] string? features = null,
-        [FromQuery] int page = 1,
-        [FromQuery] int limit = 20)
+            [FromQuery] string? q = null,
+            [FromQuery] string? propertyType = null,
+            [FromQuery] int? minRooms = null,
+            [FromQuery] int? maxRooms = null,
+            [FromQuery] int? minSpace = null,
+            [FromQuery] int? maxSpace = null,
+            [FromQuery] string? city = null,
+            [FromQuery] string? sortBy = "newest",
+            [FromQuery] string? preferences = null,
+            [FromQuery] string? features = null,
+            [FromQuery] int page = 1,
+            [FromQuery] int limit = 20)
         {
             try
             {
-                var query = _context.Properties.Include(p => p.User).Include(p => p.Photos).AsQueryable();
+                _logger.LogInformation("Search request received with query: {Query}, filters: {Filters}",
+                    q, new { propertyType, minRooms, maxRooms, minSpace, maxSpace, city, sortBy, preferences, features, page, limit });
+
+                // Log specifically for AI debugging
+                if (!string.IsNullOrEmpty(features) && features.Contains("garden", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogInformation("Garden search detected: features={Features}", features);
+                }
+
+                var query = _context.Properties
+                    .Where(p => p.Status == PropertyStatus.Approved)
+                    .Include(p => p.User)
+                    .Include(p => p.Photos)
+                    .AsQueryable();
+
+                // Apply text search filter (q parameter)
+                if (!string.IsNullOrEmpty(q))
+                {
+                    var searchTerm = q.ToLower();
+                    query = query.Where(p =>
+                        p.Title.ToLower().Contains(searchTerm) ||
+                        p.Caption.ToLower().Contains(searchTerm) ||
+                        p.City.ToLower().Contains(searchTerm) ||
+                        p.Address.ToLower().Contains(searchTerm) ||
+                        p.PropertyType.ToLower().Contains(searchTerm));
+                }
 
                 // Apply filters
                 if (!string.IsNullOrEmpty(propertyType))
@@ -494,56 +539,213 @@ namespace ReelState.Server.Controllers
                     query = query.Where(p => p.City.ToLower().Contains(city.ToLower()) ||
                                             p.Address.ToLower().Contains(city.ToLower()));
 
-                // Handle preferences filter
+                // Handle preferences filter - improved for case-insensitivity
                 if (!string.IsNullOrEmpty(preferences))
                 {
-                    var preferenceList = preferences.Split(',').Select(p => p.Trim().ToLower()).ToList();
-                    query = query.Where(p => preferenceList.Any(pref =>
-                        p.PropertyPreferences.ToLower().Contains(pref)));
+                    var preferenceList = preferences.Split(',').Select(p => p.Trim()).ToList();
+
+                    // Get all properties to filter in memory with proper JSON handling
+                    var allProperties = await query.ToListAsync();
+                    var filteredProperties = allProperties.Where(p => {
+                        if (string.IsNullOrEmpty(p.PropertyPreferences))
+                            return false;
+
+                        try
+                        {
+                            // Parse JSON and do case-insensitive comparison
+                            var propPrefs = ParseJsonArrayForSearch(p.PropertyPreferences)
+                                .Select(pref => pref.ToLowerInvariant())
+                                .ToList();
+
+                            return preferenceList.Any(searchPref =>
+                                propPrefs.Any(pref => pref.Contains(searchPref.ToLowerInvariant())));
+                        }
+                        catch
+                        {
+                            // If JSON parsing fails, do simple string contains
+                            return preferenceList.Any(searchPref =>
+                                p.PropertyPreferences.Contains(searchPref, StringComparison.OrdinalIgnoreCase));
+                        }
+                    }).ToList();
+
+                    // Keep only filtered properties IDs
+                    var filteredIds = filteredProperties.Select(p => p.Id).ToList();
+                    query = query.Where(p => filteredIds.Contains(p.Id));
                 }
 
-                // Handle features filter
+                // Handle features filter - improved for case-insensitivity and proper JSON handling
                 if (!string.IsNullOrEmpty(features))
                 {
-                    var featureList = features.Split(',').Select(f => f.Trim().ToLower()).ToList();
-                    query = query.Where(p => featureList.Any(feat =>
-                        p.PropertyFeatures.ToLower().Contains(feat)));
+                    var featureList = features.Split(',').Select(f => f.Trim()).ToList();
+                    _logger.LogInformation("Searching for features: {Features}", string.Join(", ", featureList));
+
+                    // Get all properties to filter in memory with proper JSON handling
+                    var allProperties = await query.ToListAsync();
+                    var filteredProperties = allProperties.Where(p => {
+                        if (string.IsNullOrEmpty(p.PropertyFeatures))
+                            return false;
+
+                        try
+                        {
+                            // Parse JSON and do case-insensitive comparison
+                            var propFeatures = ParseJsonArrayForSearch(p.PropertyFeatures)
+                                .Select(feat => feat.ToLowerInvariant())
+                                .ToList();
+
+                            var result = featureList.Any(searchFeat =>
+                                propFeatures.Any(feat => feat.Contains(searchFeat.ToLowerInvariant())));
+
+                            if (features.Contains("garden", StringComparison.OrdinalIgnoreCase))
+                            {
+                                _logger.LogInformation("Property {Id} features: {Features}, match: {Match}",
+                                    p.Id, string.Join(", ", propFeatures), result);
+                            }
+
+                            return result;
+                        }
+                        catch (Exception ex)
+                        {
+                            // Log parsing errors
+                            _logger.LogWarning(ex, "Failed to parse features JSON: {Features}", p.PropertyFeatures);
+
+                            // If JSON parsing fails, do simple string contains
+                            return featureList.Any(searchFeat =>
+                                p.PropertyFeatures.Contains(searchFeat, StringComparison.OrdinalIgnoreCase));
+                        }
+                    }).ToList();
+
+                    // Keep only filtered properties IDs
+                    var filteredIds = filteredProperties.Select(p => p.Id).ToList();
+                    query = query.Where(p => filteredIds.Contains(p.Id));
                 }
 
-                // Apply sorting
-                query = sortBy switch
-                {
-                    "popular" => query.OrderByDescending(p => p.LikesCount),
-                    "price_asc" => query.OrderBy(p => p.Space), // or price field if you have one
-                    "price_desc" => query.OrderByDescending(p => p.Space),
-                    _ => query.OrderByDescending(p => p.CreatedAt)
-                };
-
-                var totalCount = await query.CountAsync();
+                // Get total count before applying pagination
+                var finalQuery = query;
+                var totalCount = await finalQuery.CountAsync();
                 var totalPages = (int)Math.Ceiling((double)totalCount / limit);
 
-                var properties = await query
-                    .Skip((page - 1) * limit)
-                    .Take(limit)
-                    .ToListAsync();
-
-                return Ok(new SearchResponse
+                // Apply sorting
+                if (sortBy == "popular")
                 {
-                    Properties = properties,
-                    TotalCount = totalCount,
-                    CurrentPage = page,
-                    TotalPages = totalPages,
-                    HasNextPage = page < totalPages,
-                    HasPreviousPage = page > 1
-                });
+                    // For popular sorting, we need to join with likes and order by like count
+                    var propertyIds = await finalQuery.Select(p => p.Id).ToListAsync();
+
+                    var likeCounts = await _context.Likes
+                        .Where(l => propertyIds.Contains(l.PropertyId))
+                        .GroupBy(l => l.PropertyId)
+                        .Select(g => new { PropertyId = g.Key, Count = g.Count() })
+                        .ToDictionaryAsync(x => x.PropertyId, x => x.Count);
+
+                    var filteredProperties = await finalQuery.ToListAsync();
+
+                    var sortedProperties = filteredProperties
+                        .OrderByDescending(p => likeCounts.GetValueOrDefault(p.Id, 0))
+                        .ThenByDescending(p => p.CreatedAt)
+                        .Skip((page - 1) * limit)
+                        .Take(limit)
+                        .ToList();
+
+                    _logger.LogInformation("Search found {Count} properties (popular sort)", totalCount);
+
+                    return Ok(new SearchResponse
+                    {
+                        Properties = sortedProperties,
+                        TotalCount = totalCount,
+                        CurrentPage = page,
+                        TotalPages = totalPages,
+                        HasNextPage = page < totalPages,
+                        HasPreviousPage = page > 1
+                    });
+                }
+                else
+                {
+                    // Apply other sorting options
+                    finalQuery = sortBy switch
+                    {
+                        "oldest" => finalQuery.OrderBy(p => p.CreatedAt),
+                        "space_asc" => finalQuery.OrderBy(p => p.Space),
+                        "space_desc" => finalQuery.OrderByDescending(p => p.Space),
+                        "rooms_asc" => finalQuery.OrderBy(p => p.Rooms),
+                        "rooms_desc" => finalQuery.OrderByDescending(p => p.Rooms),
+                        _ => finalQuery.OrderByDescending(p => p.CreatedAt) // newest first (default)
+                    };
+
+                    // Apply pagination and execute the query
+                    var properties = await finalQuery
+                        .Skip((page - 1) * limit)
+                        .Take(limit)
+                        .ToListAsync();
+
+                    _logger.LogInformation("Search found {Count} properties", totalCount);
+
+                    return Ok(new SearchResponse
+                    {
+                        Properties = properties,
+                        TotalCount = totalCount,
+                        CurrentPage = page,
+                        TotalPages = totalPages,
+                        HasNextPage = page < totalPages,
+                        HasPreviousPage = page > 1
+                    });
+                }
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error occurred while searching properties");
                 return StatusCode(500, new { message = "An error occurred while searching properties.", error = ex.Message });
             }
         }
 
+        [HttpGet("search-suggestions")]
+        [AllowAnonymous]
+        public async Task<ActionResult<IEnumerable<string>>> GetSearchSuggestions([FromQuery] string q)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(q) || q.Length < 2)
+                    return Ok(new List<string>());
+
+                var searchTerm = q.ToLower();
+
+                // Get suggestions from different fields
+                var citySuggestions = await _context.Properties
+                    .Where(p => p.Status == PropertyStatus.Approved && p.City.ToLower().Contains(searchTerm))
+                    .Select(p => p.City)
+                    .Distinct()
+                    .Take(3)
+                    .ToListAsync();
+
+                var titleSuggestions = await _context.Properties
+                    .Where(p => p.Status == PropertyStatus.Approved && p.Title.ToLower().Contains(searchTerm))
+                    .Select(p => p.Title)
+                    .Distinct()
+                    .Take(3)
+                    .ToListAsync();
+
+                var typeSuggestions = await _context.Properties
+                    .Where(p => p.Status == PropertyStatus.Approved && p.PropertyType.ToLower().Contains(searchTerm))
+                    .Select(p => p.PropertyType)
+                    .Distinct()
+                    .Take(2)
+                    .ToListAsync();
+
+                // Combine and limit suggestions
+                var allSuggestions = new List<string>();
+                allSuggestions.AddRange(citySuggestions);
+                allSuggestions.AddRange(titleSuggestions);
+                allSuggestions.AddRange(typeSuggestions);
+
+                return Ok(allSuggestions.Distinct().Take(8));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while getting search suggestions");
+                return Ok(new List<string>()); // Return empty list on error
+            }
+        }
+
         [HttpGet("quick-search")]
+        [AllowAnonymous]
         public async Task<ActionResult<IEnumerable<Property>>> QuickSearch([FromQuery] string q)
         {
             try
@@ -551,13 +753,15 @@ namespace ReelState.Server.Controllers
                 if (string.IsNullOrEmpty(q) || q.Length < 2)
                     return Ok(new List<Property>());
 
+                var searchTerm = q.ToLower();
                 var properties = await _context.Properties
+                    .Where(p => p.Status == PropertyStatus.Approved)
                     .Include(p => p.User)
                     .Include(p => p.Photos)
-                    .Where(p => p.Title.ToLower().Contains(q.ToLower()) ||
-                               p.City.ToLower().Contains(q.ToLower()) ||
-                               p.Address.ToLower().Contains(q.ToLower()) ||
-                               p.PropertyType.ToLower().Contains(q.ToLower()))
+                    .Where(p => p.Title.ToLower().Contains(searchTerm) ||
+                               p.City.ToLower().Contains(searchTerm) ||
+                               p.Address.ToLower().Contains(searchTerm) ||
+                               p.PropertyType.ToLower().Contains(searchTerm))
                     .Take(10)
                     .ToListAsync();
 
@@ -565,10 +769,9 @@ namespace ReelState.Server.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error occurred during quick search");
                 return StatusCode(500, new { message = "An error occurred during quick search.", error = ex.Message });
             }
         }
-
-        
     }
 }

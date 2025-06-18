@@ -105,9 +105,10 @@ export interface VideoCardProperty {
 }
 
 /**
- * Interface for search filters
+ * Interface for search filters - UPDATED with 'q' parameter
  */
 export interface SearchFilters {
+    q?: string; // TEXT SEARCH QUERY PARAMETER - THIS WAS MISSING!
     propertyType?: string;
     minRooms?: number;
     maxRooms?: number;
