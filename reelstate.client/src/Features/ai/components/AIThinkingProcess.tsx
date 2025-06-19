@@ -1,46 +1,114 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AIThinkingProcess as AIThinkingProcessType } from '../../Features/ai/types/AITypes';
 
 interface ThinkingProcessProps {
     thinkingProcess: AIThinkingProcessType | null;
     isThinking: boolean;
+    query?: string; // Make query optional to maintain compatibility
 }
 
-const AIThinkingProcess: React.FC<ThinkingProcessProps> = ({ thinkingProcess, isThinking }) => {
+const AIThinkingProcess: React.FC<ThinkingProcessProps> = ({ thinkingProcess, isThinking, query = '' }) => {
     const [visibleSteps, setVisibleSteps] = useState<Array<{ step: number; title: string; description: string }>>([]);
     const [showConclusion, setShowConclusion] = useState(false);
+    const [typedText, setTypedText] = useState<string>('');
+    const [isInitialThinking, setIsInitialThinking] = useState(true);
+    const typingRef = useRef<NodeJS.Timeout | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
-    // Create animated effect for steps appearing
+    // Initialize typing animation when thinking starts
     useEffect(() => {
-        if (!thinkingProcess || !isThinking) {
+        if (isThinking && isInitialThinking) {
+            // Clear any previous text
+            setTypedText('');
+
+            // Initial thinking messages that appear before the formal steps
+            const messages = [
+                `> Analyzing query: "${query}"`,
+                '> Searching property database...',
+                '> Evaluating property features and preferences...'
+            ];
+
+            let currentMessageIndex = 0;
+            let charIndex = 0;
+
+            const typeNextChar = () => {
+                if (currentMessageIndex < messages.length) {
+                    if (charIndex < messages[currentMessageIndex].length) {
+                        setTypedText(prev => prev + messages[currentMessageIndex][charIndex]);
+                        charIndex++;
+                        typingRef.current = setTimeout(typeNextChar, 20 + Math.random() * 30);
+                    } else {
+                        // Move to next message
+                        charIndex = 0;
+                        currentMessageIndex++;
+                        setTypedText(prev => prev + '\n');
+                        typingRef.current = setTimeout(typeNextChar, 500);
+                    }
+                } else {
+                    // Initial thinking complete, move to formal steps
+                    setIsInitialThinking(false);
+                }
+            };
+
+            // Start typing
+            typeNextChar();
+        }
+
+        // Clean up typing timeouts
+        return () => {
+            if (typingRef.current) clearTimeout(typingRef.current);
+        };
+    }, [isThinking, isInitialThinking, query]);
+
+    // Handle formal thinking steps
+    useEffect(() => {
+        // Safety check for thinkingProcess and steps
+        if (!thinkingProcess || !thinkingProcess.steps || !isThinking || isInitialThinking) {
             // If thinking completed, show all steps immediately
-            if (thinkingProcess && !isThinking) {
-                setVisibleSteps(thinkingProcess.steps);
+            if (thinkingProcess && thinkingProcess.steps && !isThinking) {
+                setVisibleSteps(thinkingProcess.steps.filter(Boolean)); // Filter out any undefined items
                 setShowConclusion(true);
+                setIsInitialThinking(false);
                 return;
             }
-            setVisibleSteps([]);
-            setShowConclusion(false);
             return;
         }
 
-        // Animated sequencing of steps
-        const stepsToShow = [...thinkingProcess.steps];
+        // Animated sequencing of steps with typing effect
+        const stepsToShow = [...(thinkingProcess.steps || [])].filter(Boolean); // Make sure we have valid steps
         setVisibleSteps([]);
 
-        stepsToShow.forEach((step, index) => {
-            setTimeout(() => {
-                setVisibleSteps(prevSteps => [...prevSteps, step]);
+        let currentStep = 0;
 
-                // Show conclusion after last step
-                if (index === stepsToShow.length - 1) {
-                    setTimeout(() => setShowConclusion(true), 1000);
-                }
-            }, (index + 1) * 700); // Stagger the steps
-        });
-    }, [thinkingProcess, isThinking]);
+        const showNextStep = () => {
+            if (currentStep < stepsToShow.length) {
+                // Show the step immediately to maintain your existing animation approach
+                setVisibleSteps(prev => [...prev, stepsToShow[currentStep]]);
 
-    if (!thinkingProcess) {
+                // Move to next step after delay
+                currentStep++;
+                setTimeout(showNextStep, 700);
+            } else {
+                // All steps shown, show conclusion
+                setTimeout(() => setShowConclusion(true), 500);
+            }
+        };
+
+        // Start showing steps
+        if (stepsToShow.length > 0) {
+            showNextStep();
+        }
+
+    }, [thinkingProcess, isThinking, isInitialThinking]);
+
+    // Scroll to bottom when content changes
+    useEffect(() => {
+        if (containerRef.current) {
+            containerRef.current.scrollTop = containerRef.current.scrollHeight;
+        }
+    }, [typedText, visibleSteps, showConclusion]);
+
+    if (!thinkingProcess && !isThinking) {
         return null;
     }
 
@@ -62,38 +130,70 @@ const AIThinkingProcess: React.FC<ThinkingProcessProps> = ({ thinkingProcess, is
                 )}
             </h3>
 
-            {visibleSteps.length === 0 && isThinking && (
-                <div className="p-8 flex justify-center">
-                    <div className="animate-pulse flex space-x-4 w-full">
-                        <div className="flex-1 space-y-4 py-1">
-                            <div className="h-4 bg-purple-200 rounded w-3/4"></div>
-                            <div className="space-y-2">
-                                <div className="h-4 bg-purple-200 rounded"></div>
-                                <div className="h-4 bg-purple-200 rounded w-5/6"></div>
+            {/* Terminal-like container */}
+            <div
+                ref={containerRef}
+                className="bg-gray-900 rounded-lg shadow-md p-4 font-mono text-sm text-green-400 overflow-y-auto max-h-80"
+                style={{ whiteSpace: 'pre-wrap' }}
+            >
+                {/* Show initial thinking animation */}
+                {isThinking && isInitialThinking && (
+                    <div>
+                        {typedText}
+                        <span className="animate-pulse inline-block w-2 h-5 bg-green-400 ml-1"></span>
+                    </div>
+                )}
+
+                {/* Show formal steps */}
+                {!isInitialThinking && (
+                    <>
+                        {/* Initial typing has completed, show formal steps */}
+                        {isThinking && visibleSteps.length === 0 && (
+                            <div className="animate-pulse">
+                                <span className="text-yellow-300">Processing search request...</span>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+                        )}
 
-            <div className="space-y-4">
-                {visibleSteps.map((step) => (
-                    <div
-                        key={step.step}
-                        className="bg-white rounded-lg p-4 shadow-sm border-l-4 border-purple-400 thinking-step"
-                    >
-                        <h4 className="font-medium text-purple-800 mb-2">
-                            Step {step.step}: {step.title}
-                        </h4>
-                        <p className="text-gray-700 text-sm">{step.description}</p>
-                    </div>
-                ))}
+                        {/* Display completed steps with safety checks */}
+                        {visibleSteps.filter(Boolean).map((step, idx) => (
+                            <div key={idx} className="mb-4 pb-2 border-b border-gray-800">
+                                <div className="text-purple-400 font-bold mb-1">
+                                    {step?.step ? `Step ${step.step}: ${step.title || ''}` : `Step ${idx + 1}`}
+                                </div>
+                                <div className="text-green-300 pl-4">
+                                    {step?.description || 'Processing...'}
+                                </div>
+                            </div>
+                        ))}
 
-                {showConclusion && thinkingProcess.conclusion && (
-                    <div className="bg-gradient-to-r from-purple-100 to-indigo-100 rounded-lg p-4 shadow-md border-l-4 border-indigo-500 thinking-conclusion">
-                        <h4 className="font-medium text-indigo-900 mb-2">Conclusion</h4>
-                        <p className="text-indigo-900">{thinkingProcess.conclusion}</p>
-                    </div>
+                        {/* Show conclusion */}
+                        {showConclusion && thinkingProcess?.conclusion && (
+                            <div className="mt-4 pb-2 pt-2 border-t border-gray-800">
+                                <div className="text-yellow-300 font-bold mb-1">
+                                    Conclusion:
+                                </div>
+                                <div className="text-yellow-200 pl-4">
+                                    {thinkingProcess.conclusion}
+                                </div>
+
+                                {!isThinking && (
+                                    <div className="mt-4 text-green-400">
+                                        <svg className="inline-block h-4 w-4 text-green-400 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Search completed successfully. Found
+                                        <span className="text-white font-bold"> {(thinkingProcess.steps || []).length} </span>
+                                        matching properties.
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Show blinking cursor if still thinking */}
+                        {isThinking && !showConclusion && (
+                            <span className="animate-pulse inline-block w-2 h-5 bg-green-400 ml-1"></span>
+                        )}
+                    </>
                 )}
             </div>
         </div>
