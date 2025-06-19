@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { SearchFilters } from '../../Features/property/types/Property';
-import { PropertyRecommendation, AISearchState, AIMessage } from '../../Features/ai/types/AiTypes';
+import { PropertyRecommendation, AISearchState, AIThinkingProcess } from '../../Features/ai/types/AITypes';
 import axios from 'axios';
 
 // Initial state
@@ -11,6 +11,9 @@ const initialState: AISearchState = {
     error: null,
     parsedFilters: null,
     aiReasoning: '',
+    isThinking: false,
+    thinkingProcess: null,
+    showThinkingMode: false,
 };
 
 // Gemini API configuration
@@ -18,7 +21,140 @@ const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const API_BASE_URL = import.meta.env.VITE_AI_API_URL || 'https://generativelanguage.googleapis.com/v1beta';
 const MODEL = import.meta.env.VITE_AI_MODEL || 'gemini-2.0-flash';
 
-// Function to query Gemini for AI reasoning and filter extraction
+// Function to get AI thinking process for a search query
+const getAIThinkingProcess = async (query: string): Promise<{
+    thinkingProcess: AIThinkingProcess;
+    filters: SearchFilters;
+    reasoning: string;
+}> => {
+    if (!API_KEY) {
+        throw new Error('Gemini API key not configured');
+    }
+
+    console.log('Getting thinking process for query:', query);
+
+    // Thinking prompt designed to show step-by-step reasoning
+    const prompt = `I'm searching for real estate properties with this request: "${query}"
+
+I want you to analyze this in a step-by-step thinking process, showing your reasoning for each part. 
+Return a JSON object with:
+1. "steps" - Array showing your thinking process:
+   - Each step should have: "step" (number), "title" (short description), "description" (detailed thought process)
+2. "conclusion" - Your final analysis of what the user wants
+3. "filters" - The search filters you've determined from the user's query:
+   - propertyType (string): Type of property (e.g. "Apartment", "House", or "Any" if unspecified)
+   - minRooms (number): Minimum number of rooms if specified
+   - maxRooms (number): Maximum number of rooms if specified
+   - minSpace (number): Minimum space in square meters if specified
+   - maxSpace (number): Maximum space in square meters if specified
+   - city (string): City name if specified
+   - preferences (array): Array of preferences like "modern", "garden", "parking"
+   - features (array): Array of features like "balcony", "pool"
+   
+NOTE: For single-word queries like "garden" or "modern", include the term in BOTH preferences AND features arrays
+
+Example output format:
+{
+  "steps": [
+    {
+      "step": 1,
+      "title": "Identifying property type",
+      "description": "First, I need to determine what type of property the user is looking for. The query mentions 'apartment', so the user is likely looking for an apartment rather than a house."
+    },
+    {
+      "step": 2, 
+      "title": "Analyzing room requirements",
+      "description": "Next, I'll check if there are any room requirements. The query mentions '2 rooms', which indicates the user wants at least 2 rooms."
+    },
+    {
+      "step": 3,
+      "title": "Understanding preferences and features",
+      "description": "The user wants a 'modern' apartment, suggesting a contemporary design style, and also mentions 'garden', indicating they want garden access or an outdoor space."
+    }
+  ],
+  "conclusion": "The user is looking for a modern apartment with at least 2 rooms that has garden access.",
+  "filters": {
+    "propertyType": "Apartment",
+    "minRooms": 2,
+    "preferences": ["modern", "garden"],
+    "features": ["garden"]
+  }
+}`;
+
+    // Call Gemini API with higher temperature for more detailed reasoning
+    const response = await fetch(`${API_BASE_URL}/models/${MODEL}:generateContent?key=${API_KEY}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            contents: [
+                {
+                    parts: [
+                        {
+                            text: prompt
+                        }
+                    ]
+                }
+            ],
+            generationConfig: {
+                temperature: 0.3,
+                maxOutputTokens: 2000
+            }
+        })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Gemini API error for thinking mode:', errorData);
+        throw new Error(errorData.error?.message || 'Failed to analyze search query');
+    }
+
+    const data = await response.json();
+    console.log('Gemini thinking API response:', data);
+
+    // Extract text content from response
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    // Parse JSON from response
+    const jsonMatch = text.match(/```json([\s\S]*?)```/) || text.match(/\{[\s\S]*\}/);
+    let jsonContent = jsonMatch ? jsonMatch[1] || jsonMatch[0] : null;
+
+    if (jsonContent) {
+        jsonContent = jsonContent.replace(/```json|```/g, '').trim();
+        try {
+            const parsedContent = JSON.parse(jsonContent);
+            return {
+                thinkingProcess: {
+                    steps: parsedContent.steps || [],
+                    conclusion: parsedContent.conclusion || 'Analysis complete.'
+                },
+                filters: parsedContent.filters || {},
+                reasoning: parsedContent.conclusion || 'Based on your search, here are properties that might match your criteria.'
+            };
+        } catch (e) {
+            console.error('Error parsing JSON from thinking response:', e);
+        }
+    }
+
+    // Fallback when parsing fails
+    return {
+        thinkingProcess: {
+            steps: [
+                {
+                    step: 1,
+                    title: "Processing query",
+                    description: `Analyzing the search query: "${query}"`
+                }
+            ],
+            conclusion: "Based on your search, I'm looking for properties that match your criteria."
+        },
+        filters: {},
+        reasoning: "Based on your search, here are properties that might match your criteria."
+    };
+};
+
+// Regular AI analysis function (existing code)
 const getAIAnalysis = async (query: string): Promise<{
     reasoning: string;
     filters: SearchFilters;
@@ -29,7 +165,6 @@ const getAIAnalysis = async (query: string): Promise<{
 
     console.log('Analyzing query with Gemini API:', query);
 
-    // Create a prompt that asks Gemini to analyze the search request
     const prompt = `I'm searching for properties with this request: "${query}"
 
 Please analyze this search request and extract search parameters. Return ONLY a JSON object with:
@@ -44,7 +179,11 @@ Please analyze this search request and extract search parameters. Return ONLY a 
    - preferences (array): Array of preferences like "modern", "garden", "parking"
    - features (array): Array of features like "balcony", "pool"
 
-Example response format:
+SPECIAL HANDLING RULES:
+- If the query is a single word like "garden", "modern", "balcony", etc., always include it in BOTH preferences AND features arrays
+- For single-word queries, set propertyType to "Any" unless specifically mentioned
+
+Example response format for complex query:
 {
   "reasoning": "This search is looking for a modern apartment with garden access and parking facilities.",
   "filters": {
@@ -52,6 +191,16 @@ Example response format:
     "minRooms": 2,
     "preferences": ["modern", "garden"],
     "features": ["parking"]
+  }
+}
+
+Example response format for single-word query like "garden":
+{
+  "reasoning": "This search is looking for properties with gardens or outdoor spaces.",
+  "filters": {
+    "propertyType": "Any",
+    "preferences": ["garden"],
+    "features": ["garden"]
   }
 }`;
 
@@ -117,13 +266,100 @@ Example response format:
     };
 };
 
-// Function to transform backend property response to PropertyRecommendation format
-const transformBackendResponse = (properties: any[], reasoning: string): PropertyRecommendation[] => {
+// Extract search terms from query and filters
+const extractSearchTerms = (query: string, filters: SearchFilters): string[] => {
+    const searchTerms: string[] = [];
+
+    // Add main search terms from query
+    const queryWords = query.toLowerCase().split(/\s+/).filter(word =>
+        word.length > 2 &&
+        !['and', 'with', 'the', 'for', 'has', 'have', 'that'].includes(word)
+    );
+    searchTerms.push(...queryWords);
+
+    // Add terms from preferences and features arrays
+    if (filters.preferences?.length) {
+        searchTerms.push(...filters.preferences.map(p => p.toLowerCase()));
+    }
+
+    if (filters.features?.length) {
+        searchTerms.push(...filters.features.map(f => f.toLowerCase()));
+    }
+
+    // Remove duplicates
+    return [...new Set(searchTerms)];
+};
+
+// UPDATED Function to transform backend property response to PropertyRecommendation format with better matching
+const transformBackendResponse = (properties: any[], reasoning: string, filters?: SearchFilters): PropertyRecommendation[] => {
     if (!properties || properties.length === 0) return [];
 
-    return properties.map((property, index) => {
-        // Calculate confidence score based on index position (first items are best matches)
-        const confidence = Math.max(0.95 - (index * 0.05), 0.7);
+    // Extract all important search terms from reasoning and filters
+    const keyTerms = new Set<string>();
+
+    // Extract key terms from reasoning
+    const reasoningTerms = reasoning.toLowerCase()
+        .match(/\b(modern|garden|parking|traditional|balcony|pet friendly|air conditioning|storage|urban|rural)\b/g);
+
+    if (reasoningTerms) {
+        reasoningTerms.forEach(term => keyTerms.add(term));
+    }
+
+    // Add terms from filters if provided
+    if (filters) {
+        if (filters.features) {
+            filters.features.forEach(feature => keyTerms.add(feature.toLowerCase()));
+        }
+        if (filters.preferences) {
+            filters.preferences.forEach(preference => keyTerms.add(preference.toLowerCase()));
+        }
+    }
+
+    // Convert to array for easier use
+    const searchTerms = Array.from(keyTerms);
+    console.log('Key search terms extracted:', searchTerms);
+
+    // First, sort properties by match quality
+    const scoredProperties = properties.map(property => {
+        // Get all property features and preferences in lowercase
+        const propFeatures = Array.isArray(property.propertyFeatures)
+            ? property.propertyFeatures.map((f: string) => f.toLowerCase())
+            : [];
+
+        const propPreferences = Array.isArray(property.propertyPreferences)
+            ? property.propertyPreferences.map((p: string) => p.toLowerCase())
+            : [];
+
+        // Combine all property attributes
+        const propAttributes = [...propFeatures, ...propPreferences];
+
+        // Count matching terms
+        let matchCount = 0;
+        let totalTerms = searchTerms.length || 1; // Avoid division by zero
+
+        searchTerms.forEach(term => {
+            // Check if the property has this term in its features or preferences
+            if (propAttributes.some(attr => attr.includes(term))) {
+                matchCount++;
+            }
+        });
+
+        // Calculate match percentage (75% - 98%)
+        const matchPercentage = Math.min(0.98, Math.max(0.75, 0.75 + (matchCount / totalTerms * 0.23)));
+
+        return {
+            property,
+            matchScore: matchPercentage
+        };
+    });
+
+    // Sort by match quality (highest first)
+    scoredProperties.sort((a, b) => b.matchScore - a.matchScore);
+
+    // Now transform the sorted properties
+    return scoredProperties.map((scoredProperty, index) => {
+        const property = scoredProperty.property;
+        const confidence = scoredProperty.matchScore;
 
         // Get the first photo URL or use placeholder
         let photoUrl = '';
@@ -138,7 +374,7 @@ const transformBackendResponse = (properties: any[], reasoning: string): Propert
         } else if (property.propertyType.toLowerCase().includes('apartment')) {
             matchReason = `This ${property.propertyType.toLowerCase()} matches several aspects of your search criteria.`;
         } else {
-            matchReason = `This property offers ${property.rooms} rooms and is located in ${property.city}.`;
+            matchReason = `This property offers ${property.rooms} rooms and is located in ${property.city || ''}.`;
         }
 
         return {
@@ -146,7 +382,7 @@ const transformBackendResponse = (properties: any[], reasoning: string): Propert
             title: property.title,
             caption: property.caption,
             matchReason: matchReason,
-            confidence: confidence,
+            confidence: confidence, // Use the calculated match score
             propertyType: property.propertyType,
             rooms: property.rooms,
             space: property.space,
@@ -174,63 +410,126 @@ const transformBackendResponse = (properties: any[], reasoning: string): Propert
     });
 };
 
-// Async thunk for making AI search requests - now with backend integration
 export const searchWithAI = createAsyncThunk(
     'ai/searchWithAI',
-    async ({ query }: { query: string }, { rejectWithValue }) => {
+    async ({ query, useThinkingMode = false }: { query: string, useThinkingMode?: boolean }, { dispatch, rejectWithValue }) => {
         try {
-            // Step 1: Use Gemini to analyze the query and extract filters
-            const { reasoning, filters } = await getAIAnalysis(query);
-            console.log('AI extracted filters:', filters);
-            console.log('AI reasoning:', reasoning);
+            console.log('Starting AI search for query:', query, 'Using thinking mode:', useThinkingMode);
 
-            // Step 2: Build query parameters for backend API
-            const params = new URLSearchParams();
-
-            // Add search query as q parameter
-            params.set('q', query);
-
-            // Add extracted filters
-            if (filters.propertyType) params.set('propertyType', filters.propertyType);
-            if (filters.minRooms) params.set('minRooms', filters.minRooms.toString());
-            if (filters.maxRooms) params.set('maxRooms', filters.maxRooms.toString());
-            if (filters.minSpace) params.set('minSpace', filters.minSpace.toString());
-            if (filters.maxSpace) params.set('maxSpace', filters.maxSpace.toString());
-            if (filters.city) params.set('city', filters.city);
-
-            // Handle arrays
-            if (filters.preferences && Array.isArray(filters.preferences) && filters.preferences.length > 0) {
-                params.set('preferences', filters.preferences.join(','));
+            // Set thinking mode flag if requested
+            if (useThinkingMode) {
+                dispatch({ type: 'ai/startThinking' });
             }
 
-            if (filters.features && Array.isArray(filters.features) && filters.features.length > 0) {
-                params.set('features', filters.features.join(','));
+            // Step 1: Get AI analysis based on mode
+            let filters: SearchFilters = {};
+            let reasoning = '';
+            let thinkingProcess: AIThinkingProcess | null = null;
+
+            if (useThinkingMode) {
+                // Get detailed thinking process
+                const thinkingResult = await getAIThinkingProcess(query);
+                filters = thinkingResult.filters;
+                reasoning = thinkingResult.reasoning;
+                thinkingProcess = thinkingResult.thinkingProcess;
+
+                // Update thinking process state
+                dispatch({
+                    type: 'ai/updateThinkingProcess',
+                    payload: thinkingProcess
+                });
+            } else {
+                // Regular analysis
+                const analysisResult = await getAIAnalysis(query);
+                filters = analysisResult.filters;
+                reasoning = analysisResult.reasoning;
             }
 
-            // Step 3: Call backend API with extracted parameters
-            console.log('Calling backend search API with params:', params.toString());
-            const response = await axios.get(`/api/Property/search?${params.toString()}`);
+            console.log('AI analysis filters:', filters);
 
-            console.log('Backend API response:', response.data);
+            // Create a modified version of filters to send to API
+            const modifiedFilters = { ...filters };
 
-            // Step 4: Transform backend response to our app's format
+            // 1. Remove "Any" property type completely to avoid filtering
+            if (modifiedFilters.propertyType === "Any") {
+                delete modifiedFilters.propertyType;
+                console.log('Removed "Any" propertyType from filters');
+            }
+
+            // 2. For single-word queries, ensure both preferences and features have the term
+            const isSimpleQuery = query.trim().split(/\s+/).length === 1;
+            if (isSimpleQuery) {
+                const searchTerm = query.trim().toLowerCase();
+                console.log('Processing single-word query:', searchTerm);
+
+                if (!modifiedFilters.features) modifiedFilters.features = [];
+                if (!modifiedFilters.preferences) modifiedFilters.preferences = [];
+
+                // Add the term to both arrays if not already present
+                if (!modifiedFilters.features.some(f => f.toLowerCase() === searchTerm)) {
+                    modifiedFilters.features.push(searchTerm);
+                }
+
+                if (!modifiedFilters.preferences.some(p => p.toLowerCase() === searchTerm)) {
+                    modifiedFilters.preferences.push(searchTerm);
+                }
+
+                console.log('Enhanced filters for single-word query:', modifiedFilters);
+            }
+
+            // Step 2: Convert filters to JSON string for API
+            const filtersJson = JSON.stringify(modifiedFilters);
+
+            // Step 3: Call the unified AI search endpoint
+            console.log('Calling unified ai-search endpoint with filters:', modifiedFilters);
+            let response = await axios.get(`/api/Property/unified-ai-search`, {
+                params: {
+                    query: query,
+                    filters: filtersJson
+                }
+            });
+
+            console.log('AI search response count:', response.data.totalCount);
+
+            // If no results from the unified search, try a simple text search as fallback
+            if (!response.data.properties || response.data.properties.length === 0) {
+                console.log('No results from AI search, trying text search fallback');
+
+                // Use simple text search as fallback
+                response = await axios.get(`/api/Property/search?q=${encodeURIComponent(query)}`);
+                console.log('Fallback search response count:', response.data.totalCount || 0);
+            }
+
+            // Step 4: Transform results - passing filters to use for better match calculation
             const properties = response.data.properties || [];
-            const recommendations = transformBackendResponse(properties, reasoning);
+            const recommendations = transformBackendResponse(properties, reasoning, filters);
+
+            // Finish thinking mode animation
+            if (useThinkingMode) {
+                // Small delay to let user see the conclusion
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                dispatch({ type: 'ai/finishThinking' });
+            }
 
             return {
                 recommendations,
-                parsedFilters: filters,
+                parsedFilters: filters, // Original filters for display
                 aiReasoning: reasoning,
+                thinkingProcess: thinkingProcess,
                 totalCount: response.data.totalCount || 0
             };
         } catch (error: any) {
             console.error('AI search error:', error);
+
+            // Clear thinking mode on error
+            dispatch({ type: 'ai/finishThinking' });
+
             return rejectWithValue(error.message || 'An unknown error occurred');
         }
     }
 );
 
-// AI slice
+// Updated slice with thinking mode actions
 const aiSlice = createSlice({
     name: 'ai',
     initialState,
@@ -243,6 +542,20 @@ const aiSlice = createSlice({
             state.error = null;
             state.parsedFilters = null;
             state.aiReasoning = '';
+            state.thinkingProcess = null;
+        },
+        toggleThinkingMode: (state) => {
+            state.showThinkingMode = !state.showThinkingMode;
+        },
+        startThinking: (state) => {
+            state.isThinking = true;
+            state.thinkingProcess = null;
+        },
+        updateThinkingProcess: (state, action: PayloadAction<AIThinkingProcess>) => {
+            state.thinkingProcess = action.payload;
+        },
+        finishThinking: (state) => {
+            state.isThinking = false;
         }
     },
     extraReducers: (builder) => {
@@ -256,6 +569,10 @@ const aiSlice = createSlice({
                 state.recommendations = action.payload.recommendations;
                 state.parsedFilters = action.payload.parsedFilters;
                 state.aiReasoning = action.payload.aiReasoning;
+                // Keep thinking process if it was part of the response
+                if (action.payload.thinkingProcess) {
+                    state.thinkingProcess = action.payload.thinkingProcess;
+                }
             })
             .addCase(searchWithAI.rejected, (state, action) => {
                 state.isLoading = false;
@@ -265,5 +582,5 @@ const aiSlice = createSlice({
 });
 
 // Export actions and reducer
-export const { setQuery, clearAISearch } = aiSlice.actions;
+export const { setQuery, clearAISearch, toggleThinkingMode, startThinking, updateThinkingProcess, finishThinking } = aiSlice.actions;
 export default aiSlice.reducer;

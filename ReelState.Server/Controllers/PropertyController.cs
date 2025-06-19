@@ -473,6 +473,203 @@ namespace ReelState.Server.Controllers
             }
         }
 
+        // New debug endpoint specifically for garden searches
+        [HttpGet("garden-debug")]
+        [AllowAnonymous]
+        public async Task<IActionResult> DebugGardenSearch()
+        {
+            try
+            {
+                // Direct database query for garden properties
+                var properties = await _context.Properties
+                    .Where(p => p.Status == PropertyStatus.Approved)
+                    .Where(p => p.PropertyFeatures != null && p.PropertyFeatures.Contains("Garden"))
+                    .ToListAsync();
+
+                return Ok(new
+                {
+                    count = properties.Count,
+                    sample = properties.Take(5).Select(p => new {
+                        p.Id,
+                        p.Title,
+                        p.PropertyFeatures
+                    }).ToList()
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in garden debug endpoint");
+                return StatusCode(500, new { message = "Error testing garden properties", error = ex.Message });
+            }
+        }
+
+        // Raw debug endpoint to see exact database format
+        [HttpGet("raw-garden-debug")]
+        [AllowAnonymous]
+        public async Task<IActionResult> RawGardenDebug()
+        {
+            try
+            {
+                // Get raw SQL data to see exactly how PropertyFeatures is stored
+                var rawProperties = await _context.Properties
+                    .Where(p => p.Status == PropertyStatus.Approved)
+                    .Select(p => new {
+                        p.Id,
+                        p.Title,
+                        PropertyFeaturesRaw = p.PropertyFeatures
+                    })
+                    .Take(20)
+                    .ToListAsync();
+
+                // Also try a direct LIKE query
+                var properties = await _context.Properties
+                    .FromSqlRaw("SELECT TOP 10 * FROM Properties WHERE PropertyFeatures LIKE '%Garden%' OR PropertyFeatures LIKE '%garden%'")
+                    .ToListAsync();
+
+                return Ok(new
+                {
+                    rawSample = rawProperties,
+                    directQueryCount = properties.Count,
+                    directQuerySample = properties.Select(p => new {
+                        p.Id,
+                        p.Title,
+                        p.PropertyFeatures
+                    }).ToList()
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in raw garden debug endpoint");
+                return StatusCode(500, new { message = "Error examining garden properties", error = ex.Message });
+            }
+        }
+
+        // Garden-specific endpoint for AI search
+        [HttpGet("garden-properties")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetGardenProperties()
+        {
+            try
+            {
+                _logger.LogInformation("Fetching garden properties for AI search");
+
+                // Get all properties and filter in memory with proper JSON parsing
+                var allProperties = await _context.Properties
+                    .Where(p => p.Status == PropertyStatus.Approved)
+                    .Include(p => p.User)
+                    .Include(p => p.Photos)
+                    .ToListAsync();
+
+                // Use JSON deserialization to properly identify garden properties
+                var gardenProperties = allProperties.Where(p => {
+                    if (string.IsNullOrEmpty(p.PropertyFeatures))
+                        return false;
+
+                    try
+                    {
+                        // This is the key part - properly deserialize the JSON
+                        var features = System.Text.Json.JsonSerializer.Deserialize<List<string>>(p.PropertyFeatures);
+                        return features != null &&
+                              features.Any(f => f.Equals("Garden", StringComparison.OrdinalIgnoreCase));
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error parsing PropertyFeatures JSON: {Features}", p.PropertyFeatures);
+                        // Fallback to string contains
+                        return p.PropertyFeatures.Contains("\"Garden\"") ||
+                               p.PropertyFeatures.Contains("\"garden\"");
+                    }
+                }).ToList();
+
+                _logger.LogInformation("Found {Count} garden properties with JSON parsing", gardenProperties.Count);
+
+                // Get like counts for each property
+                var propertyIds = gardenProperties.Select(p => p.Id).ToList();
+                var likeCounts = await _context.Likes
+                    .Where(l => propertyIds.Contains(l.PropertyId))
+                    .GroupBy(l => l.PropertyId)
+                    .Select(g => new { PropertyId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.PropertyId, x => x.Count);
+
+                // Get comment counts
+                var commentCounts = await _context.Comments
+                    .Where(c => propertyIds.Contains(c.PropertyId))
+                    .GroupBy(c => c.PropertyId)
+                    .Select(g => new { PropertyId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.PropertyId, x => x.Count);
+
+                // Parse JSON for return data
+                List<string> ParseJsonArray(string? jsonString)
+                {
+                    if (string.IsNullOrEmpty(jsonString))
+                        return new List<string>();
+
+                    try
+                    {
+                        return System.Text.Json.JsonSerializer.Deserialize<List<string>>(jsonString) ?? new List<string>();
+                    }
+                    catch
+                    {
+                        return jsonString.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList();
+                    }
+                }
+
+                // Format properties for response
+                var propertyDtos = gardenProperties.Select(p => new {
+                    p.Id,
+                    p.Title,
+                    p.Caption,
+                    p.Rooms,
+                    p.PropertyType,
+                    p.Space,
+                    p.Address,
+                    p.City,
+                    p.Latitude,
+                    p.Longitude,
+                    p.VideoUrl,
+                    p.UserId,
+                    p.CreatedAt,
+                    p.Views,
+                    p.Status,
+                    p.RejectionReason,
+                    // Parse JSON strings to arrays
+                    PropertyPreferences = ParseJsonArray(p.PropertyPreferences),
+                    PropertyFeatures = ParseJsonArray(p.PropertyFeatures),
+                    p.UploadToYouTube,
+                    p.UploadToTikTok,
+                    p.UploadToInstagram,
+                    p.UploadToFacebook,
+                    LikesCount = likeCounts.GetValueOrDefault(p.Id, 0),
+                    CommentsCount = commentCounts.GetValueOrDefault(p.Id, 0),
+                    User = p.User != null ? new
+                    {
+                        p.User.Id,
+                        p.User.Email,
+                        p.User.FirstName,
+                        p.User.LastName,
+                        p.User.ProfilePictureUrl
+                    } : null,
+                    Photos = p.Photos.Select(photo => new {
+                        photo.Id,
+                        photo.PropertyId,
+                        photo.PhotoUrl,
+                        photo.CreatedAt
+                    }).ToList()
+                }).ToList();
+
+                return Ok(new
+                {
+                    properties = propertyDtos,
+                    totalCount = propertyDtos.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching garden properties");
+                return StatusCode(500, new { message = "Error getting garden properties", error = ex.Message });
+            }
+        }
+
         // Updated search endpoint with proper query parameter handling
         [HttpGet("search")]
         [AllowAnonymous]
@@ -544,33 +741,87 @@ namespace ReelState.Server.Controllers
                 {
                     var preferenceList = preferences.Split(',').Select(p => p.Trim()).ToList();
 
-                    // Get all properties to filter in memory with proper JSON handling
-                    var allProperties = await query.ToListAsync();
-                    var filteredProperties = allProperties.Where(p => {
-                        if (string.IsNullOrEmpty(p.PropertyPreferences))
-                            return false;
+                    // Special handling for garden in preferences
+                    if (preferenceList.Any(p => p.Equals("garden", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        _logger.LogInformation("Garden found in preferences, adding special handling");
 
-                        try
-                        {
-                            // Parse JSON and do case-insensitive comparison
-                            var propPrefs = ParseJsonArrayForSearch(p.PropertyPreferences)
-                                .Select(pref => pref.ToLowerInvariant())
-                                .ToList();
+                        // Get all properties with proper JSON parsing
+                        var allProperties = await query.ToListAsync();
 
-                            return preferenceList.Any(searchPref =>
-                                propPrefs.Any(pref => pref.Contains(searchPref.ToLowerInvariant())));
-                        }
-                        catch
-                        {
-                            // If JSON parsing fails, do simple string contains
-                            return preferenceList.Any(searchPref =>
-                                p.PropertyPreferences.Contains(searchPref, StringComparison.OrdinalIgnoreCase));
-                        }
-                    }).ToList();
+                        // Filter using JSON deserialization
+                        var filteredProperties = allProperties.Where(p => {
+                            // Check if property features contain garden
+                            bool hasGarden = false;
+                            if (!string.IsNullOrEmpty(p.PropertyFeatures))
+                            {
+                                try
+                                {
+                                    var features = System.Text.Json.JsonSerializer.Deserialize<List<string>>(p.PropertyFeatures);
+                                    hasGarden = features != null && features.Any(f => f.Equals("Garden", StringComparison.OrdinalIgnoreCase));
+                                }
+                                catch
+                                {
+                                    hasGarden = p.PropertyFeatures.Contains("Garden") || p.PropertyFeatures.Contains("garden");
+                                }
+                            }
 
-                    // Keep only filtered properties IDs
-                    var filteredIds = filteredProperties.Select(p => p.Id).ToList();
-                    query = query.Where(p => filteredIds.Contains(p.Id));
+                            // Check preferences
+                            bool matchesPreferences = false;
+                            if (!string.IsNullOrEmpty(p.PropertyPreferences))
+                            {
+                                try
+                                {
+                                    var prefs = System.Text.Json.JsonSerializer.Deserialize<List<string>>(p.PropertyPreferences);
+                                    matchesPreferences = prefs != null && preferenceList.Any(searchPref =>
+                                        prefs.Any(pref => pref.Contains(searchPref, StringComparison.OrdinalIgnoreCase)));
+                                }
+                                catch
+                                {
+                                    matchesPreferences = preferenceList.Any(searchPref =>
+                                        p.PropertyPreferences.Contains(searchPref, StringComparison.OrdinalIgnoreCase));
+                                }
+                            }
+
+                            // Return true if either condition is met
+                            return hasGarden || matchesPreferences;
+                        }).ToList();
+
+                        // Keep only filtered properties IDs
+                        var filteredIds = filteredProperties.Select(p => p.Id).ToList();
+                        query = query.Where(p => filteredIds.Contains(p.Id));
+                    }
+                    else
+                    {
+                        // Regular preference handling without garden
+                        // Get all properties to filter in memory with proper JSON handling
+                        var allProperties = await query.ToListAsync();
+                        var filteredProperties = allProperties.Where(p => {
+                            if (string.IsNullOrEmpty(p.PropertyPreferences))
+                                return false;
+
+                            try
+                            {
+                                // Parse JSON and do case-insensitive comparison
+                                var propPrefs = ParseJsonArrayForSearch(p.PropertyPreferences)
+                                    .Select(pref => pref.ToLowerInvariant())
+                                    .ToList();
+
+                                return preferenceList.Any(searchPref =>
+                                    propPrefs.Any(pref => pref.Contains(searchPref.ToLowerInvariant())));
+                            }
+                            catch
+                            {
+                                // If JSON parsing fails, do simple string contains
+                                return preferenceList.Any(searchPref =>
+                                    p.PropertyPreferences.Contains(searchPref, StringComparison.OrdinalIgnoreCase));
+                            }
+                        }).ToList();
+
+                        // Keep only filtered properties IDs
+                        var filteredIds = filteredProperties.Select(p => p.Id).ToList();
+                        query = query.Where(p => filteredIds.Contains(p.Id));
+                    }
                 }
 
                 // Handle features filter - improved for case-insensitivity and proper JSON handling
@@ -579,44 +830,77 @@ namespace ReelState.Server.Controllers
                     var featureList = features.Split(',').Select(f => f.Trim()).ToList();
                     _logger.LogInformation("Searching for features: {Features}", string.Join(", ", featureList));
 
-                    // Get all properties to filter in memory with proper JSON handling
-                    var allProperties = await query.ToListAsync();
-                    var filteredProperties = allProperties.Where(p => {
-                        if (string.IsNullOrEmpty(p.PropertyFeatures))
-                            return false;
+                    // Special handling for garden in features
+                    if (featureList.Any(f => f.Equals("garden", StringComparison.OrdinalIgnoreCase) || f.Equals("Garden")))
+                    {
+                        _logger.LogInformation("GARDEN DEBUG - JSON-aware garden search");
 
-                        try
-                        {
-                            // Parse JSON and do case-insensitive comparison
-                            var propFeatures = ParseJsonArrayForSearch(p.PropertyFeatures)
-                                .Select(feat => feat.ToLowerInvariant())
-                                .ToList();
+                        // Get all properties first
+                        var allProperties = await query.ToListAsync();
 
-                            var result = featureList.Any(searchFeat =>
-                                propFeatures.Any(feat => feat.Contains(searchFeat.ToLowerInvariant())));
+                        // Then filter them using proper JSON deserialization
+                        var gardenProperties = allProperties.Where(p => {
+                            if (string.IsNullOrEmpty(p.PropertyFeatures))
+                                return false;
 
-                            if (features.Contains("garden", StringComparison.OrdinalIgnoreCase))
+                            try
                             {
-                                _logger.LogInformation("Property {Id} features: {Features}, match: {Match}",
-                                    p.Id, string.Join(", ", propFeatures), result);
+                                // This is the key part - properly deserialize the JSON
+                                var features = System.Text.Json.JsonSerializer.Deserialize<List<string>>(p.PropertyFeatures);
+                                return features != null &&
+                                      features.Any(f => f.Equals("Garden", StringComparison.OrdinalIgnoreCase));
                             }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Error parsing PropertyFeatures JSON: {Features}", p.PropertyFeatures);
+                                // Fallback to string contains
+                                return p.PropertyFeatures.Contains("\"Garden\"") ||
+                                       p.PropertyFeatures.Contains("\"garden\"");
+                            }
+                        }).ToList();
 
-                            return result;
-                        }
-                        catch (Exception ex)
-                        {
-                            // Log parsing errors
-                            _logger.LogWarning(ex, "Failed to parse features JSON: {Features}", p.PropertyFeatures);
+                        _logger.LogInformation("GARDEN DEBUG - Found {Count} properties with Garden", gardenProperties.Count);
 
-                            // If JSON parsing fails, do simple string contains
-                            return featureList.Any(searchFeat =>
-                                p.PropertyFeatures.Contains(searchFeat, StringComparison.OrdinalIgnoreCase));
-                        }
-                    }).ToList();
+                        // Use these properties for the result
+                        var filteredIds = gardenProperties.Select(p => p.Id).ToList();
+                        query = query.Where(p => filteredIds.Contains(p.Id));
+                    }
+                    else
+                    {
+                        // Regular feature handling for non-garden features
+                        // Get all properties to filter in memory with proper JSON handling
+                        var allProperties = await query.ToListAsync();
+                        var filteredProperties = allProperties.Where(p => {
+                            if (string.IsNullOrEmpty(p.PropertyFeatures))
+                                return false;
 
-                    // Keep only filtered properties IDs
-                    var filteredIds = filteredProperties.Select(p => p.Id).ToList();
-                    query = query.Where(p => filteredIds.Contains(p.Id));
+                            try
+                            {
+                                // Parse JSON and do case-insensitive comparison
+                                var propFeatures = ParseJsonArrayForSearch(p.PropertyFeatures)
+                                    .Select(feat => feat.ToLowerInvariant())
+                                    .ToList();
+
+                                var result = featureList.Any(searchFeat =>
+                                    propFeatures.Any(feat => feat.Contains(searchFeat.ToLowerInvariant())));
+
+                                return result;
+                            }
+                            catch (Exception ex)
+                            {
+                                // Log parsing errors
+                                _logger.LogWarning(ex, "Failed to parse features JSON: {Features}", p.PropertyFeatures);
+
+                                // If JSON parsing fails, do simple string contains
+                                return featureList.Any(searchFeat =>
+                                    p.PropertyFeatures.Contains(searchFeat, StringComparison.OrdinalIgnoreCase));
+                            }
+                        }).ToList();
+
+                        // Keep only filtered properties IDs
+                        var filteredIds = filteredProperties.Select(p => p.Id).ToList();
+                        query = query.Where(p => filteredIds.Contains(p.Id));
+                    }
                 }
 
                 // Get total count before applying pagination
@@ -729,11 +1013,21 @@ namespace ReelState.Server.Controllers
                     .Take(2)
                     .ToListAsync();
 
+                // Special case for garden suggestions
+                var featureSuggestions = new List<string>();
+                if (searchTerm.Contains("garden"))
+                {
+                    _logger.LogInformation("Garden suggestion query detected");
+                    featureSuggestions.Add("Garden");
+                    featureSuggestions.Add("Properties with Gardens");
+                }
+
                 // Combine and limit suggestions
                 var allSuggestions = new List<string>();
                 allSuggestions.AddRange(citySuggestions);
                 allSuggestions.AddRange(titleSuggestions);
                 allSuggestions.AddRange(typeSuggestions);
+                allSuggestions.AddRange(featureSuggestions);
 
                 return Ok(allSuggestions.Distinct().Take(8));
             }
@@ -743,7 +1037,586 @@ namespace ReelState.Server.Controllers
                 return Ok(new List<string>()); // Return empty list on error
             }
         }
+        [HttpGet("simple-garden-search")]
+        [AllowAnonymous]
+        public async Task<IActionResult> SimpleGardenSearch()
+        {
+            _logger.LogInformation("Simple garden search endpoint called");
+            try
+            {
+                // First get all properties
+                var allProperties = await _context.Properties
+                    .Where(p => p.Status == PropertyStatus.Approved)
+                    .Include(p => p.User)
+                    .Include(p => p.Photos)
+                    .ToListAsync();
 
+                _logger.LogInformation("Got {Count} total properties to filter", allProperties.Count);
+
+                // Filter them in memory with multiple approaches
+                List<Property> gardenProperties = new List<Property>();
+
+                foreach (var property in allProperties)
+                {
+                    bool hasGarden = false;
+
+                    // 1. Direct string check (backup method)
+                    if (!string.IsNullOrEmpty(property.PropertyFeatures) &&
+                        (property.PropertyFeatures.Contains("Garden") ||
+                         property.PropertyFeatures.Contains("garden")))
+                    {
+                        hasGarden = true;
+                    }
+
+                    // 2. Try proper JSON parsing
+                    if (!hasGarden && !string.IsNullOrEmpty(property.PropertyFeatures))
+                    {
+                        try
+                        {
+                            var features = System.Text.Json.JsonSerializer.Deserialize<List<string>>(property.PropertyFeatures);
+                            if (features != null && features.Any(f => f.IndexOf("garden", StringComparison.OrdinalIgnoreCase) >= 0))
+                            {
+                                hasGarden = true;
+                            }
+                        }
+                        catch
+                        {
+                            // JSON parsing failed, already tried string contains above
+                        }
+                    }
+
+                    if (hasGarden)
+                    {
+                        gardenProperties.Add(property);
+                    }
+                }
+
+                _logger.LogInformation("Simple garden search found {Count} properties", gardenProperties.Count);
+
+                return Ok(new
+                {
+                    properties = gardenProperties,
+                    totalCount = gardenProperties.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in simple garden search");
+                return StatusCode(500, new { message = "Error in garden search", error = ex.Message });
+            }
+        }
+        [HttpGet("ai-search")]
+        [AllowAnonymous]
+        public async Task<IActionResult> AiSearch([FromQuery] string query, [FromQuery] string? filters = null)
+        {
+            try
+            {
+                _logger.LogInformation("AI search requested with query: {Query}, filters: {Filters}", query, filters);
+
+                // Step 1: Get all properties first - this avoids LINQ expression tree issues
+                var allProperties = await _context.Properties
+                    .Where(p => p.Status == PropertyStatus.Approved)
+                    .Include(p => p.User)
+                    .Include(p => p.Photos)
+                    .ToListAsync(); // Convert to list to perform filtering in memory
+
+                _logger.LogInformation("Retrieved {Count} properties for AI filtering", allProperties.Count);
+
+                // Step 2: Parse filters if provided
+                Dictionary<string, object> filterDict = new Dictionary<string, object>();
+                if (!string.IsNullOrEmpty(filters))
+                {
+                    try
+                    {
+                        filterDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(filters) ??
+                            new Dictionary<string, object>();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to parse filters JSON");
+                    }
+                }
+
+                // Step 3: Apply all filters in memory (not as LINQ expressions)
+                IEnumerable<Property> filteredProperties = allProperties;
+
+                // Apply propertyType filter - MODIFIED to handle "Any" type
+                if (filterDict.TryGetValue("propertyType", out var propType) && propType != null)
+                {
+                    string propertyTypeStr = propType.ToString() ?? "";
+
+                    // Skip this filter if propertyType is "Any"
+                    if (!string.Equals(propertyTypeStr, "Any", StringComparison.OrdinalIgnoreCase))
+                    {
+                        filteredProperties = filteredProperties.Where(p =>
+                            p.PropertyType != null &&
+                            p.PropertyType.IndexOf(propertyTypeStr, StringComparison.OrdinalIgnoreCase) >= 0);
+                    }
+                    else
+                    {
+                        // Log that we're skipping the property type filter due to "Any"
+                        _logger.LogInformation("Property type 'Any' detected - skipping property type filter");
+                    }
+                }
+
+                // Apply room filters
+                if (filterDict.TryGetValue("minRooms", out var minR) && int.TryParse(minR?.ToString(), out int minRooms))
+                {
+                    filteredProperties = filteredProperties.Where(p => p.Rooms >= minRooms);
+                }
+
+                if (filterDict.TryGetValue("maxRooms", out var maxR) && int.TryParse(maxR?.ToString(), out int maxRooms))
+                {
+                    filteredProperties = filteredProperties.Where(p => p.Rooms <= maxRooms);
+                }
+
+                // Apply space filters
+                if (filterDict.TryGetValue("minSpace", out var minS) && int.TryParse(minS?.ToString(), out int minSpace))
+                {
+                    filteredProperties = filteredProperties.Where(p => p.Space >= minSpace);
+                }
+
+                if (filterDict.TryGetValue("maxSpace", out var maxS) && int.TryParse(maxS?.ToString(), out int maxSpace))
+                {
+                    filteredProperties = filteredProperties.Where(p => p.Space <= maxSpace);
+                }
+
+                // Apply city filter
+                if (filterDict.TryGetValue("city", out var cityVal) && cityVal != null)
+                {
+                    string cityStr = cityVal.ToString() ?? "";
+                    filteredProperties = filteredProperties.Where(p =>
+                        (p.City != null && p.City.IndexOf(cityStr, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                        (p.Address != null && p.Address.IndexOf(cityStr, StringComparison.OrdinalIgnoreCase) >= 0));
+                }
+
+                // Apply preferences filter with proper JSON parsing
+                if (filterDict.TryGetValue("preferences", out var prefsObj) && prefsObj != null)
+                {
+                    string prefsJson = prefsObj.ToString() ?? "[]";
+                    List<string> preferences;
+                    try
+                    {
+                        preferences = System.Text.Json.JsonSerializer.Deserialize<List<string>>(prefsJson) ?? new List<string>();
+                    }
+                    catch
+                    {
+                        preferences = new List<string>();
+                    }
+
+                    if (preferences.Count > 0)
+                    {
+                        _logger.LogInformation("Filtering by preferences: {Preferences}", string.Join(", ", preferences));
+                        filteredProperties = filteredProperties.Where(p => {
+                            if (string.IsNullOrEmpty(p.PropertyPreferences))
+                                return false;
+
+                            try
+                            {
+                                var propPrefs = System.Text.Json.JsonSerializer.Deserialize<List<string>>(p.PropertyPreferences);
+                                return propPrefs != null && preferences.Any(searchPref =>
+                                    propPrefs.Any(pref => pref.IndexOf(searchPref, StringComparison.OrdinalIgnoreCase) >= 0));
+                            }
+                            catch
+                            {
+                                return preferences.Any(pref =>
+                                    p.PropertyPreferences.IndexOf(pref, StringComparison.OrdinalIgnoreCase) >= 0);
+                            }
+                        });
+                    }
+                }
+
+                // Apply features filter with proper JSON parsing
+                if (filterDict.TryGetValue("features", out var featObj) && featObj != null)
+                {
+                    string featJson = featObj.ToString() ?? "[]";
+                    List<string> features;
+                    try
+                    {
+                        features = System.Text.Json.JsonSerializer.Deserialize<List<string>>(featJson) ?? new List<string>();
+                    }
+                    catch
+                    {
+                        features = new List<string>();
+                    }
+
+                    if (features.Count > 0)
+                    {
+                        _logger.LogInformation("Filtering by features: {Features}", string.Join(", ", features));
+                        filteredProperties = filteredProperties.Where(p => {
+                            if (string.IsNullOrEmpty(p.PropertyFeatures))
+                                return false;
+
+                            try
+                            {
+                                var propFeats = System.Text.Json.JsonSerializer.Deserialize<List<string>>(p.PropertyFeatures);
+                                return propFeats != null && features.Any(searchFeat =>
+                                    propFeats.Any(feat => feat.IndexOf(searchFeat, StringComparison.OrdinalIgnoreCase) >= 0));
+                            }
+                            catch
+                            {
+                                return features.Any(feat =>
+                                    p.PropertyFeatures.IndexOf(feat, StringComparison.OrdinalIgnoreCase) >= 0);
+                            }
+                        });
+                    }
+                }
+
+                // Text search on title, caption etc.
+                if (!string.IsNullOrEmpty(query))
+                {
+                    var searchTerms = query.ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+                    filteredProperties = filteredProperties.Where(p =>
+                        searchTerms.Any(term =>
+                            (p.Title != null && p.Title.ToLower().Contains(term)) ||
+                            (p.Caption != null && p.Caption.ToLower().Contains(term)) ||
+                            (p.City != null && p.City.ToLower().Contains(term)) ||
+                            (p.Address != null && p.Address.ToLower().Contains(term)) ||
+                            (p.PropertyType != null && p.PropertyType.ToLower().Contains(term))
+                        )
+                    );
+                }
+
+                // Step 4: Convert to list for final processing
+                var finalProperties = filteredProperties.ToList();
+                _logger.LogInformation("AI search found {Count} matching properties", finalProperties.Count);
+
+                // Step 5: Get like and comment counts
+                var propertyIds = finalProperties.Select(p => p.Id).ToList();
+
+                var likeCounts = await _context.Likes
+                    .Where(l => propertyIds.Contains(l.PropertyId))
+                    .GroupBy(l => l.PropertyId)
+                    .Select(g => new { PropertyId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.PropertyId, x => x.Count);
+
+                var commentCounts = await _context.Comments
+                    .Where(c => propertyIds.Contains(c.PropertyId))
+                    .GroupBy(c => c.PropertyId)
+                    .Select(g => new { PropertyId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.PropertyId, x => x.Count);
+
+                // Step 6: Format the response
+                var resultProperties = finalProperties.Select(p => new {
+                    p.Id,
+                    p.Title,
+                    p.Caption,
+                    p.Rooms,
+                    p.PropertyType,
+                    p.Space,
+                    p.Address,
+                    p.City,
+                    p.Latitude,
+                    p.Longitude,
+                    p.VideoUrl,
+                    p.UserId,
+                    p.CreatedAt,
+                    p.Views,
+                    p.Status,
+                    p.RejectionReason,
+                    // Use the existing ParseJsonArrayForSearch method instead of ParseJsonArray
+                    PropertyPreferences = ParseJsonArrayForSearch(p.PropertyPreferences),
+                    PropertyFeatures = ParseJsonArrayForSearch(p.PropertyFeatures),
+                    p.UploadToYouTube,
+                    p.UploadToTikTok,
+                    p.UploadToInstagram,
+                    p.UploadToFacebook,
+                    LikesCount = likeCounts.GetValueOrDefault(p.Id, 0),
+                    CommentsCount = commentCounts.GetValueOrDefault(p.Id, 0),
+                    User = p.User != null ? new
+                    {
+                        p.User.Id,
+                        p.User.Email,
+                        p.User.FirstName,
+                        p.User.LastName,
+                        p.User.ProfilePictureUrl
+                    } : null,
+                    // Fix the method group assignment issue
+                    Photos = p.Photos.Select(photo => new {
+                        photo.Id,
+                        photo.PropertyId,
+                        photo.PhotoUrl,
+                        photo.CreatedAt
+                    }).ToList()
+                }).ToList();
+
+                return Ok(new
+                {
+                    properties = resultProperties,
+                    totalCount = resultProperties.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in AI search");
+                return StatusCode(500, new { message = "Error processing AI search", error = ex.Message });
+            }
+        }
+        [HttpGet("unified-ai-search")]
+        [AllowAnonymous]
+        public async Task<IActionResult> UnifiedAISearch([FromQuery] string query, [FromQuery] string? filters = null)
+        {
+            try
+            {
+                _logger.LogInformation("Unified AI search requested with query: {Query}, filters: {Filters}", query, filters);
+
+                // Step 1: Get all properties first for complete filtering flexibility
+                var allProperties = await _context.Properties
+                    .Where(p => p.Status == PropertyStatus.Approved)
+                    .Include(p => p.User)
+                    .Include(p => p.Photos)
+                    .ToListAsync(); // Convert to list to perform filtering in memory
+
+                _logger.LogInformation("Retrieved {Count} properties for AI filtering", allProperties.Count);
+
+                // Step 2: Parse filters if provided
+                Dictionary<string, object> filterDict = new Dictionary<string, object>();
+                if (!string.IsNullOrEmpty(filters))
+                {
+                    try
+                    {
+                        filterDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(filters) ??
+                            new Dictionary<string, object>();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to parse filters JSON");
+                    }
+                }
+
+                // Step 3: Apply filters in memory (not as LINQ expressions) for more flexibility
+                IEnumerable<Property> filteredProperties = allProperties;
+
+                // Apply propertyType filter (if present and not "Any")
+                if (filterDict.TryGetValue("propertyType", out var propType) && propType != null)
+                {
+                    string propertyTypeStr = propType.ToString() ?? "";
+
+                    if (!string.Equals(propertyTypeStr, "Any", StringComparison.OrdinalIgnoreCase))
+                    {
+                        filteredProperties = filteredProperties.Where(p =>
+                            p.PropertyType != null &&
+                            p.PropertyType.IndexOf(propertyTypeStr, StringComparison.OrdinalIgnoreCase) >= 0);
+                    }
+                }
+
+                // Apply room filters
+                if (filterDict.TryGetValue("minRooms", out var minR) && int.TryParse(minR?.ToString(), out int minRooms))
+                {
+                    filteredProperties = filteredProperties.Where(p => p.Rooms >= minRooms);
+                }
+
+                if (filterDict.TryGetValue("maxRooms", out var maxR) && int.TryParse(maxR?.ToString(), out int maxRooms))
+                {
+                    filteredProperties = filteredProperties.Where(p => p.Rooms <= maxRooms);
+                }
+
+                // Apply space filters
+                if (filterDict.TryGetValue("minSpace", out var minS) && int.TryParse(minS?.ToString(), out int minSpace))
+                {
+                    filteredProperties = filteredProperties.Where(p => p.Space >= minSpace);
+                }
+
+                if (filterDict.TryGetValue("maxSpace", out var maxS) && int.TryParse(maxS?.ToString(), out int maxSpace))
+                {
+                    filteredProperties = filteredProperties.Where(p => p.Space <= maxSpace);
+                }
+
+                // Apply city filter
+                if (filterDict.TryGetValue("city", out var cityVal) && cityVal != null)
+                {
+                    string cityStr = cityVal.ToString() ?? "";
+                    filteredProperties = filteredProperties.Where(p =>
+                        (p.City != null && p.City.IndexOf(cityStr, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                        (p.Address != null && p.Address.IndexOf(cityStr, StringComparison.OrdinalIgnoreCase) >= 0));
+                }
+
+                // NEW: IMPROVED JSON SEARCH FOR BOTH PREFERENCES AND FEATURES
+                // This is the key improvement that will work for all terms like "modern", "garden", etc.
+
+                // First, extract search terms from preferences and features
+                var searchTerms = new List<string>();
+
+                // Add the main query as a search term
+                if (!string.IsNullOrEmpty(query))
+                {
+                    searchTerms.Add(query.ToLower());
+                }
+
+                // Add preferences from filters
+                if (filterDict.TryGetValue("preferences", out var prefsObj) && prefsObj != null)
+                {
+                    try
+                    {
+                        string prefsJson = prefsObj.ToString() ?? "[]";
+                        var preferences = System.Text.Json.JsonSerializer.Deserialize<List<string>>(prefsJson);
+                        if (preferences != null)
+                        {
+                            searchTerms.AddRange(preferences.Select(p => p.ToLower()));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to parse preferences");
+                    }
+                }
+
+                // Add features from filters
+                if (filterDict.TryGetValue("features", out var featsObj) && featsObj != null)
+                {
+                    try
+                    {
+                        string featsJson = featsObj.ToString() ?? "[]";
+                        var features = System.Text.Json.JsonSerializer.Deserialize<List<string>>(featsJson);
+                        if (features != null)
+                        {
+                            searchTerms.AddRange(features.Select(f => f.ToLower()));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to parse features");
+                    }
+                }
+
+                // If we have search terms, filter properties that match ANY term
+                if (searchTerms.Count > 0)
+                {
+                    _logger.LogInformation("Filtering by search terms: {Terms}", string.Join(", ", searchTerms));
+
+                    // Find properties that match ANY of the search terms in ANY field
+                    filteredProperties = filteredProperties.Where(p => {
+                        // Look for matches in various text fields
+                        bool titleMatch = searchTerms.Any(term =>
+                            p.Title != null && p.Title.ToLower().Contains(term));
+
+                        bool captionMatch = searchTerms.Any(term =>
+                            p.Caption != null && p.Caption.ToLower().Contains(term));
+
+                        // Check PropertyPreferences JSON
+                        bool preferenceMatch = false;
+                        if (!string.IsNullOrEmpty(p.PropertyPreferences))
+                        {
+                            try
+                            {
+                                // First try proper JSON parsing
+                                var prefs = System.Text.Json.JsonSerializer.Deserialize<List<string>>(p.PropertyPreferences);
+                                if (prefs != null)
+                                {
+                                    preferenceMatch = searchTerms.Any(term =>
+                                        prefs.Any(pref => pref.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0));
+                                }
+                            }
+                            catch
+                            {
+                                // Fallback to simple string contains
+                                preferenceMatch = searchTerms.Any(term =>
+                                    p.PropertyPreferences.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0);
+                            }
+                        }
+
+                        // Check PropertyFeatures JSON
+                        bool featureMatch = false;
+                        if (!string.IsNullOrEmpty(p.PropertyFeatures))
+                        {
+                            try
+                            {
+                                // First try proper JSON parsing
+                                var features = System.Text.Json.JsonSerializer.Deserialize<List<string>>(p.PropertyFeatures);
+                                if (features != null)
+                                {
+                                    featureMatch = searchTerms.Any(term =>
+                                        features.Any(feat => feat.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0));
+                                }
+                            }
+                            catch
+                            {
+                                // Fallback to simple string contains
+                                featureMatch = searchTerms.Any(term =>
+                                    p.PropertyFeatures.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0);
+                            }
+                        }
+
+                        // Return true if ANY of the matches succeeded
+                        return titleMatch || captionMatch || preferenceMatch || featureMatch;
+                    });
+                }
+
+                // Step 4: Convert to list for final processing
+                var finalProperties = filteredProperties.ToList();
+                _logger.LogInformation("Unified AI search found {Count} matching properties", finalProperties.Count);
+
+                // Step 5: Get like and comment counts
+                var propertyIds = finalProperties.Select(p => p.Id).ToList();
+
+                var likeCounts = await _context.Likes
+                    .Where(l => propertyIds.Contains(l.PropertyId))
+                    .GroupBy(l => l.PropertyId)
+                    .Select(g => new { PropertyId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.PropertyId, x => x.Count);
+
+                var commentCounts = await _context.Comments
+                    .Where(c => propertyIds.Contains(c.PropertyId))
+                    .GroupBy(c => c.PropertyId)
+                    .Select(g => new { PropertyId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.PropertyId, x => x.Count);
+
+                // Step 6: Format the response
+                var resultProperties = finalProperties.Select(p => new {
+                    p.Id,
+                    p.Title,
+                    p.Caption,
+                    p.Rooms,
+                    p.PropertyType,
+                    p.Space,
+                    p.Address,
+                    p.City,
+                    p.Latitude,
+                    p.Longitude,
+                    p.VideoUrl,
+                    p.UserId,
+                    p.CreatedAt,
+                    p.Views,
+                    p.Status,
+                    p.RejectionReason,
+                    // Parse JSON strings to arrays
+                    PropertyPreferences = ParseJsonArrayForSearch(p.PropertyPreferences),
+                    PropertyFeatures = ParseJsonArrayForSearch(p.PropertyFeatures),
+                    p.UploadToYouTube,
+                    p.UploadToTikTok,
+                    p.UploadToInstagram,
+                    p.UploadToFacebook,
+                    LikesCount = likeCounts.GetValueOrDefault(p.Id, 0),
+                    CommentsCount = commentCounts.GetValueOrDefault(p.Id, 0),
+                    User = p.User != null ? new
+                    {
+                        p.User.Id,
+                        p.User.Email,
+                        p.User.FirstName,
+                        p.User.LastName,
+                        p.User.ProfilePictureUrl
+                    } : null,
+                    Photos = p.Photos.Select(photo => new {
+                        photo.Id,
+                        photo.PropertyId,
+                        photo.PhotoUrl,
+                        photo.CreatedAt
+                    }).ToList()
+                }).ToList();
+
+                return Ok(new
+                {
+                    properties = resultProperties,
+                    totalCount = resultProperties.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in unified AI search");
+                return StatusCode(500, new { message = "Error processing unified AI search", error = ex.Message });
+            }
+        }
         [HttpGet("quick-search")]
         [AllowAnonymous]
         public async Task<ActionResult<IEnumerable<Property>>> QuickSearch([FromQuery] string q)
@@ -754,14 +1627,55 @@ namespace ReelState.Server.Controllers
                     return Ok(new List<Property>());
 
                 var searchTerm = q.ToLower();
+
+                // Special handling for garden searches
+                if (searchTerm.Contains("garden"))
+                {
+                    _logger.LogInformation("Garden quick search detected");
+
+                    // Get all properties first for proper JSON handling
+                    var allProperties = await _context.Properties
+                        .Where(p => p.Status == PropertyStatus.Approved)
+                        .Include(p => p.User)
+                        .Include(p => p.Photos)
+                        .ToListAsync();
+
+                    // Filter in memory with proper JSON deserialization
+                    var gardenProperties = allProperties
+                        .Where(p => {
+                            if (string.IsNullOrEmpty(p.PropertyFeatures))
+                                return false;
+
+                            try
+                            {
+                                var features = System.Text.Json.JsonSerializer.Deserialize<List<string>>(p.PropertyFeatures);
+                                return features != null && features.Any(f =>
+                                    f.IndexOf("garden", StringComparison.OrdinalIgnoreCase) >= 0);
+                            }
+                            catch
+                            {
+                                return p.PropertyFeatures.IndexOf("garden", StringComparison.OrdinalIgnoreCase) >= 0;
+                            }
+                        })
+                        .Take(10)
+                        .ToList();
+
+                    if (gardenProperties.Count > 0)
+                    {
+                        _logger.LogInformation("Found {Count} garden properties in quick search", gardenProperties.Count);
+                        return Ok(gardenProperties);
+                    }
+                }
+
+                // Regular search for other terms
                 var properties = await _context.Properties
                     .Where(p => p.Status == PropertyStatus.Approved)
                     .Include(p => p.User)
                     .Include(p => p.Photos)
                     .Where(p => p.Title.ToLower().Contains(searchTerm) ||
-                               p.City.ToLower().Contains(searchTerm) ||
-                               p.Address.ToLower().Contains(searchTerm) ||
-                               p.PropertyType.ToLower().Contains(searchTerm))
+                              p.City.ToLower().Contains(searchTerm) ||
+                              p.Address.ToLower().Contains(searchTerm) ||
+                              p.PropertyType.ToLower().Contains(searchTerm))
                     .Take(10)
                     .ToListAsync();
 

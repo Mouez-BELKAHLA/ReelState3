@@ -1,5 +1,17 @@
 import { SearchFilters, Property, propertyTypes, propertyPreferences, propertyFeatures } from '../../property/types/Property';
 
+// Add this new interface for the thinking process
+export interface AIThinkingStep {
+    step: number;
+    title: string;
+    description: string;
+}
+
+export interface AIThinkingProcess {
+    steps: AIThinkingStep[];
+    conclusion: string;
+}
+
 export interface PropertyRecommendation {
     id: string;
     title: string;
@@ -21,6 +33,7 @@ export interface PropertyRecommendation {
     commentsCount?: number;
     status: 'pending' | 'approved' | 'rejected';
     statusReason?: string;
+    photoUrl?: string; // Added this to match your code
     propertyPreferences?: string[]; // Must use values from propertyPreferences array
     propertyFeatures?: string[]; // Must use values from propertyFeatures array
     photos?: Array<{
@@ -44,6 +57,10 @@ export interface AISearchState {
     error: string | null;
     parsedFilters: SearchFilters | null;
     aiReasoning: string;
+    // New fields for thinking mode
+    isThinking: boolean;
+    thinkingProcess: AIThinkingProcess | null;
+    showThinkingMode: boolean;
 }
 
 export interface AIMessage {
@@ -56,12 +73,14 @@ export interface AISearchParams {
     query: string;
     filters?: SearchFilters;
     userId?: string;
+    useThinkingMode?: boolean; // New parameter
 }
 
 export interface AISearchResponse {
     recommendations: PropertyRecommendation[];
     parsedFilters: SearchFilters | null;
     messages?: AIMessage[];
+    thinkingProcess?: AIThinkingProcess; // New field
 }
 
 // Type guard to check if a PropertyRecommendation is a valid Property

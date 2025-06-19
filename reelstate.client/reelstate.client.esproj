@@ -10,9 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Folder Include="src\Features\admin\pages\" />
-    <Folder Include="src\Features\ai\components\" />
     <Folder Include="src\Features\ai\config\" />
-    <Folder Include="src\Features\ai\slices\" />
     <Folder Include="src\Features\dashboard\constants\" />
     <Folder Include="src\Features\dashboard\types\" />
     <Folder Include="src\Features\dashboard\services\" />

@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useAppSelector, useAppDispatch } from '../../../store/hooks';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { searchProperties, clearSearchResults } from '../../../store/slices/propertySlice';
-import { searchWithAI, setQuery } from '../../../store/slices/aiSlice';
+import { searchWithAI, setQuery, toggleThinkingMode } from '../../../store/slices/aiSlice';
 import { SearchFilters } from '../types/Property';
 import DynamicPropertyTags from '../components/VideoCard/DynamicPropertyTags';
+import AIThinkingProcess from "../../ai/components/AIThinkingProcess";
 
 const SearchResults: React.FC = () => {
     const dispatch = useAppDispatch();
@@ -25,7 +26,10 @@ const SearchResults: React.FC = () => {
     const {
         recommendations,
         isLoading: isAiLoading,
-        error: aiError
+        error: aiError,
+        showThinkingMode,
+        isThinking,
+        thinkingProcess
     } = useAppSelector(state => state.ai);
 
     // Track whether this is an AI-powered search
@@ -37,6 +41,7 @@ const SearchResults: React.FC = () => {
         // Check if this is an AI search from URL
         const isAiParam = searchParams.get('ai') === 'true';
         const aiQuery = searchParams.get('aiQuery') || '';
+        const useThinkingMode = searchParams.get('thinkingMode') === 'true';
 
         if (isAiParam) {
             setIsAiSearch(true);
@@ -46,8 +51,12 @@ const SearchResults: React.FC = () => {
             if (aiQuery) {
                 console.log("Running AI search with query:", aiQuery);
                 dispatch(setQuery(aiQuery));
-                // Notice we don't pass any filters here - pure natural language search
-                dispatch(searchWithAI({ query: aiQuery }));
+
+                // Use thinking mode if specified in URL
+                dispatch(searchWithAI({
+                    query: aiQuery,
+                    useThinkingMode: useThinkingMode
+                }));
             }
         } else {
             // Regular search with filters
@@ -105,7 +114,32 @@ const SearchResults: React.FC = () => {
 
         // AI search is completely separate from regular search
         // We use only the aiQuery parameter and ai=true flag
-        navigate(`/search?ai=true&aiQuery=${encodeURIComponent(aiQueryInput)}`);
+        const params = new URLSearchParams();
+        params.set('ai', 'true');
+        params.set('aiQuery', aiQueryInput);
+
+        // Add thinking mode flag if enabled
+        if (showThinkingMode) {
+            params.set('thinkingMode', 'true');
+        }
+
+        navigate(`/search?${params.toString()}`);
+    };
+
+    const handleToggleThinking = () => {
+        dispatch(toggleThinkingMode());
+    };
+
+    // Retry with thinking mode if we got no results
+    const retryWithThinking = () => {
+        if (!isAiSearch || !searchParams.get('aiQuery')) return;
+
+        const params = new URLSearchParams();
+        params.set('ai', 'true');
+        params.set('aiQuery', searchParams.get('aiQuery') || '');
+        params.set('thinkingMode', 'true');
+
+        navigate(`/search?${params.toString()}`);
     };
 
     if ((isSearching && !isAiSearch) || (isAiLoading && isAiSearch)) {
@@ -157,6 +191,8 @@ const SearchResults: React.FC = () => {
                             {isAiSearch && searchParams.get('aiQuery') && (
                                 <p className="text-gray-600 mt-1">
                                     AI results for "{searchParams.get('aiQuery')}"
+                                    {searchParams.get('thinkingMode') === 'true' &&
+                                        " (with thinking process)"}
                                 </p>
                             )}
                         </div>
@@ -200,9 +236,23 @@ const SearchResults: React.FC = () => {
                                         Search
                                     </button>
                                 </div>
-                                <p className="mt-1 text-xs text-gray-500">
-                                    Try: "I need a modern apartment with sea view" or "Find a family house with garden"
-                                </p>
+                                <div className="flex justify-between mt-2">
+                                    <p className="text-xs text-gray-500">
+                                        Try: "I need a modern apartment with sea view" or "Find a family house with garden"
+                                    </p>
+                                    <div className="flex items-center">
+                                        <input
+                                            id="thinking-mode"
+                                            type="checkbox"
+                                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                            checked={showThinkingMode}
+                                            onChange={handleToggleThinking}
+                                        />
+                                        <label htmlFor="thinking-mode" className="ml-2 block text-xs text-indigo-700">
+                                            Show AI Thinking Process
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -224,7 +274,15 @@ const SearchResults: React.FC = () => {
                         </div>
                     )}
 
-                    {/* AI Search Explanation - only for AI searches */}
+                    {/* Show AI Thinking Process if enabled */}
+                    {isAiSearch && showThinkingMode && (
+                        <AIThinkingProcess
+                            thinkingProcess={thinkingProcess}
+                            isThinking={isThinking}
+                        />
+                    )}
+
+                    {/* AI Search Explanation - only for AI searches with results */}
                     {isAiSearch && recommendations.length > 0 && (
                         <div className="mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                             <h3 className="text-lg font-medium text-purple-900 mb-2 flex items-center">
@@ -308,12 +366,26 @@ const SearchResults: React.FC = () => {
                             <p className="text-gray-600 mb-4">
                                 Try using different words to describe what you're looking for.
                             </p>
-                            <button
-                                onClick={handleClearSearch}
-                                className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
-                            >
-                                Browse All Properties
-                            </button>
+                            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                                <button
+                                    onClick={handleClearSearch}
+                                    className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+                                >
+                                    Browse All Properties
+                                </button>
+
+                                {!searchParams.get('thinkingMode') && (
+                                    <button
+                                        onClick={retryWithThinking}
+                                        className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center justify-center"
+                                    >
+                                        <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
+                                        </svg>
+                                        Show AI Thinking
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     ) : (
                         // AI results found - display in a special layout
@@ -503,7 +575,7 @@ const SearchResults: React.FC = () => {
 
                                             {/* Likes Count */}
                                             <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded-full">
-                                                {property.likes || 0} likes
+                                                {property.likesCount || 0} likes
                                             </div>
                                         </div>
 
