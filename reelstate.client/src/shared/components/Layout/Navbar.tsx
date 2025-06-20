@@ -97,40 +97,138 @@ const Navbar: React.FC = () => {
         <nav className="bg-white shadow-md sticky top-0 z-50">
             {/* Custom CSS for animations and styling */}
             <style jsx>{`
-                .brand-text {
+                .state-text {
                     background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
                     -webkit-background-clip: text;
                     -webkit-text-fill-color: transparent;
                     background-clip: text;
                 }
                 
-                .dropdown-item {
+                /* Custom button animations */
+                .btn-effect {
                     position: relative;
-                    transition: all 0.2s;
+                    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+                    overflow: hidden;
                 }
                 
-                .dropdown-item::before {
+                .btn-effect:before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 0%;
+                    height: 100%;
+                    background-color: rgba(255, 255, 255, 0.1);
+                    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+                    z-index: -1;
+                }
+                
+                .btn-effect:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 5px 15px rgba(59, 130, 246, 0.2);
+                }
+                
+                .btn-effect:hover:before {
+                    width: 100%;
+                }
+                
+                .btn-effect:active {
+                    transform: translateY(1px);
+                }
+                
+                /* Login button special effect */
+                .login-btn {
+                    position: relative;
+                    z-index: 1;
+                    transition: all 0.3s;
+                }
+                
+                .login-btn:hover {
+                    border-color: #3b82f6;
+                    color: #2563eb;
+                }
+                
+                .login-btn:after {
+                    content: '';
+                    position: absolute;
+                    bottom: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 0;
+                    background: rgba(219, 234, 254, 0.5);
+                    transition: height 0.3s cubic-bezier(0.33, 1, 0.68, 1);
+                    z-index: -1;
+                }
+                
+                .login-btn:hover:after {
+                    height: 100%;
+                }
+                
+                /* Nav items */
+                .nav-item {
+                    position: relative;
+                    overflow: hidden;
+                    transition: color 0.3s ease;
+                }
+                
+                .nav-item:after {
+                    content: '';
+                    position: absolute;
+                    left: 0;
+                    bottom: 0;
+                    width: 100%;
+                    height: 2px;
+                    background-image: linear-gradient(to right, #3b82f6, #1e3a8a);
+                    transform: translateX(-100%);
+                    transition: transform 0.4s cubic-bezier(0.65, 0, 0.35, 1);
+                }
+                
+                .nav-item.active:after {
+                    transform: translateX(0);
+                }
+                
+                .nav-item:hover:after {
+                    transform: translateX(0);
+                }
+                
+                /* Dropdown item animations */
+                .dropdown-item {
+                    position: relative;
+                    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    overflow: hidden;
+                }
+                
+                .dropdown-item:before {
                     content: '';
                     position: absolute;
                     left: 0;
                     top: 0;
                     height: 100%;
-                    width: 0;
+                    width: 0.25rem;
+                    background-color: transparent;
+                    transition: background-color 0.2s ease;
+                }
+                
+                .dropdown-item:hover {
+                    padding-left: 1.25rem;
                     background-color: #f3f4f6;
-                    transition: width 0.2s ease;
-                    z-index: -1;
                 }
                 
-                .dropdown-item:hover::before {
-                    width: 100%;
+                .dropdown-item:hover:before {
+                    background-color: #3b82f6;
                 }
                 
+                /* Mobile menu button */
                 .menu-button {
-                    transition: transform 0.3s ease;
+                    transition: transform 0.5s cubic-bezier(0.68, -0.6, 0.32, 1.6);
                 }
                 
                 .menu-button.active {
                     transform: rotate(90deg);
+                }
+                
+                .menu-button:active {
+                    transform: scale(0.9);
                 }
                 
                 .profile-avatar {
@@ -140,6 +238,55 @@ const Navbar: React.FC = () => {
                     background-image: 
                         linear-gradient(white, white), 
                         linear-gradient(135deg, #3b82f6, #1e3a8a);
+                    transition: all 0.3s ease;
+                }
+                
+                .profile-avatar:hover {
+                    transform: scale(1.05);
+                    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+                }
+                
+                /* Slide-in animation for dropdowns */
+                .dropdown-slide {
+                    animation: dropdownSlide 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+                    transform-origin: top right;
+                }
+                
+                @keyframes dropdownSlide {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-10px) scale(0.98);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                    }
+                }
+                
+                .notification-item {
+                    transition: all 0.2s ease;
+                    border-left: 3px solid transparent;
+                }
+                
+                .notification-item:hover {
+                    background-color: #f9fafb;
+                    border-left-color: #3b82f6;
+                }
+                
+                .notification-item.unread {
+                    border-left-color: #3b82f6;
+                    background-color: rgba(219, 234, 254, 0.4);
+                }
+                
+                /* Record button animation */
+                @keyframes pulseRecord {
+                    0% { transform: scale(1); opacity: 0.8; }
+                    50% { transform: scale(1.05); opacity: 1; }
+                    100% { transform: scale(1); opacity: 0.8; }
+                }
+                
+                .record-btn {
+                    animation: pulseRecord 2s infinite cubic-bezier(0.66, 0, 0.34, 1);
                 }
                 
                 .tunisia-shadow {
@@ -166,7 +313,7 @@ const Navbar: React.FC = () => {
                     {/* Logo */}
                     <div className="flex-shrink-0 flex items-center">
                         <Link to="/" className="flex items-center">
-                            <div className="relative h-10 w-10 flex-shrink-0">
+                            <div className="relative h-14 w-14 flex-shrink-0">
                                 <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     {/* Roof */}
                                     <path d="M10 40L50 10L90 40" stroke="#475569" strokeWidth="2" strokeLinecap="round" />
@@ -245,7 +392,16 @@ const Navbar: React.FC = () => {
                                     <path d="M57 71C60 73 60 77 57 79" stroke="#111827" strokeWidth="0.5" strokeDasharray="0.8 0.8" strokeLinecap="round" />
                                 </svg>
                             </div>
-                            <span className="ml-2 text-xl font-bold brand-text tracking-tight">ReelState</span>
+                            <div className="flex flex-col ml-2">
+                                <span className="text-lg font-bold tracking-tight">
+                                    <span className="text-black">Reel</span>
+                                    <span className="state-text">State</span>
+                                </span>
+                                <span className="text-xs text-gray-500 -mt-1">Video tours & property reels</span>
+                            </div>
+                            <div className="relative ml-1">
+                                <div className="w-3 h-3 bg-red-500 rounded-full record-btn"></div>
+                            </div>
                         </Link>
                     </div>
 
@@ -256,22 +412,22 @@ const Navbar: React.FC = () => {
 
                     {/* Desktop Navigation */}
                     <div className="hidden md:flex items-center space-x-4">
-                        <Link to="/feed" className={`px-3 py-2 rounded-md text-sm font-medium ${isActive('/feed')}`}>
+                        <Link to="/feed" className={`nav-item px-3 py-2 rounded-md text-sm font-medium ${location.pathname === '/feed' ? 'active' : ''}`}>
                             Discover
                         </Link>
                         {isAuthenticated && (
                             <>
-                                <Link to="/dashboard" className={`px-3 py-2 rounded-md text-sm font-medium ${isActive('/dashboard')}`}>
+                                <Link to="/dashboard" className={`nav-item px-3 py-2 rounded-md text-sm font-medium ${location.pathname === '/dashboard' ? 'active' : ''}`}>
                                     Dashboard
                                 </Link>
-                                <Link to="/create" className={`px-3 py-2 rounded-md text-sm font-medium ${isActive('/create')}`}>
+                                <Link to="/create" className={`nav-item px-3 py-2 rounded-md text-sm font-medium ${location.pathname === '/create' ? 'active' : ''}`}>
                                     Add Listing
                                 </Link>
-                                <Link to="/profile" className={`px-3 py-2 rounded-md text-sm font-medium ${isActive('/profile')}`}>
+                                <Link to="/profile" className={`nav-item px-3 py-2 rounded-md text-sm font-medium ${location.pathname === '/profile' ? 'active' : ''}`}>
                                     Profile
                                 </Link>
                                 {isAdmin && (
-                                    <Link to="/admin" className={`px-3 py-2 rounded-md text-sm font-medium ${isActive('/admin')}`}>
+                                    <Link to="/admin" className={`nav-item px-3 py-2 rounded-md text-sm font-medium ${location.pathname === '/admin' ? 'active' : ''}`}>
                                         Admin
                                     </Link>
                                 )}
@@ -286,18 +442,18 @@ const Navbar: React.FC = () => {
                                 {/* Notification with dropdown */}
                                 <div className="relative" ref={notificationRef}>
                                     {/* Using our custom NotificationBadge component */}
-                                    <div onClick={handleNotificationClick} className="cursor-pointer">
+                                    <div onClick={handleNotificationClick} className="cursor-pointer transform hover:scale-110 transition-transform duration-200">
                                         <NotificationBadge onClick={handleNotificationClick} />
                                     </div>
 
                                     {/* Notification dropdown */}
                                     {notificationDropdownOpen && (
-                                        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg py-1 z-50 border border-gray-200 max-h-[500px] overflow-y-auto tunisia-shadow">
-                                            <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                                        <div className="dropdown-slide absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg py-1 z-50 border-0 max-h-[500px] overflow-y-auto tunisia-shadow">
+                                            <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-blue-50 to-white">
                                                 <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
                                                 <Link
                                                     to="/notifications"
-                                                    className="text-xs text-blue-600 hover:text-blue-800"
+                                                    className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
                                                     onClick={() => setNotificationDropdownOpen(false)}
                                                 >
                                                     View all
@@ -318,7 +474,7 @@ const Navbar: React.FC = () => {
                                                         return (
                                                             <div
                                                                 key={notification.id}
-                                                                className={`px-4 py-3 hover:bg-gray-50 flex items-start cursor-pointer ${!notification.isRead ? 'bg-blue-50' : ''}`}
+                                                                className={`notification-item px-4 py-3 flex items-start cursor-pointer ${!notification.isRead ? 'unread' : ''}`}
                                                                 onClick={() => handleNotificationView(notification.id)}
                                                             >
                                                                 {/* Notification Icon based on type */}
@@ -326,7 +482,7 @@ const Navbar: React.FC = () => {
                                                                     typeString === 'comment' ? 'bg-blue-100 text-blue-600' :
                                                                         typeString === 'follow' ? 'bg-purple-100 text-purple-600' :
                                                                             typeString === 'property_approved' ? 'bg-green-100 text-green-600' :
-                                                                                typeString === 'property_rejected' ? 'bg-yellow-100 text-yellow-600' :
+                                                                                typeString === 'property_rejected' ? 'bg-amber-100 text-amber-600' :
                                                                                     'bg-gray-100 text-gray-600'
                                                                     }`}>
                                                                     {typeString === 'like' && (
@@ -361,7 +517,7 @@ const Navbar: React.FC = () => {
                                                                         {notification.message}
                                                                     </p>
                                                                     <p className="text-xs text-gray-500 mt-1">
-                                                                        {new Date(notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(notification.createdAt).toLocaleDateString()}
+                                                                        {new Date(notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {new Date(notification.createdAt).toLocaleDateString()}
                                                                     </p>
                                                                 </div>
 
@@ -421,8 +577,7 @@ const Navbar: React.FC = () => {
                                             </div>
                                         </div>
                                         <svg
-                                            className={`h-4 w-4 text-gray-500 transition-transform ${profileMenuOpen ? "transform rotate-180" : ""
-                                                }`}
+                                            className={`h-4 w-4 text-gray-500 transition-transform duration-300 ${profileMenuOpen ? "transform rotate-180" : ""}`}
                                             fill="none"
                                             stroke="currentColor"
                                             viewBox="0 0 24 24"
@@ -437,28 +592,47 @@ const Navbar: React.FC = () => {
                                     </button>
 
                                     {profileMenuOpen && (
-                                        <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 z-50">
+                                        <div className="dropdown-slide origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 z-50">
+                                            <div className="py-2 px-4 border-b border-gray-100 bg-gray-50">
+                                                <p className="text-xs text-gray-500">Signed in as</p>
+                                                <p className="text-sm font-medium text-gray-900 truncate">{user?.email}</p>
+                                            </div>
                                             <Link
                                                 to="/profile"
-                                                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                className="dropdown-item block px-4 py-2 text-sm text-gray-700"
                                                 onClick={() => setProfileMenuOpen(false)}
                                             >
-                                                Your Profile
+                                                <div className="flex items-center">
+                                                    <svg className="mr-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                                                    </svg>
+                                                    Your Profile
+                                                </div>
                                             </Link>
                                             <Link
                                                 to="/dashboard"
-                                                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                className="dropdown-item block px-4 py-2 text-sm text-gray-700"
                                                 onClick={() => setProfileMenuOpen(false)}
                                             >
-                                                Dashboard
+                                                <div className="flex items-center">
+                                                    <svg className="mr-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                                    </svg>
+                                                    Dashboard
+                                                </div>
                                             </Link>
                                             {isAdmin && (
                                                 <Link
                                                     to="/admin"
-                                                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                    className="dropdown-item block px-4 py-2 text-sm text-gray-700"
                                                     onClick={() => setProfileMenuOpen(false)}
                                                 >
-                                                    Admin Dashboard
+                                                    <div className="flex items-center">
+                                                        <svg className="mr-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                                                        </svg>
+                                                        Admin Dashboard
+                                                    </div>
                                                 </Link>
                                             )}
                                             <div className="border-t border-gray-100 my-1"></div>
@@ -467,9 +641,14 @@ const Navbar: React.FC = () => {
                                                     setProfileMenuOpen(false);
                                                     handleLogout();
                                                 }}
-                                                className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                                className="dropdown-item block w-full text-left px-4 py-2 text-sm text-red-600"
                                             >
-                                                Sign out
+                                                <div className="flex items-center">
+                                                    <svg className="mr-2 h-4 w-4 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V7.414l-4-4H3zm9 5a1 1 0 00-1 1v6a1 1 0 102 0V9a1 1 0 00-1-1zm-2 1a1 1 0 10-2 0v6a1 1 0 102 0V9z" clipRule="evenodd" />
+                                                    </svg>
+                                                    Sign out
+                                                </div>
                                             </button>
                                         </div>
                                     )}
@@ -479,13 +658,13 @@ const Navbar: React.FC = () => {
                             <div className="flex items-center space-x-4">
                                 <Link
                                     to="/login"
-                                    className="px-4 py-1.5 text-blue-600 border border-blue-200 rounded-md hover:bg-blue-50 transition-colors text-sm"
+                                    className="login-btn px-5 py-2 text-blue-600 border border-blue-200 rounded-md text-sm font-medium"
                                 >
                                     Log In
                                 </Link>
                                 <Link
                                     to="/register"
-                                    className="px-4 py-1.5 text-white rounded-md text-sm relative overflow-hidden"
+                                    className="btn-effect px-5 py-2 text-white rounded-md text-sm font-medium"
                                     style={{
                                         background: 'linear-gradient(to right, #3b82f6, #1e40af)',
                                         boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.2), 0 2px 4px -1px rgba(59, 130, 246, 0.1)'
@@ -500,24 +679,14 @@ const Navbar: React.FC = () => {
                     {/* Mobile menu button and search */}
                     <div className="flex items-center md:hidden">
                         {isAuthenticated && (
-                            <div className="mr-2" onClick={() => navigate('/notifications')}>
+                            <div className="mr-3 transform hover:scale-110 transition-transform duration-200" onClick={() => navigate('/notifications')}>
                                 <NotificationBadge onClick={() => navigate('/notifications')} />
                             </div>
                         )}
 
-                        {/* Mobile search icon */}
-                        <button
-                            className="p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none mr-1"
-                            onClick={() => setIsMenuOpen(!isMenuOpen)}
-                        >
-                            <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                        </button>
-
                         <button
                             onClick={() => setIsMenuOpen(!isMenuOpen)}
-                            className="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none"
+                            className={`menu-button inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-blue-600 hover:bg-gray-50 focus:outline-none ${isMenuOpen ? 'active' : ''}`}
                         >
                             <span className="sr-only">Open main menu</span>
                             {isMenuOpen ? (
@@ -551,7 +720,7 @@ const Navbar: React.FC = () => {
                 <div className="pt-1 pb-3 space-y-1">
                     <Link
                         to="/feed"
-                        className={`block pl-3 pr-4 py-2 border-l-4 ${location.pathname === '/feed' ? 'border-blue-700 text-blue-700 bg-blue-50' : 'border-transparent'}`}
+                        className={`block pl-3 pr-4 py-2.5 border-l-4 ${location.pathname === '/feed' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300'}`}
                         onClick={() => setIsMenuOpen(false)}
                     >
                         Discover
@@ -561,28 +730,28 @@ const Navbar: React.FC = () => {
                         <>
                             <Link
                                 to="/dashboard"
-                                className={`block pl-3 pr-4 py-2 border-l-4 ${location.pathname === '/dashboard' ? 'border-blue-700 text-blue-700 bg-blue-50' : 'border-transparent'}`}
+                                className={`block pl-3 pr-4 py-2.5 border-l-4 ${location.pathname === '/dashboard' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300'}`}
                                 onClick={() => setIsMenuOpen(false)}
                             >
                                 Dashboard
                             </Link>
                             <Link
                                 to="/create"
-                                className={`block pl-3 pr-4 py-2 border-l-4 ${location.pathname === '/create' ? 'border-blue-700 text-blue-700 bg-blue-50' : 'border-transparent'}`}
+                                className={`block pl-3 pr-4 py-2.5 border-l-4 ${location.pathname === '/create' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300'}`}
                                 onClick={() => setIsMenuOpen(false)}
                             >
                                 Add Listing
                             </Link>
                             <Link
                                 to="/profile"
-                                className={`block pl-3 pr-4 py-2 border-l-4 ${location.pathname === '/profile' ? 'border-blue-700 text-blue-700 bg-blue-50' : 'border-transparent'}`}
+                                className={`block pl-3 pr-4 py-2.5 border-l-4 ${location.pathname === '/profile' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300'}`}
                                 onClick={() => setIsMenuOpen(false)}
                             >
                                 Profile
                             </Link>
                             <Link
                                 to="/notifications"
-                                className={`block pl-3 pr-4 py-2 border-l-4 ${location.pathname === '/notifications' ? 'border-blue-700 text-blue-700 bg-blue-50' : 'border-transparent'}`}
+                                className={`block pl-3 pr-4 py-2.5 border-l-4 ${location.pathname === '/notifications' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300'}`}
                                 onClick={() => setIsMenuOpen(false)}
                             >
                                 Notifications
@@ -590,7 +759,7 @@ const Navbar: React.FC = () => {
                             {isAdmin && (
                                 <Link
                                     to="/admin"
-                                    className={`block pl-3 pr-4 py-2 border-l-4 ${location.pathname === '/admin' ? 'border-blue-700 text-blue-700 bg-blue-50' : 'border-transparent'}`}
+                                    className={`block pl-3 pr-4 py-2.5 border-l-4 ${location.pathname === '/admin' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300'}`}
                                     onClick={() => setIsMenuOpen(false)}
                                 >
                                     Admin Dashboard
@@ -627,7 +796,7 @@ const Navbar: React.FC = () => {
                                     handleLogout();
                                     setIsMenuOpen(false);
                                 }}
-                                className="flex items-center w-full px-3 py-2 text-left text-red-600 rounded-md hover:bg-red-50"
+                                className="btn-effect flex items-center w-full px-4 py-2.5 text-left text-red-600 rounded-md hover:bg-red-50"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                                     <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V7.414l-4-4H3zm9 5a1 1 0 00-1 1v6a1 1 0 102 0V9a1 1 0 00-1-1zm-2 1a1 1 0 10-2 0v6a1 1 0 102 0V9z" clipRule="evenodd" />
@@ -638,17 +807,17 @@ const Navbar: React.FC = () => {
                     </div>
                 ) : (
                     <div className="border-t border-gray-200 pt-4 pb-3 bg-gradient-to-b from-white to-gray-50">
-                        <div className="flex flex-col space-y-3 px-4">
+                        <div className="grid grid-cols-2 gap-3 px-4">
                             <Link
                                 to="/login"
-                                className="block text-center py-2 px-4 border border-blue-200 rounded-md text-blue-600 hover:bg-blue-50"
+                                className="login-btn block text-center py-2.5 px-4 border border-blue-200 rounded-md text-blue-600 font-medium"
                                 onClick={() => setIsMenuOpen(false)}
                             >
                                 Log In
                             </Link>
                             <Link
                                 to="/register"
-                                className="block text-center py-2 px-4 rounded-md text-white"
+                                className="btn-effect block text-center py-2.5 px-4 rounded-md text-white font-medium"
                                 style={{
                                     background: 'linear-gradient(to right, #3b82f6, #1e40af)',
                                     boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.2), 0 2px 4px -1px rgba(59, 130, 246, 0.1)'
