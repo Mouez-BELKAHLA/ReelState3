@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppSelector, useAppDispatch } from '../../../../store/hooks';
 import { checkLikeStatus, toggleLike } from '../../../../store/slices/propertySlice';
+import axios from 'axios'; // Make sure axios is imported
 
 // Import components but NOT ArrowButton (keeping your existing imports)
 import {
@@ -75,6 +76,8 @@ export default function VideoCard({
     const [userPaused, setUserPaused] = useState(false);
     const [isAnimating, setIsAnimating] = useState(false);
     const [commentsCount] = useState(comments);
+    const [localViews, setLocalViews] = useState(views); // Add local state for views
+    const [viewIncremented, setViewIncremented] = useState(false); // Track if view has been incremented
 
     // Touch handling state
     const [touchStart, setTouchStart] = useState(0);
@@ -109,11 +112,32 @@ export default function VideoCard({
         }
     }, [id, isAuthenticated, dispatch]);
 
+    // New function to increment view count
+    const incrementViewCount = async () => {
+        if (viewIncremented) return; // Don't increment if already done
+
+        try {
+            const response = await axios.post(`/api/property/${id}/view`);
+            if (response.data && response.data.success) {
+                setLocalViews(response.data.views);
+                setViewIncremented(true);
+                console.log("View count incremented successfully:", response.data.views);
+            }
+        } catch (error) {
+            console.error("Failed to increment view count:", error);
+        }
+    };
+
     // Ensure proper video state when active status changes
     useEffect(() => {
         if (!internalVideoRef.current) return;
 
         if (isActive && activeIndex === 0 && !userPaused) {
+            // Increment view when video becomes active
+            if (!viewIncremented) {
+                incrementViewCount();
+            }
+
             const playPromise = internalVideoRef.current.play();
             if (playPromise !== undefined) {
                 playPromise
@@ -127,7 +151,7 @@ export default function VideoCard({
                 internalVideoRef.current.muted = true;
             }
         }
-    }, [isActive, activeIndex, userPaused]);
+    }, [isActive, activeIndex, userPaused, viewIncremented]);
 
     // Handle like toggle using Redux
     const handleLikeToggle = async (e: React.MouseEvent) => {
@@ -160,6 +184,12 @@ export default function VideoCard({
 
         if (internalVideoRef.current.paused) {
             setUserPaused(false);
+
+            // Increment view when user plays video
+            if (!viewIncremented) {
+                incrementViewCount();
+            }
+
             const playPromise = internalVideoRef.current.play();
             if (playPromise !== undefined) {
                 playPromise
@@ -193,6 +223,8 @@ export default function VideoCard({
             setIsPlaying(false);
         }
     };
+
+    // Rest of your component code remains the same...
 
     // Touch handling
     const handleTouchStart = (e: React.TouchEvent) => {
@@ -645,7 +677,7 @@ export default function VideoCard({
                         <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
                         <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-white text-xs font-medium">{views}</span>
+                    <span className="text-white text-xs font-medium">{localViews}</span>
                 </div>
             </div>
 

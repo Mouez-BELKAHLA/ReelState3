@@ -98,12 +98,14 @@ const SearchBar: React.FC<SearchBarProps> = ({
         setShowFilterModal(true);
     };
 
+    // This function now just updates the filters state without navigation
     const handleFiltersApply = (newFilters: SearchFilters) => {
         setFilters(newFilters);
-        navigateToSearch(searchValue, newFilters);
+        setShowFilterModal(false); // Close the modal after applying filters
+        // No navigation here - wait for search button click
     };
 
-    // Modified to navigate directly to AI search page
+    // Navigate directly to AI search page
     const handleAIClick = () => {
         navigate(`/search?ai=true&aiQuery=${encodeURIComponent(searchValue || '')}`);
     };
@@ -115,9 +117,123 @@ const SearchBar: React.FC<SearchBarProps> = ({
         }).length;
     };
 
+    // Custom CSS for animations and styling - matching navbar style
+    const customStyles = `
+        /* Search input animations */
+        .search-input {
+            transition: all 0.3s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+        
+        .search-input:focus {
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+        }
+        
+        /* Custom button animations */
+        .btn-effect {
+            position: relative;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            overflow: hidden;
+        }
+        
+        .btn-effect:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.1);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: -1;
+        }
+        
+        .btn-effect:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.2);
+        }
+        
+        .btn-effect:hover:before {
+            width: 100%;
+        }
+        
+        .btn-effect:active {
+            transform: translateY(1px);
+        }
+        
+        /* Filter button animation */
+        .filter-btn {
+            transition: all 0.2s ease;
+        }
+        
+        .filter-btn:hover {
+            background-color: #f3f4f6;
+            border-color: #d1d5db;
+        }
+        
+        .filter-btn:active {
+            background-color: #e5e7eb;
+        }
+        
+        /* AI button animation */
+        .ai-btn {
+            transition: all 0.2s ease;
+            border-color: rgba(147, 51, 234, 0.3);
+        }
+        
+        .ai-btn:hover {
+            background-color: rgba(147, 51, 234, 0.1);
+            border-color: rgba(147, 51, 234, 0.5);
+        }
+        
+        /* Suggestion dropdown animation */
+        .dropdown-slide {
+            animation: dropdownSlide 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+            transform-origin: top center;
+        }
+        
+        @keyframes dropdownSlide {
+            from {
+                opacity: 0;
+                transform: translateY(-10px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        .suggestion-item {
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+        }
+        
+        .suggestion-item:hover {
+            background-color: #f9fafb;
+            border-left-color: #3b82f6;
+            padding-left: 1rem;
+        }
+        
+        /* Badge animation */
+        @keyframes pulseBadge {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .badge-pulse {
+            animation: pulseBadge 2s infinite cubic-bezier(0.66, 0, 0.34, 1);
+        }
+        
+        .tunisia-shadow {
+            box-shadow: 0 4px 14px -2px rgba(59, 130, 246, 0.2);
+        }
+    `;
+
     if (isMobile) {
         return (
             <>
+                <style jsx>{customStyles}</style>
                 <FilterModal
                     isOpen={showFilterModal}
                     onClose={() => setShowFilterModal(false)}
@@ -137,7 +253,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                                 ref={searchInputRef}
                                 type="text"
                                 name="search"
-                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                className="search-input block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="Search for properties, locations..."
                                 value={searchValue}
                                 onChange={(e) => setSearchValue(e.target.value)}
@@ -146,7 +262,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                             {showSuggestions && suggestions.length > 0 && (
                                 <div
                                     ref={suggestionsRef}
-                                    className="absolute z-50 w-full bg-white border border-gray-300 rounded-md mt-1 max-h-48 overflow-y-auto shadow-lg"
+                                    className="dropdown-slide absolute z-50 w-full bg-white border border-gray-300 rounded-md mt-1 max-h-48 overflow-y-auto shadow-lg tunisia-shadow"
                                 >
                                     {isLoadingSuggestions ? (
                                         <div className="px-3 py-2 text-gray-500 text-sm">Loading...</div>
@@ -154,7 +270,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                                         suggestions.map((suggestion, index) => (
                                             <div
                                                 key={index}
-                                                className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                                                className="suggestion-item px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
                                                 onClick={() => handleSuggestionClick(suggestion)}
                                             >
                                                 {suggestion}
@@ -168,21 +284,25 @@ const SearchBar: React.FC<SearchBarProps> = ({
                         <div className="flex space-x-2">
                             <button
                                 type="submit"
-                                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                                className="btn-effect flex-1 py-2 px-4 rounded-lg text-sm font-medium text-white"
+                                style={{
+                                    background: 'linear-gradient(to right, #3b82f6, #1e40af)',
+                                    boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.2), 0 2px 4px -1px rgba(59, 130, 246, 0.1)'
+                                }}
                             >
                                 Search
                             </button>
                             <button
                                 type="button"
                                 onClick={handleFilterClick}
-                                className="relative px-4 py-2 border border-gray-300 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                                className="filter-btn relative px-4 py-2 border border-gray-300 bg-gray-50 text-gray-600 rounded-lg"
                                 title="Filters"
                             >
                                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                                 </svg>
                                 {getActiveFiltersCount() > 0 && (
-                                    <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                                    <span className="badge-pulse absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                                         {getActiveFiltersCount()}
                                     </span>
                                 )}
@@ -190,7 +310,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                             <button
                                 type="button"
                                 onClick={handleAIClick}
-                                className="px-4 py-2 border border-purple-300 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors"
+                                className="ai-btn px-4 py-2 border border-purple-300 bg-purple-50 text-purple-600 rounded-lg"
                                 title="AI Assistant"
                             >
                                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -206,6 +326,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
     return (
         <>
+            <style jsx>{customStyles}</style>
             <FilterModal
                 isOpen={showFilterModal}
                 onClose={() => setShowFilterModal(false)}
@@ -227,7 +348,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                                 type="text"
                                 name="search"
                                 id="search"
-                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-l-full text-sm placeholder-gray-500 focus:outline-none focus:text-gray-900 focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                className="search-input block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-l-full text-sm placeholder-gray-500 focus:outline-none focus:text-gray-900 focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                 placeholder="Search for properties, locations..."
                                 value={searchValue}
                                 onChange={(e) => setSearchValue(e.target.value)}
@@ -236,7 +357,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                             {showSuggestions && suggestions.length > 0 && (
                                 <div
                                     ref={suggestionsRef}
-                                    className="absolute z-50 left-0 right-0 bg-white border border-gray-300 rounded-md mt-1 max-h-48 overflow-y-auto shadow-lg"
+                                    className="dropdown-slide absolute z-50 left-0 right-0 bg-white border border-gray-300 rounded-md mt-1 max-h-48 overflow-y-auto shadow-lg tunisia-shadow"
                                 >
                                     {isLoadingSuggestions ? (
                                         <div className="px-3 py-2 text-gray-500 text-sm">Loading...</div>
@@ -244,7 +365,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                                         suggestions.map((suggestion, index) => (
                                             <div
                                                 key={index}
-                                                className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                                                className="suggestion-item px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
                                                 onClick={() => handleSuggestionClick(suggestion)}
                                             >
                                                 {suggestion}
@@ -258,14 +379,14 @@ const SearchBar: React.FC<SearchBarProps> = ({
                         <button
                             type="button"
                             onClick={handleFilterClick}
-                            className="relative px-3 py-2 border-t border-b border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-600 transition-colors"
+                            className="filter-btn relative px-3 py-2 border-t border-b border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-600 transition-colors"
                             title="Advanced Filters"
                         >
                             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                             </svg>
                             {getActiveFiltersCount() > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                                <span className="badge-pulse absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                                     {getActiveFiltersCount()}
                                 </span>
                             )}
@@ -274,7 +395,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                         <button
                             type="button"
                             onClick={handleAIClick}
-                            className="px-3 py-2 border-t border-b border-r border-gray-300 bg-purple-50 hover:bg-purple-100 text-purple-600 transition-colors"
+                            className="ai-btn px-3 py-2 border-t border-b border-r border-gray-300 bg-purple-50 hover:bg-purple-100 text-purple-600 transition-colors"
                             title="AI Property Assistant"
                         >
                             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -284,7 +405,11 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
                         <button
                             type="submit"
-                            className="px-4 py-2 bg-blue-600 text-white rounded-r-full hover:bg-blue-700 transition-colors"
+                            className="btn-effect px-4 py-2 text-white rounded-r-full"
+                            style={{
+                                background: 'linear-gradient(to right, #3b82f6, #1e40af)',
+                                boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.2), 0 2px 4px -1px rgba(59, 130, 246, 0.1)'
+                            }}
                         >
                             <span className="text-sm font-medium">Search</span>
                         </button>
