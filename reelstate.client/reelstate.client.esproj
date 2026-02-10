@@ -18,6 +18,7 @@
     <Folder Include="src\Features\notification\services\" />
     <Folder Include="src\Features\notification\types\" />
     <Folder Include="src\Features\profile\services\" />
+    <Folder Include="src\Features\property\components\search\" />
     <Folder Include="src\Features\property\constants\" />
     <Folder Include="src\shared\components\Common\" />
     <Folder Include="src\Components\Feed\" />

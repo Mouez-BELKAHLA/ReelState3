@@ -234,9 +234,16 @@ const propertySlice = createSlice({
     reducers: {
         setActiveVideoIndex: (state, action: PayloadAction<number>) => {
             state.activeVideoIndex = action.payload;
-            const currentProperties = state.searchResults.length > 0 ? state.searchResults : state.properties;
-            if (currentProperties.length > action.payload) {
-                state.activePropertyId = currentProperties[action.payload].id;
+
+            // Safety check to prevent error when index is -1 or out of bounds
+            if (action.payload >= 0 && state.searchResults.length > action.payload) {
+                const property = state.searchResults[action.payload];
+                if (property) {
+                    state.activePropertyId = property.id;
+                }
+            } else {
+                // If index is invalid, clear the active property ID
+                state.activePropertyId = null;
             }
         },
         toggleComments: (state, action: PayloadAction<boolean | undefined>) => {

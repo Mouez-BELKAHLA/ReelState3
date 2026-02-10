@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { SearchFilters } from '../../Features/property/types/Property';
 import { PropertyRecommendation, AISearchState, AIThinkingProcess } from '../../Features/ai/types/AITypes';
 import axios from 'axios';
+import { API_URL } from "../../shared";
 
 // Initial state
 const initialState: AISearchState = {
@@ -154,7 +155,7 @@ Example output format:
     };
 };
 
-// Regular AI analysis function (existing code)
+// Regular AI analysis function
 const getAIAnalysis = async (query: string): Promise<{
     reasoning: string;
     filters: SearchFilters;
@@ -290,7 +291,58 @@ const extractSearchTerms = (query: string, filters: SearchFilters): string[] => 
     return [...new Set(searchTerms)];
 };
 
-// UPDATED Function to transform backend property response to PropertyRecommendation format with better matching
+// NEW FUNCTION: Fetch user information for properties
+const fetchUserInfoForProperties = async (properties: any[]): Promise<any[]> => {
+    if (!properties || properties.length === 0) return properties;
+
+    try {
+        // Create a set of unique user IDs to fetch
+        const userIds = new Set(properties.map(p => p.userId).filter(id => id));
+
+        if (userIds.size === 0) return properties;
+
+        console.log(`Fetching user info for ${userIds.size} unique users`);
+
+        // Create a map to store user information by ID
+        const userInfoMap: Record<string, any> = {};
+
+        // Fetch user information for each user ID
+        // You may need to adjust this endpoint based on your API
+        const userRequests = Array.from(userIds).map(async (userId) => {
+            try {
+                const response = await axios.get(`${API_URL}/api/User/${userId}`);
+                if (response.data) {
+                    userInfoMap[userId] = response.data;
+                }
+            } catch (error) {
+                console.error(`Error fetching user info for user ${userId}:`, error);
+            }
+        });
+
+        // Wait for all user info requests to complete
+        await Promise.all(userRequests);
+
+        console.log('User info fetched successfully:', Object.keys(userInfoMap).length);
+
+        // Enrich properties with user information
+        return properties.map(property => {
+            if (property.userId && userInfoMap[property.userId]) {
+                const userInfo = userInfoMap[property.userId];
+                return {
+                    ...property,
+                    username: userInfo.username || userInfo.displayName || 'User',
+                    avatarUrl: userInfo.avatarUrl || userInfo.photoUrl || null
+                };
+            }
+            return property;
+        });
+    } catch (error) {
+        console.error('Error fetching user information:', error);
+        return properties;
+    }
+};
+
+// Updated transform function
 const transformBackendResponse = (properties: any[], reasoning: string, filters?: SearchFilters): PropertyRecommendation[] => {
     if (!properties || properties.length === 0) return [];
 
@@ -319,7 +371,7 @@ const transformBackendResponse = (properties: any[], reasoning: string, filters?
     const searchTerms = Array.from(keyTerms);
     console.log('Key search terms extracted:', searchTerms);
 
-    // First, sort properties by match quality
+    // Calculate match scores for each property
     const scoredProperties = properties.map(property => {
         // Get all property features and preferences in lowercase
         const propFeatures = Array.isArray(property.propertyFeatures)
@@ -357,9 +409,9 @@ const transformBackendResponse = (properties: any[], reasoning: string, filters?
     scoredProperties.sort((a, b) => b.matchScore - a.matchScore);
 
     // Now transform the sorted properties
-    return scoredProperties.map((scoredProperty, index) => {
-        const property = scoredProperty.property;
-        const confidence = scoredProperty.matchScore;
+    return scoredProperties.map((scoredProp, index) => {
+        const property = scoredProp.property;
+        const confidence = scoredProp.matchScore;
 
         // Get the first photo URL or use placeholder
         let photoUrl = '';
@@ -371,10 +423,15 @@ const transformBackendResponse = (properties: any[], reasoning: string, filters?
         let matchReason = '';
         if (index === 0) {
             matchReason = reasoning;
-        } else if (property.propertyType.toLowerCase().includes('apartment')) {
+        } else if (property.propertyType && property.propertyType.toLowerCase().includes('apartment')) {
             matchReason = `This ${property.propertyType.toLowerCase()} matches several aspects of your search criteria.`;
         } else {
-            matchReason = `This property offers ${property.rooms} rooms and is located in ${property.city || ''}.`;
+            matchReason = `This property offers ${property.rooms || '?'} rooms and is located in ${property.city || 'a great area'}.`;
+        }
+
+        // Make sure full photo URL is used
+        if (photoUrl && !photoUrl.startsWith('http') && !photoUrl.startsWith('data:')) {
+            photoUrl = `${API_URL}${photoUrl}`;
         }
 
         return {
@@ -382,7 +439,7 @@ const transformBackendResponse = (properties: any[], reasoning: string, filters?
             title: property.title,
             caption: property.caption,
             matchReason: matchReason,
-            confidence: confidence, // Use the calculated match score
+            confidence: confidence,
             propertyType: property.propertyType,
             rooms: property.rooms,
             space: property.space,
@@ -392,12 +449,16 @@ const transformBackendResponse = (properties: any[], reasoning: string, filters?
             longitude: property.longitude,
             videoUrl: property.videoUrl,
             userId: property.userId,
+            // Add these fields for PropertyCard to work correctly
+            username: property.username || property.user?.username || 'User',  // Default to 'User' instead of empty string
+            avatarUrl: property.avatarUrl || property.user?.avatarUrl || null,
             createdAt: property.createdAt,
             views: property.views || 0,
             likesCount: property.likesCount || 0,
+            likes: property.likesCount || property.likes || 0, // Ensure likes is available for backward compatibility
             commentsCount: property.commentsCount || 0,
             status: property.status,
-            statusReason: property.rejectionReason,
+            statusReason: property.statusReason || property.rejectionReason,
             photoUrl: photoUrl,
             propertyPreferences: Array.isArray(property.propertyPreferences)
                 ? property.propertyPreferences
@@ -410,6 +471,7 @@ const transformBackendResponse = (properties: any[], reasoning: string, filters?
     });
 };
 
+// Updated AI search thunk with user info fetching
 export const searchWithAI = createAsyncThunk(
     'ai/searchWithAI',
     async ({ query, useThinkingMode = false }: { query: string, useThinkingMode?: boolean }, { dispatch, rejectWithValue }) => {
@@ -482,7 +544,7 @@ export const searchWithAI = createAsyncThunk(
 
             // Step 3: Call the unified AI search endpoint
             console.log('Calling unified ai-search endpoint with filters:', modifiedFilters);
-            let response = await axios.get(`/api/Property/unified-ai-search`, {
+            let response = await axios.get(`${API_URL}/api/Property/unified-ai-search`, {
                 params: {
                     query: query,
                     filters: filtersJson
@@ -496,13 +558,25 @@ export const searchWithAI = createAsyncThunk(
                 console.log('No results from AI search, trying text search fallback');
 
                 // Use simple text search as fallback
-                response = await axios.get(`/api/Property/search?q=${encodeURIComponent(query)}`);
+                response = await axios.get(`${API_URL}/api/Property/search?q=${encodeURIComponent(query)}`);
                 console.log('Fallback search response count:', response.data.totalCount || 0);
             }
 
-            // Step 4: Transform results - passing filters to use for better match calculation
-            const properties = response.data.properties || [];
+            // Step 4: Fetch user information for properties
+            let properties = response.data.properties || [];
+
+            // Fetch user information
+            properties = await fetchUserInfoForProperties(properties);
+
+            // Step 5: Transform results with the enriched property data
             const recommendations = transformBackendResponse(properties, reasoning, filters);
+
+            // Debug the first recommendation
+            if (recommendations.length > 0) {
+                console.log('First AI recommendation:', recommendations[0]);
+                console.log('AI recommendation photo URL:', recommendations[0]?.photoUrl);
+                console.log('AI recommendation username:', recommendations[0]?.username);
+            }
 
             // Finish thinking mode animation
             if (useThinkingMode) {
