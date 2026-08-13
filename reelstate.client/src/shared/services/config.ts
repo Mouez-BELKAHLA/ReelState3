@@ -1,8 +1,12 @@
 // src/shared/services/config.ts
-
-// Get API base URL that works for both local and network access
+// Get API base URL that works for local, network access, and production
 const getApiBaseUrl = () => {
     const hostname = window.location.hostname;
+
+    // Production (Vercel) — use the live Render backend
+    if (hostname.includes('vercel.app') || hostname === 'yourdomain.com') {
+        return 'https://reelstate3.onrender.com';
+    }
 
     // Special handling for ngrok to avoid mixed content errors
     if (hostname.includes('ngrok')) {
