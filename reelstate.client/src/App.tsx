@@ -13,8 +13,7 @@ import SearchResults from './Features/property/pages/SearchResults';
 import { Profile } from './Features/profile';
 import { Notification } from './Features/notification';
 import { AdminDashboard } from './Features/admin';
-import UnauthorizedPage from './Features/auth/pages/UnauthorizedPage';
-
+import UnauthorizedPage from './Features/auth/Pages/UnauthorizedPage';
 // Shared component imports
 import { Layout } from './shared';
 
