@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -7,6 +7,7 @@
     <SpaRoot>..\reelstate.client</SpaRoot>
     <SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
     <SpaProxyServerUrl>https://localhost:64889</SpaProxyServerUrl>
+    <UserSecretsId>fe8e8718-9a16-4b2c-ac55-417b3a30eea1</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

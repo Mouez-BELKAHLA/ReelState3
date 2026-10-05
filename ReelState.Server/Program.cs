@@ -174,6 +174,7 @@ builder.Services.AddCors(options =>
 });
 
 // Add Services
+builder.Services.AddHttpClient<GeminiService>(c => c.Timeout = TimeSpan.FromSeconds(60));
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IGoogleAuthService, GoogleAuthService>();
 builder.Services.AddScoped<ReelState.Server.Services.NotificationService>();
