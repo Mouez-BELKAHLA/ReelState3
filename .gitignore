@@ -39,3 +39,6 @@ bld/
 ## Others
 *.tmp
 *.temp
+.env
+.env.*
+!.env.example
