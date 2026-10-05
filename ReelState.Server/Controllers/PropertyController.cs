@@ -13,7 +13,8 @@ using Microsoft.Extensions.Logging;
 using ReelState.Data;
 using ReelState.Server.Models;
 using ReelState.Server.Models.DTOs;
-
+using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
 
 namespace ReelState.Server.Controllers
 {
@@ -27,15 +28,18 @@ namespace ReelState.Server.Controllers
         private readonly ApplicationDbContext _context;
         private readonly IWebHostEnvironment _env;
         private readonly ILogger<PropertyController> _logger;
+        private readonly Cloudinary _cloudinary;
 
         public PropertyController(
             ApplicationDbContext context,
             IWebHostEnvironment env,
-            ILogger<PropertyController> logger)
+            ILogger<PropertyController> logger,
+            Cloudinary cloudinary)
         {
             _context = context;
             _env = env;
             _logger = logger;
+            _cloudinary = cloudinary;
         }
 
         [HttpGet]
@@ -420,39 +424,35 @@ namespace ReelState.Server.Controllers
 
         private async Task<string> SaveFileAsync(IFormFile file, string folder)
         {
-            try
+            if (file == null)
+                return string.Empty;
+
+            await using var stream = file.OpenReadStream();
+            var fileDesc = new FileDescription(file.FileName, stream);
+
+            RawUploadResult result;
+            if (folder == "videos")
             {
-                if (file == null)
-                    return string.Empty;
-
-                // Generate unique filename
-                string fileName = $"{Guid.NewGuid()}_{Path.GetFileNameWithoutExtension(file.FileName)}_{DateTime.Now.Ticks}{Path.GetExtension(file.FileName)}";
-                fileName = fileName.Replace(" ", "_"); // Replace spaces with underscores
-
-                // Use ContentRootPath instead of WebRootPath
-                string folderPath = Path.Combine(_env.ContentRootPath, "uploads", folder);
-                if (!Directory.Exists(folderPath))
+                result = await _cloudinary.UploadAsync(new VideoUploadParams
                 {
-                    Directory.CreateDirectory(folderPath);
-                }
-
-                // Save file
-                string filePath = Path.Combine(folderPath, fileName);
-                using (var stream = new FileStream(filePath, FileMode.Create))
-                {
-                    await file.CopyToAsync(stream);
-                }
-
-                _logger.LogInformation("File saved successfully: {FilePath}", filePath);
-
-                // Return relative path
-                return $"/uploads/{folder}/{fileName}";
+                    File = fileDesc,
+                    Folder = "reelstate/videos"
+                });
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogError(ex, "Error saving file");
-                throw; // Rethrow to handle in the calling method
+                result = await _cloudinary.UploadAsync(new ImageUploadParams
+                {
+                    File = fileDesc,
+                    Folder = "reelstate/photos"
+                });
             }
+
+            if (result.Error != null)
+                throw new InvalidOperationException($"Cloudinary upload failed: {result.Error.Message}");
+
+            _logger.LogInformation("File uploaded to Cloudinary: {Url}", result.SecureUrl);
+            return result.SecureUrl.ToString();
         }
 
         // Helper method to parse JSON arrays for searching
