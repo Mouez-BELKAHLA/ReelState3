@@ -85,12 +85,17 @@ public class GeminiService
                     "Gemini call failed: model={Model} attempt={Attempt} status={Status} latencyMs={Latency}",
                     model, attempt + 1, status, timer.ElapsedMilliseconds);
 
-                if (status == 404) break;
+                // Log the reason Google gave (first 500 chars; it contains no key)
+                _logger.LogWarning("Gemini error body: {Body}", json.Length > 500 ? json[..500] : json);
+
+                if (status == 404 || status == 429) break; // 429: go straight to the next model
 
                 if (!RetryableStatusCodes.Contains(status))
                     throw new InvalidOperationException(lastError);
 
-                await Task.Delay(800 * (1 << attempt), ct);
+                // 500/503/504: overloaded, so retry with backoff, but don't wait after the last attempt
+                if (attempt < MaxAttemptsPerModel - 1)
+                    await Task.Delay(1000 * (1 << attempt), ct);
             }
         }
 
