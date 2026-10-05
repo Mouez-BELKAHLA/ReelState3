@@ -15,7 +15,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.FileProviders;
 using System.Text.Json.Serialization.Metadata;
 using System.Net;
-
+using CloudinaryDotNet;
 var builder = WebApplication.CreateBuilder(args);
 
 // Configure Kestrel to handle large file uploads and listen on all interfaces
@@ -172,6 +172,15 @@ builder.Services.AddCors(options =>
         }
     });
 });
+builder.Services.AddSingleton(sp =>
+{
+    var cfg = sp.GetRequiredService<IConfiguration>();
+    var account = new Account(
+        cfg["Cloudinary:CloudName"],
+        cfg["Cloudinary:ApiKey"],
+        cfg["Cloudinary:ApiSecret"]);
+    return new Cloudinary(account) { Api = { Secure = true } };
+});
 
 // Add Services
 builder.Services.AddHttpClient<GeminiService>(c => c.Timeout = TimeSpan.FromSeconds(60));
@@ -183,7 +192,9 @@ builder.Services.AddDirectoryBrowser();
 //builder.Services.AddScoped<NotificationService>(); Duplicated
 
 var app = builder.Build();
-
+Console.WriteLine($"Secret length: {app.Configuration["Cloudinary:ApiSecret"]?.Length}");
+var s = app.Configuration["Cloudinary:ApiSecret"];
+Console.WriteLine($"Cloudinary secret length: {s?.Length}, key: {app.Configuration["Cloudinary:ApiKey"]}");
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
