@@ -192,9 +192,7 @@ builder.Services.AddDirectoryBrowser();
 //builder.Services.AddScoped<NotificationService>(); Duplicated
 
 var app = builder.Build();
-Console.WriteLine($"Secret length: {app.Configuration["Cloudinary:ApiSecret"]?.Length}");
-var s = app.Configuration["Cloudinary:ApiSecret"];
-Console.WriteLine($"Cloudinary secret length: {s?.Length}, key: {app.Configuration["Cloudinary:ApiKey"]}");
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {

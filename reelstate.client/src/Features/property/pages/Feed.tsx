@@ -15,6 +15,9 @@ import { PropertyList } from "..";
 import axios from 'axios';
 import { API_URL } from "../../../shared";
 
+// Must match the navbar height (h-16 = 64px)
+const NAVBAR_HEIGHT = 64;
+
 export default function Feed() {
     const dispatch = useAppDispatch();
     const {
@@ -33,6 +36,7 @@ export default function Feed() {
     // Layout state - still kept locally as it's UI related
     const [hasLargeLayout, setHasLargeLayout] = useState(false);
     const [windowWidth, setWindowWidth] = useState(0);
+    const [windowHeight, setWindowHeight] = useState(0);
     const [previousIndex, setPreviousIndex] = useState(-1);
     const [isMobile, setIsMobile] = useState(false);
 
@@ -48,9 +52,23 @@ export default function Feed() {
 
     // Breakpoints for responsive layout
     const LARGE_LAYOUT_BREAKPOINT = 1280;
-    const MEDIUM_LAYOUT_BREAKPOINT = 768;
-    const SMALL_LAYOUT_BREAKPOINT = 480;
-    const MOBILE_BREAKPOINT = 768; // Define mobile breakpoint
+    const MOBILE_BREAKPOINT = 768;
+
+    // ---- Card size: computed from the screen so the card is always 9:16 and never "long" ----
+    // Height available for the feed (navbar is hidden on mobile after scrolling)
+    const availableHeight = Math.max(
+        300,
+        (isMobile && !showNavbar ? windowHeight : windowHeight - NAVBAR_HEIGHT)
+    );
+    // Width available (comment panel takes space on large screens)
+    const availableWidth = hasLargeLayout && showComments
+        ? windowWidth - commentPanelWidth
+        : windowWidth;
+    // 9:16 card: width follows height, but never wider than the screen
+    const cardWidth = Math.max(
+        200,
+        Math.min(Math.round(availableHeight * 9 / 16), availableWidth)
+    );
 
     // Function to increment view count - only called when video actually starts playing
     const incrementViewCount = useCallback(async (propertyId: string) => {
@@ -136,9 +154,10 @@ export default function Feed() {
                 scroll-snap-align: start;
                 scroll-snap-stop: always;
             }
-            /* Hide any overflow beyond the current item */
+            /* Hide any overflow beyond the current item.
+               --avail-h is set from JS on the feed root element. */
             .property-container {
-                height: calc(100vh - 55px);
+                height: var(--avail-h, calc(100vh - 64px));
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -169,34 +188,23 @@ export default function Feed() {
             .video-shift {
                 transition: transform 400ms cubic-bezier(0.33, 1, 0.68, 1), width 400ms cubic-bezier(0.33, 1, 0.68, 1);
             }
-            
-            /* TikTok-style slim video card */
+
+            /* Slim video card: size comes from JS (--card-w / --avail-h),
+               so it is always 9:16, centered, and fits the screen. */
             .tiktok-slim-card {
-                aspect-ratio: 9/16 !important;
-                max-width: 360px !important;
-                width: 360px !important;
+                width: var(--card-w, 360px) !important;
+                max-width: 100% !important;
+                height: var(--avail-h, auto) !important;
                 margin: 0 auto;
                 border-radius: 0 !important;
             }
-            
-            /* Responsive adjustments for different screens */
+
             @media (max-width: 480px) {
                 .property-container {
                     padding: 0;
                 }
-                .tiktok-slim-card {
-                    max-width: 100% !important;
-                    width: 100% !important;
-                }
             }
-            
-            @media (min-width: 481px) and (max-width: 768px) {
-                .tiktok-slim-card {
-                    max-width: 340px !important;
-                    width: 340px !important;
-                }
-            }
-            
+
             /* Property list item styles for TikTok-like appearance */
             .property-list-item {
                 padding: 0 !important;
@@ -205,7 +213,7 @@ export default function Feed() {
                 justify-content: center;
                 background: #000;
             }
-            
+
             /* Navbar toggle button styles */
             .navbar-toggle {
                 position: fixed;
@@ -225,16 +233,16 @@ export default function Feed() {
                 opacity: 0;
                 visibility: hidden;
             }
-            
+
             .navbar-toggle.visible {
                 opacity: 1;
                 visibility: visible;
             }
-            
+
             .navbar-toggle:hover {
                 background-color: rgba(0, 0, 0, 0.7);
             }
-            
+
             /* Only hide navbar on mobile */
             @media (min-width: 769px) {
                 .navbar-toggle {
@@ -249,11 +257,12 @@ export default function Feed() {
         };
     }, []);
 
-    // Check window size for responsive layout
+    // Check window size for responsive layout (also runs on browser zoom)
     useEffect(() => {
         const checkLayoutSize = () => {
             const width = window.innerWidth;
             setWindowWidth(width);
+            setWindowHeight(window.innerHeight);
             setHasLargeLayout(width >= LARGE_LAYOUT_BREAKPOINT);
             setIsMobile(width < MOBILE_BREAKPOINT);
 
@@ -302,18 +311,10 @@ export default function Feed() {
         dispatch(updatePropertyLike({ propertyId, isLiked, count }));
     };
 
-    // Calculate video width based on screen size - TikTok style slim videos
+    // Video width passed to PropertyList: now a 9:16 width computed from the screen height
     const getVideoWidth = useCallback(() => {
-        // For TikTok-like videos, we want a narrow width with 9:16 aspect ratio
-        if (windowWidth < SMALL_LAYOUT_BREAKPOINT) {
-            return '100%';  // Full width on small screens but with enforced aspect ratio
-        } else if (windowWidth < MEDIUM_LAYOUT_BREAKPOINT) {
-            return '340px'; // Slim width on medium screens
-        } else {
-            // Even on large screens, we keep it slim
-            return '360px';
-        }
-    }, [windowWidth, SMALL_LAYOUT_BREAKPOINT, MEDIUM_LAYOUT_BREAKPOINT]);
+        return `${cardWidth}px`;
+    }, [cardWidth]);
 
     // Set active video index when video is in view - NO VIEW INCREMENT HERE
     const handleVideoInView = useCallback((index: number) => {
@@ -356,9 +357,9 @@ export default function Feed() {
     // Calculate container height based on navbar visibility - but always subtract navbar height on desktop
     const getContainerHeight = () => {
         if (!isMobile) {
-            return 'calc(100vh - 55px)'; // Always leave space for navbar on desktop
+            return `calc(100vh - ${NAVBAR_HEIGHT}px)`; // Always leave space for navbar on desktop
         }
-        return showNavbar ? 'calc(100vh - 55px)' : '100vh'; // Dynamic on mobile
+        return showNavbar ? `calc(100vh - ${NAVBAR_HEIGHT}px)` : '100vh'; // Dynamic on mobile
     };
 
     if (isLoading) {
@@ -415,7 +416,13 @@ export default function Feed() {
     }
 
     return (
-        <div className="bg-black h-screen overflow-hidden">
+        <div
+            className="bg-black h-screen overflow-hidden"
+            style={{
+                ['--card-w' as string]: `${cardWidth}px`,
+                ['--avail-h' as string]: `${availableHeight}px`,
+            } as React.CSSProperties}
+        >
             {/* Navbar toggle button - only visible when navbar is hidden on mobile */}
             <div
                 className={`navbar-toggle ${!showNavbar && isMobile ? 'visible' : ''}`}
@@ -461,7 +468,7 @@ export default function Feed() {
                                 className="fixed right-0 bottom-0 z-40 shadow-xl border-l border-gray-200 bg-white comment-panel-slide"
                                 style={{
                                     width: `${commentPanelWidth}px`,
-                                    top: '55px', // Always account for navbar on desktop
+                                    top: `${NAVBAR_HEIGHT}px`, // Always account for navbar on desktop
                                     transform: showComments ? 'translateX(0)' : 'translateX(100%)',
                                     transition: 'transform 400ms cubic-bezier(0.33, 1, 0.68, 1)'
                                 }}
@@ -479,8 +486,8 @@ export default function Feed() {
                                 <div
                                     className="fixed bg-white rounded-xl shadow-2xl overflow-hidden animate-fadeIn"
                                     style={{
-                                        maxHeight: windowWidth < MEDIUM_LAYOUT_BREAKPOINT ? '85vh' : '90vh',
-                                        width: windowWidth < MEDIUM_LAYOUT_BREAKPOINT ? '95%' : '90%',
+                                        maxHeight: windowWidth < 768 ? '85vh' : '90vh',
+                                        width: windowWidth < 768 ? '95%' : '90%',
                                         maxWidth: '480px',
                                         top: '50%',
                                         left: '50%',
