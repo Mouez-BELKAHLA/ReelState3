@@ -22,7 +22,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
     serverOptions.Limits.MaxRequestBodySize = 104857600; // 100MB
-    serverOptions.ListenAnyIP(5034); // Listen on all network interfaces
+    // Render provides a PORT environment variable; locally we fall back to 5034
+    var port = int.TryParse(Environment.GetEnvironmentVariable("PORT"), out var p) ? p : 5034;
+    serverOptions.ListenAnyIP(port); // Listen on all network interfaces
 });
 
 // Configure IIS Server options for large file uploads
