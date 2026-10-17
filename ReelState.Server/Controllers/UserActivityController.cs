@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
@@ -14,7 +14,9 @@ using System.Collections.Generic;
 namespace ReelState.Server.Controllers
 {
     [ApiController]
+    [Asp.Versioning.ApiVersion("1.0")]
     [Route("api/[controller]")]
+    [Route("api/v{version:apiVersion}/[controller]")]
     [Authorize]
     public class UserActivityController : ControllerBase
     {

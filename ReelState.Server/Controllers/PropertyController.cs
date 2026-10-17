@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,7 +19,9 @@ using CloudinaryDotNet.Actions;
 namespace ReelState.Server.Controllers
 {
     [Authorize]
+    [Asp.Versioning.ApiVersion("1.0")]
     [Route("api/[controller]")]
+    [Route("api/v{version:apiVersion}/[controller]")]
     [ApiController]
     [RequestFormLimits(MultipartBodyLengthLimit = 104857600)] // 100 MB limit
     [RequestSizeLimit(104857600)] // 100 MB limit

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -13,7 +13,9 @@ using ReelState.Server.Services;
 
 namespace ReelState.Server.Controllers
 {
+    [Asp.Versioning.ApiVersion("1.0")]
     [Route("api/[controller]")]
+    [Route("api/v{version:apiVersion}/[controller]")]
     [ApiController]
     [Authorize]
     public class FollowsController : ControllerBase

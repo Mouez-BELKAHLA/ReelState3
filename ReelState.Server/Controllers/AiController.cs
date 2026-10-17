@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ReelState.Data;
@@ -13,7 +13,9 @@ public record AskMatch(string Id, string Reason);
 public record AskResponse(string Answer, List<AskMatch> Matches);
 
 [ApiController]
+[Asp.Versioning.ApiVersion("1.0")]
 [Route("api/[controller]")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class AiController : ControllerBase
 {
     private const int MaxCandidates = 10;
