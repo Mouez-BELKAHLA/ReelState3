@@ -43,3 +43,5 @@ bld/
 .env.*
 !.env.example
 logs/
+ReelState.Server/uploads/
+ReelState.Server/logs/
