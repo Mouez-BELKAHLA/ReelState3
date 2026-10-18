@@ -15,6 +15,8 @@ using ReelState.Server.Models;
 using ReelState.Server.Models.DTOs;
 using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ReelState.Server.Controllers
 {
@@ -476,13 +478,57 @@ namespace ReelState.Server.Controllers
         }
 
         // New debug endpoint specifically for garden searches
-       
-        
-        
+        private IMemoryCache SearchCache => HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
+
         [HttpGet("search")]
         [AllowAnonymous]
         public async Task<ActionResult<SearchResponse>> SearchProperties(
             [FromQuery] string? q = null,
+            [FromQuery] string? propertyType = null,
+            [FromQuery] int? minRooms = null,
+            [FromQuery] int? maxRooms = null,
+            [FromQuery] int? minSpace = null,
+            [FromQuery] int? maxSpace = null,
+            [FromQuery] string? city = null,
+            [FromQuery] string? sortBy = "newest",
+            [FromQuery] string? preferences = null,
+            [FromQuery] string? features = null,
+            [FromQuery] int page = 1,
+            [FromQuery] int limit = 20)
+        {
+            var key = string.Join("|", "search",
+                q?.Trim().ToLowerInvariant(), propertyType?.Trim().ToLowerInvariant(),
+                minRooms, maxRooms, minSpace, maxSpace, city?.Trim().ToLowerInvariant(),
+                sortBy, preferences?.Trim().ToLowerInvariant(), features?.Trim().ToLowerInvariant(),
+                page, limit);
+
+            if (SearchCache.TryGetValue(key, out SearchResponse? cached) && cached != null)
+            {
+                Response.Headers["X-Cache"] = "HIT";
+                return Ok(cached);
+            }
+
+            var result = await SearchPropertiesCore(q, propertyType, minRooms, maxRooms, minSpace, maxSpace,
+                city, sortBy, preferences, features, page, limit);
+
+            if (result.Result is OkObjectResult ok && ok.Value is SearchResponse response)
+            {
+                SearchCache.Set(key, response, new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30),
+                    Size = 1
+                });
+            }
+
+            Response.Headers["X-Cache"] = "MISS";
+            return result;
+        }
+
+
+
+        [HttpGet("search")]
+        [AllowAnonymous]
+        private async Task<ActionResult<SearchResponse>> SearchPropertiesCore([FromQuery] string? q = null,
             [FromQuery] string? propertyType = null,
             [FromQuery] int? minRooms = null,
             [FromQuery] int? maxRooms = null,

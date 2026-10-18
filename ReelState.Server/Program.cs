@@ -27,6 +27,7 @@ using System.Security.Claims;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddMemoryCache(o => o.SizeLimit = 1000);
 
 // ---- Serilog: structured logs to console + daily rolling file ----
 builder.Host.UseSerilog((ctx, services, cfg) => cfg
