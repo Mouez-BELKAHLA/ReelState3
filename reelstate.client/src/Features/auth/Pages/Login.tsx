@@ -33,8 +33,6 @@ const Login: React.FC = () => {
             // Dispatch login action
             const result = await dispatch(loginUser(credentials)).unwrap();
             console.log('Login successful, roles:', result.roles);
-            console.log('Full login response:', result);
-
             navigate('/dashboard');
         } catch (err: unknown) {
             // Error handling is automatic through the Redux slice

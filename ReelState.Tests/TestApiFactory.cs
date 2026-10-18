@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +21,10 @@ public class TestApiFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("JWT__ValidAudience", "reelstate-tests");
         Environment.SetEnvironmentVariable("Authentication__Google__ClientId", "test-client-id");
         Environment.SetEnvironmentVariable("Authentication__Google__ClientSecret", "test-client-secret");
+        Environment.SetEnvironmentVariable("Gemini__ApiKey", "test-gemini-key");
+        Environment.SetEnvironmentVariable("Cloudinary__CloudName", "test-cloud");
+        Environment.SetEnvironmentVariable("Cloudinary__ApiKey", "test-key");
+        Environment.SetEnvironmentVariable("Cloudinary__ApiSecret", "test-secret");
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
