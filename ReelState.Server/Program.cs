@@ -19,7 +19,7 @@ using System.Net;
 using CloudinaryDotNet;
 using Asp.Versioning;
 using FluentValidation;
-using FluentValidation.AspNetCore;
+using SharpGrip.FluentValidation.AutoValidation.Mvc.Extensions;
 using Microsoft.AspNetCore.RateLimiting;
 using ReelState.Server.Infrastructure;
 using Serilog;
