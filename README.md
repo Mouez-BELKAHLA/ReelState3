@@ -1,3 +1,5 @@
+![tests](https://github.com/Mouez-BELKAHLA/ReelState3/actions/workflows/tests.yml/badge.svg) ![frontend](https://github.com/Mouez-BELKAHLA/ReelState3/actions/workflows/frontend.yml/badge.svg)
+
 ReelState
 
 A social real-estate platform with short-form video listings — think TikTok/Instagram Reels, but for property listings. Agents post short vertical videos of properties, and users can like, comment, follow agents, and get notified about new posts.
@@ -20,13 +22,13 @@ Frontend organized by feature (auth, dashboard, property, profile, admin, notifi
 Running locally
 bash
 # Backend
-cd ReelState.Api
+cd ReelState.Server
 dotnet restore
 dotnet ef database update
 dotnet run
 
 # Frontend
-cd reelstate-frontend
+cd reelstate.client
 npm install
 npm run dev
 
@@ -39,3 +41,16 @@ Media uploads (photos/videos) are currently stored locally on the backend rather
 Author
 
 Mouez Belkahla — Portfolio · LinkedIn
+
+## Testing and CI
+
+- **Backend:** 29 xUnit tests, including integration tests with `WebApplicationFactory` (in-memory database) for authentication, role-based access, API versioning and rate limiting.
+- **Frontend:** 17 tests with Vitest and React Testing Library.
+- GitHub Actions runs both test suites on every push and pull request.
+
+Run the tests locally:
+
+```bash
+dotnet test
+cd reelstate.client && npm test
+```
