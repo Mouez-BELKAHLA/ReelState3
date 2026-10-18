@@ -1,4 +1,4 @@
-﻿import axios from 'axios'; // Removed AxiosError since it's not used
+import axios from 'axios'; // Removed AxiosError since it's not used
 import {
     AuthResponse,
     LoginCredentials,
@@ -118,11 +118,6 @@ class AuthService {
 
             if (!token || !refreshToken) return null;
 
-            console.log("Refresh Token Request:", {
-                Token: token,
-                RefreshToken: refreshToken
-            });
-
             try {
                 const response = await axios.post<AuthResponse>(
                     this.getApiEndpoint('Auth/refreshToken'),
@@ -131,8 +126,6 @@ class AuthService {
                         RefreshToken: refreshToken
                     }
                 );
-
-                console.log("Refresh Token Response:", response.data);
 
                 if (response.data.isSuccess && response.data.token) {
                     localStorage.setItem('token', response.data.token);
