@@ -199,11 +199,11 @@ namespace ReelState.Server.Controllers
             if (principal == null)
                 return BadRequest("Invalid jwt token");
 
-            var email = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (email == null)
+            var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userId == null)
                 return BadRequest("Invalid token claim");
 
-            var user = await _userManager.FindByEmailAsync(email);
+            var user = await _userManager.FindByIdAsync(userId);
 
             if (user == null || user.RefreshToken != model.RefreshToken || user.RefreshTokenExpiryTime <= DateTime.Now)
                 return BadRequest("Invalid refresh token or token expired");
@@ -226,11 +226,11 @@ namespace ReelState.Server.Controllers
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {
-            var userEmail = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userEmail))
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
                 return BadRequest(new AuthResponseDto { IsSuccess = false, Message = "User not found" });
 
-            var user = await _userManager.FindByEmailAsync(userEmail);
+            var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
                 return BadRequest(new AuthResponseDto { IsSuccess = false, Message = "User not found" });
 

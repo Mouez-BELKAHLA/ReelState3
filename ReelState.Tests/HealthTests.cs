@@ -1,14 +1,10 @@
-﻿using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.VisualStudio.TestPlatform.TestHost;
-using System.Net;
-using Xunit;
+﻿using System.Net;
 
-public class HealthTests : IClassFixture<WebApplicationFactory<Program>>
+public class HealthTests : IClassFixture<TestApiFactory>
 {
     private readonly HttpClient _client;
 
-    public HealthTests(WebApplicationFactory<Program> factory)
-        => _client = factory.CreateClient();
+    public HealthTests(TestApiFactory factory) => _client = factory.CreateClient();
 
     [Fact]
     public async Task Health_returns_200()
