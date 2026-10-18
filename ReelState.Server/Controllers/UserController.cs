@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
@@ -12,7 +12,9 @@ using ReelState.Server.Models;
 namespace ReelState.Server.Controllers
 {
     [ApiController]
+    [Asp.Versioning.ApiVersion("1.0")]
     [Route("api/[controller]")]
+    [Route("api/v{version:apiVersion}/[controller]")]
     public class UserController : ControllerBase
     {
         private readonly ApplicationDbContext _context;

@@ -42,3 +42,4 @@ bld/
 .env
 .env.*
 !.env.example
+logs/

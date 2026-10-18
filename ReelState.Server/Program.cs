@@ -11,12 +11,31 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.FileProviders;
 using System.Text.Json.Serialization.Metadata;
 using System.Net;
 using CloudinaryDotNet;
+using Asp.Versioning;
+using FluentValidation;
+using SharpGrip.FluentValidation.AutoValidation.Mvc.Extensions;
+using Microsoft.AspNetCore.RateLimiting;
+using ReelState.Server.Infrastructure;
+using Serilog;
+using System.Security.Claims;
+using System.Threading.RateLimiting;
+
 var builder = WebApplication.CreateBuilder(args);
+
+// ---- Serilog: structured logs to console + daily rolling file ----
+builder.Host.UseSerilog((ctx, services, cfg) => cfg
+    .ReadFrom.Configuration(ctx.Configuration)
+    .Enrich.FromLogContext()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
+    .WriteTo.Console()
+    .WriteTo.File("logs/reelstate-.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 14));
 
 // Configure Kestrel to handle large file uploads and listen on all interfaces
 builder.WebHost.ConfigureKestrel(serverOptions =>
@@ -54,6 +73,58 @@ builder.Services.AddControllers()
             : JsonTypeInfoResolver.Combine(new DefaultJsonTypeInfoResolver());
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     });
+
+// ---- API versioning (URL segment /api/v1/... ; the legacy /api/... routes keep working as v1) ----
+builder.Services.AddApiVersioning(o =>
+{
+    o.DefaultApiVersion = new ApiVersion(1, 0);
+    o.AssumeDefaultVersionWhenUnspecified = true;
+    o.ReportApiVersions = true;
+    o.ApiVersionReader = new UrlSegmentApiVersionReader();
+})
+.AddMvc()
+.AddApiExplorer(o =>
+{
+    o.GroupNameFormat = "'v'VVV";
+    o.SubstituteApiVersionInUrl = true;
+});
+
+// ---- FluentValidation: validators in /Validators run automatically before controller actions ----
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+// ---- Global error handling (RFC 7807 ProblemDetails) ----
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
+// ---- Rate limiting ----
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Global: 200 requests/minute per user (or per IP when anonymous)
+    o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ctx.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 200, Window = TimeSpan.FromMinutes(1) }));
+
+    // Strict policy for login / register / refresh: 10 requests/minute per IP (brute-force protection)
+    o.AddPolicy("auth", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ctx.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+});
+
+// ---- Policy-based authorization ----
+builder.Services.AddAuthorization(o =>
+{
+    o.AddPolicy("AdminOnly", p => p.RequireAuthenticatedUser().RequireRole("Admin"));
+    o.AddPolicy("RegisteredUser", p => p.RequireAuthenticatedUser().RequireClaim(ClaimTypes.NameIdentifier));
+});
+
+// ---- Health checks ----
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ApplicationDbContext>("database");
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -193,7 +264,19 @@ builder.Services.AddScoped<ReelState.Server.Services.NotificationService>();
 builder.Services.AddDirectoryBrowser();
 //builder.Services.AddScoped<NotificationService>(); Duplicated
 
+// ---- Behind a reverse proxy (Render): read the real client IP from X-Forwarded-For ----
+// Without this, every visitor shares the proxy's IP, so the rate limiter would count them all together.
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    o.KnownNetworks.Clear();
+    o.KnownProxies.Clear();
+});
+
 var app = builder.Build();
+
+// Must run first so later middleware (rate limiter, logging) sees the real client IP
+app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -203,9 +286,6 @@ if (app.Environment.IsDevelopment())
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "ReelState API v1");
     });
-
-    // In development, detailed errors are helpful
-    app.UseDeveloperExceptionPage();
 
     // Print listening addresses for debugging
     Console.WriteLine("Development server is running. Listening on:");
@@ -229,10 +309,13 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
-    // In production, use the error handler middleware
-    app.UseExceptionHandler("/error");
     app.UseHsts();
 }
+
+// Global exception handler (all environments; detail is only exposed in Development)
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+app.UseSerilogRequestLogging();
 
 // Create uploads directory in the content root path instead of web root
 var contentRootPath = app.Environment.ContentRootPath;
@@ -278,11 +361,13 @@ app.UseStaticFiles(new StaticFileOptions
 
 // Apply CORS policy before authentication
 app.UseCors("CorsPolicy");
+app.UseRateLimiter();
 
 // Authentication comes before Authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthChecks("/health");
 
 app.Run();
