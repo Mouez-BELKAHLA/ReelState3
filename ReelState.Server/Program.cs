@@ -11,6 +11,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.FileProviders;
 using System.Text.Json.Serialization.Metadata;
@@ -263,7 +264,19 @@ builder.Services.AddScoped<ReelState.Server.Services.NotificationService>();
 builder.Services.AddDirectoryBrowser();
 //builder.Services.AddScoped<NotificationService>(); Duplicated
 
+// ---- Behind a reverse proxy (Render): read the real client IP from X-Forwarded-For ----
+// Without this, every visitor shares the proxy's IP, so the rate limiter would count them all together.
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    o.KnownNetworks.Clear();
+    o.KnownProxies.Clear();
+});
+
 var app = builder.Build();
+
+// Must run first so later middleware (rate limiter, logging) sees the real client IP
+app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
