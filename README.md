@@ -1,5 +1,7 @@
 ![tests](https://github.com/Mouez-BELKAHLA/ReelState3/actions/workflows/tests.yml/badge.svg) ![frontend](https://github.com/Mouez-BELKAHLA/ReelState3/actions/workflows/frontend.yml/badge.svg)
 
+![tests](https://github.com/Mouez-BELKAHLA/ReelState3/actions/workflows/tests.yml/badge.svg) ![frontend](https://github.com/Mouez-BELKAHLA/ReelState3/actions/workflows/frontend.yml/badge.svg)
+
 ReelState
 
 A social real-estate platform with short-form video listings — think TikTok/Instagram Reels, but for property listings. Agents post short vertical videos of properties, and users can like, comment, follow agents, and get notified about new posts.
@@ -17,7 +19,7 @@ Backend: ASP.NET Core Web API (.NET 9), Entity Framework Core, SQL Server Auth: 
 
 Architecture
 REST controllers for Auth, Properties, Comments, Comment Likes, Likes, Follows, Notifications, User Activity, and Admin
-Database modeled with EF Core Code-First, evolved through 15+ incremental migrations as features were added
+Database modeled with EF Core Code-First, evolved through 16 incremental migrations as features were added
 Frontend organized by feature (auth, dashboard, property, profile, admin, notifications, AI)
 Running locally
 bash
@@ -36,7 +38,7 @@ You'll need a SQL Server instance and to configure your connection string and JW
 
 Known limitations
 
-Media uploads (photos/videos) are currently stored locally on the backend rather than in cloud blob storage. This means uploaded media doesn't persist across server restarts on the free-tier hosting used for the demo. The database and application logic already support swapping in a cloud storage provider (e.g., Azure Blob Storage, AWS S3) — it's a storage backend change, not an architectural one.
+Photos and videos are stored on Cloudinary.
 
 Author
 
@@ -49,6 +51,17 @@ Mouez Belkahla — Portfolio · LinkedIn
 - GitHub Actions runs both test suites on every push and pull request.
 
 Run the tests locally:
+
+```bash
+dotnet test
+cd reelstate.client && npm test
+```
+
+## Testing and CI
+
+- **Backend:** 33 xUnit tests, including Moq unit tests and `WebApplicationFactory` integration tests (authentication, role-based access, API versioning, rate limiting).
+- **Frontend:** 17 tests with Vitest and React Testing Library.
+- GitHub Actions runs both suites on every push and pull request.
 
 ```bash
 dotnet test
