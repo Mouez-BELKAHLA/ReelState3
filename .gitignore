@@ -45,3 +45,6 @@ bld/
 logs/
 ReelState.Server/uploads/
 ReelState.Server/logs/
+
+appsettings.json
+appsettings.*.json
