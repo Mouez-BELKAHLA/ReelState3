@@ -83,9 +83,7 @@ dotnet test
 cd reelstate.client && npm test
 ```
 
-## Known limitations
 
-- The AI search passes listings directly to Gemini instead of using embeddings and a vector database, so it suits small to medium datasets
 
 ## Author
 
