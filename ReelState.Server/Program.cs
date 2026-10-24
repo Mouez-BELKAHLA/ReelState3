@@ -154,7 +154,12 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
-
+var csDebug = builder.Configuration.GetConnectionString("DefaultConnection");
+if (!string.IsNullOrEmpty(csDebug))
+{
+    var sb = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(csDebug);
+    Console.WriteLine($"DB host in use: {sb.DataSource} | db: {sb.InitialCatalog} | user: {sb.UserID}");
+}
 // Add DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection") ??
