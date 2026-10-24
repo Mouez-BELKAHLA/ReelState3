@@ -353,8 +353,10 @@ Console.WriteLine($"Uploads Path: {uploadsPath}");
 Console.WriteLine($"Videos Path: {videosPath}");
 Console.WriteLine($"Photos Path: {photosPath}");
 
-app.UseHttpsRedirection();
-
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 // Configure the static file middleware to serve files from the uploads folder
 app.UseStaticFiles(); // Serve files from wwwroot folder
 
