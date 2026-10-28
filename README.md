@@ -1,5 +1,3 @@
-﻿![tests](https://github.com/Mouez-BELKAHLA/ReelState3/actions/workflows/tests.yml/badge.svg) ![frontend](https://github.com/Mouez-BELKAHLA/ReelState3/actions/workflows/frontend.yml/badge.svg)
-
 ![ci-cd](https://github.com/Mouez-BELKAHLA/ReelState3/actions/workflows/ci-cd.yml/badge.svg)
 
 # ReelState
