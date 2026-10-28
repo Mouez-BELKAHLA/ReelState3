@@ -12,7 +12,7 @@ A social real-estate platform with short-form video listings, like TikTok or Ins
 - Users browse a video feed, search, like, comment, follow agents, and receive real-time notifications
 - AI-powered property search using RAG with Gemini: listings from SQL Server are passed to Gemini, which returns validated matches with a reason for each
 - Authentication with JWT access and refresh tokens, plus Google OAuth 2.0 sign-in
-- Three roles: users, agents, and admins, with policy-based authorization
+- Three access levels with policy-based authorization: visitors (no account) can browse and search listings, registered users can post listings and interact (like, comment, follow, get notifications), and admins approve or reject listings and manage users
 - Admin tools for managing listings and users
 
 ## Tech stack
@@ -72,7 +72,7 @@ npm run dev
 
 ## Testing and CI
 
-- **Backend:** 33 xUnit tests, including Moq unit tests and `WebApplicationFactory` integration tests (authentication, role-based access, API versioning, rate limiting)
+- **Backend:** 35 xUnit tests, including Moq unit tests and `WebApplicationFactory` integration tests (authentication, role-based access, API versioning, rate limiting)
 - **Frontend:** 17 tests with Vitest and React Testing Library
 - **CI:** GitHub Actions runs both suites on every push and pull request
 
