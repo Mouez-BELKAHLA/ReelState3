@@ -1,0 +1,51 @@
+name: ci-cd
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - run: dotnet restore
+      - run: dotnet build --no-restore -c Release
+      - run: dotnet test --no-build -c Release
+
+  frontend-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: reelstate.client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: reelstate.client/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Adjust context/-f if your Dockerfile expects a different build context
+      - run: docker build -f ReelState.Server/Dockerfile -t reelstate-api .
+
+  deploy:
+    # Runs only on pushes to main, and only if every job above passed
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [backend-test, frontend-test, docker-build]
+    runs-on: ubuntu-latest
+    steps:
+      # Backend: Render is set to "After CI Checks Pass", so it deploys itself
+      - name: Deploy frontend (Vercel)
+        run: curl -fsS -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
