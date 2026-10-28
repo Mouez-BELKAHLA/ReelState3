@@ -87,4 +87,4 @@ cd reelstate.client && npm test
 
 ## Author
 
-**Mouez Belkahla**: [Portfolio](https://mouez-belkahla.vercel.app/) Â· [LinkedIn](https://www.linkedin.com/in/mouez-belkahla-5ba46817b/) Â· [GitHub](https://github.com/Mouez-BELKAHLA)
+**Mouez Belkahla**: [Portfolio](https://mouez-belkahla.vercel.app/) · [LinkedIn](https://www.linkedin.com/in/mouez-belkahla-5ba46817b/) · [GitHub](https://github.com/Mouez-BELKAHLA)
