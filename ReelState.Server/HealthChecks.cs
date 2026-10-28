@@ -86,3 +86,4 @@ public class ConfigHealthCheck : IHealthCheck
             : HealthCheckResult.Degraded($"{_name} not configured"));
     }
 }
+// trigger deploy
