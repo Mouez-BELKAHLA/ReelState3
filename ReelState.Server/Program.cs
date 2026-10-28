@@ -191,14 +191,14 @@ var jwtIssuer = builder.Configuration["JWT:ValidIssuer"] ??
 var jwtAudience = builder.Configuration["JWT:ValidAudience"] ??
     throw new InvalidOperationException("JWT:ValidAudience configuration is missing");
 
-// Get Google auth config with null safety
-var googleClientId = builder.Configuration["Authentication:Google:ClientId"] ??
-    throw new InvalidOperationException("Google ClientId configuration is missing");
-var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ??
-    throw new InvalidOperationException("Google ClientSecret configuration is missing");
+// Google auth is optional: only enabled when both values are configured
+var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
+var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
+var googleAuthEnabled = !string.IsNullOrWhiteSpace(googleClientId)
+                        && !string.IsNullOrWhiteSpace(googleClientSecret);
 
 // Adding Authentication
-builder.Services.AddAuthentication(options =>
+var authBuilder = builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -220,14 +220,22 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
         ClockSkew = TimeSpan.Zero
     };
-})
-// Add Google Authentication
-.AddGoogle(options =>
-{
-    options.ClientId = googleClientId;
-    options.ClientSecret = googleClientSecret;
-    options.CallbackPath = "/api/auth/google-callback";
 });
+
+// Add Google Authentication only when configured
+if (googleAuthEnabled)
+{
+    authBuilder.AddGoogle(options =>
+    {
+        options.ClientId = googleClientId!;
+        options.ClientSecret = googleClientSecret!;
+        options.CallbackPath = "/api/auth/google-callback";
+    });
+}
+else
+{
+    Console.WriteLine("Google authentication disabled: ClientId/ClientSecret not configured.");
+}
 
 // Enhanced CORS policy to allow access from mobile devices on the same network
 builder.Services.AddCors(options =>
@@ -286,6 +294,25 @@ var app = builder.Build();
 
 // Must run first so later middleware (rate limiter, logging) sees the real client IP
 app.UseForwardedHeaders();
+// Optional: apply EF Core migrations on startup (enabled in docker compose only)
+if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    for (var attempt = 1; ; attempt++)
+    {
+        try
+        {
+            db.Database.Migrate();
+            break;
+        }
+        catch (Exception ex) when (attempt < 10)
+        {
+            Console.WriteLine($"Database not ready (attempt {attempt}/10): {ex.Message}");
+            Thread.Sleep(3000);
+        }
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
