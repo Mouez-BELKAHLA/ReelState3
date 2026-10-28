@@ -14,6 +14,10 @@ public class MigrationsHealthCheck : IHealthCheck
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context, CancellationToken ct = default)
     {
+        // In-memory/test providers have no migrations: nothing to check.
+        if (!_db.Database.IsRelational())
+            return HealthCheckResult.Healthy("Non-relational provider, migrations not applicable");
+
         try
         {
             var pending = (await _db.Database.GetPendingMigrationsAsync(ct)).ToList();
