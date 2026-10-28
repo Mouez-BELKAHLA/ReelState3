@@ -48,3 +48,5 @@ ReelState.Server/logs/
 
 appsettings.json
 appsettings.*.json
+
+ReelState.Server/Properties/PublishProfiles/
