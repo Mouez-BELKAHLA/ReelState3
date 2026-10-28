@@ -25,6 +25,8 @@ using ReelState.Server.Infrastructure;
 using Serilog;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddMemoryCache(o => o.SizeLimit = 1000);
@@ -125,7 +127,16 @@ builder.Services.AddAuthorization(o =>
 
 // ---- Health checks ----
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<ApplicationDbContext>("database");
+    .AddDbContextCheck<ApplicationDbContext>("database")
+    .AddCheck<MigrationsHealthCheck>("migrations")
+    .AddCheck<CloudinaryHealthCheck>("cloudinary")
+    .Add(new HealthCheckRegistration("gemini",
+        sp => new ConfigHealthCheck(sp.GetRequiredService<IConfiguration>(), "Gemini", "Gemini:ApiKey"),
+        HealthStatus.Degraded, null))
+    .Add(new HealthCheckRegistration("google-auth",
+        sp => new ConfigHealthCheck(sp.GetRequiredService<IConfiguration>(), "Google auth",
+            "Authentication:Google:ClientId", "Authentication:Google:ClientSecret"),
+        HealthStatus.Degraded, null));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -265,11 +276,14 @@ builder.Services.AddCors(options =>
 builder.Services.AddSingleton(sp =>
 {
     var cfg = sp.GetRequiredService<IConfiguration>();
-    var account = new Account(
-        cfg["Cloudinary:CloudName"],
-        cfg["Cloudinary:ApiKey"],
-        cfg["Cloudinary:ApiSecret"]);
-    return new Cloudinary(account) { Api = { Secure = true } };
+    var cloud = cfg["Cloudinary:CloudName"];
+    var key = cfg["Cloudinary:ApiKey"];
+    var secret = cfg["Cloudinary:ApiSecret"];
+
+    if (string.IsNullOrWhiteSpace(cloud) || string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(secret))
+        throw new InvalidOperationException("Cloudinary is not configured. Uploads are unavailable.");
+
+    return new Cloudinary(new Account(cloud, key, secret)) { Api = { Secure = true } };
 });
 
 // Add Services
@@ -406,7 +420,26 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var result = new
+        {
+            status = report.Status.ToString(),
+            totalDurationMs = Math.Round(report.TotalDuration.TotalMilliseconds, 1),
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description,
+                durationMs = Math.Round(e.Value.Duration.TotalMilliseconds, 1)
+            })
+        };
+        await context.Response.WriteAsync(JsonSerializer.Serialize(result));
+    }
+});
 
 app.Run();
 public partial class Program { }
