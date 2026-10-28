@@ -154,11 +154,14 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
-var csDebug = builder.Configuration.GetConnectionString("DefaultConnection");
-if (!string.IsNullOrEmpty(csDebug))
+if (builder.Environment.IsDevelopment())
 {
-    var sb = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(csDebug);
-    Console.WriteLine($"DB host in use: {sb.DataSource} | db: {sb.InitialCatalog} | user: {sb.UserID}");
+    var csDebug = builder.Configuration.GetConnectionString("DefaultConnection");
+    if (!string.IsNullOrEmpty(csDebug))
+    {
+        var sb = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(csDebug);
+        Console.WriteLine($"DB host in use: {sb.DataSource} | db: {sb.InitialCatalog}");
+    }
 }
 // Add DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
