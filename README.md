@@ -1,4 +1,6 @@
-![tests](https://github.com/Mouez-BELKAHLA/ReelState3/actions/workflows/tests.yml/badge.svg) ![frontend](https://github.com/Mouez-BELKAHLA/ReelState3/actions/workflows/frontend.yml/badge.svg)
+﻿![tests](https://github.com/Mouez-BELKAHLA/ReelState3/actions/workflows/tests.yml/badge.svg) ![frontend](https://github.com/Mouez-BELKAHLA/ReelState3/actions/workflows/frontend.yml/badge.svg)
+
+![ci-cd](https://github.com/Mouez-BELKAHLA/ReelState3/actions/workflows/ci-cd.yml/badge.svg)
 
 # ReelState
 
@@ -87,4 +89,4 @@ cd reelstate.client && npm test
 
 ## Author
 
-**Mouez Belkahla**: [Portfolio](https://mouez-belkahla.vercel.app/) · [LinkedIn](https://www.linkedin.com/in/mouez-belkahla-5ba46817b/) · [GitHub](https://github.com/Mouez-BELKAHLA)
+**Mouez Belkahla**: [Portfolio](https://mouez-belkahla.vercel.app/) Â· [LinkedIn](https://www.linkedin.com/in/mouez-belkahla-5ba46817b/) Â· [GitHub](https://github.com/Mouez-BELKAHLA)
