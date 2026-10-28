@@ -3,16 +3,47 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using ReelState.Data;
 using ReelState.Server.Models;
+using Microsoft.AspNetCore.SignalR;
+using ReelState.Server.Hubs;
+using ReelState.Server.Models.DTOs;
 
 namespace ReelState.Server.Services
 {
     public class NotificationService
     {
         private readonly ApplicationDbContext _context;
+        private readonly IHubContext<NotificationHub> _hub;
 
-        public NotificationService(ApplicationDbContext context)
+        public NotificationService(ApplicationDbContext context, IHubContext<NotificationHub> hub)
         {
             _context = context;
+            _hub = hub;
+        }
+
+        // Real-time push. Failures are swallowed: the notification is already saved in the DB.
+        private async Task PushAsync(Notification n, string? senderName)
+        {
+            try
+            {
+                var dto = new NotificationDTO
+                {
+                    Id = n.Id,
+                    UserId = n.UserId,
+                    SenderId = n.SenderId,
+                    SenderName = senderName,
+                    Type = n.Type,
+                    Message = n.Message,
+                    PropertyId = n.PropertyId,
+                    CommentId = n.CommentId,
+                    IsRead = false,
+                    CreatedAt = n.CreatedAt
+                };
+                await _hub.Clients.User(n.UserId).SendAsync("ReceiveNotification", dto);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error pushing notification: {ex.Message}");
+            }
         }
 
         // For likes on properties
@@ -23,7 +54,7 @@ namespace ReelState.Server.Services
                 .FirstOrDefaultAsync(p => p.Id == propertyId);
 
             if (property == null || property.UserId == likerId)
-                return; // Don't notify if property not found or user liked their own property
+                return;
 
             var liker = await _context.Users.FindAsync(likerId);
             if (liker == null) return;
@@ -43,6 +74,7 @@ namespace ReelState.Server.Services
 
             _context.Notifications.Add(notification);
             await _context.SaveChangesAsync();
+            await PushAsync(notification, likerName);
         }
 
         // For likes on comments
@@ -54,7 +86,7 @@ namespace ReelState.Server.Services
                 .FirstOrDefaultAsync(c => c.Id == commentId);
 
             if (comment == null || comment.UserId == likerId)
-                return; // Don't notify if comment not found or user liked their own comment
+                return;
 
             var liker = await _context.Users.FindAsync(likerId);
             if (liker == null) return;
@@ -75,6 +107,7 @@ namespace ReelState.Server.Services
 
             _context.Notifications.Add(notification);
             await _context.SaveChangesAsync();
+            await PushAsync(notification, likerName);
         }
 
         // For new comments on properties
@@ -85,7 +118,7 @@ namespace ReelState.Server.Services
                 .FirstOrDefaultAsync(p => p.Id == propertyId);
 
             if (property == null || property.UserId == commenterId)
-                return; // Don't notify if property not found or user commented on their own property
+                return;
 
             var commenter = await _context.Users.FindAsync(commenterId);
             if (commenter == null) return;
@@ -106,9 +139,10 @@ namespace ReelState.Server.Services
 
             _context.Notifications.Add(notification);
             await _context.SaveChangesAsync();
+            await PushAsync(notification, commenterName);
         }
 
-        // For follows (if you implement a follow system)
+        // For follows
         public async Task CreateFollowNotification(string followedUserId, string followerId)
         {
             try
@@ -118,7 +152,7 @@ namespace ReelState.Server.Services
                 if (followedUserId == followerId)
                 {
                     Console.WriteLine("Skipping notification - user tried to follow themselves");
-                    return; // User can't follow themselves
+                    return;
                 }
 
                 var follower = await _context.Users.FindAsync(followerId);
@@ -144,13 +178,12 @@ namespace ReelState.Server.Services
 
                 await _context.Notifications.AddAsync(notification);
                 await _context.SaveChangesAsync();
-
+                await PushAsync(notification, followerName);
                 Console.WriteLine($"Created follow notification with ID: {notification.Id}");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error creating follow notification: {ex.Message}");
-                // Don't throw - notifications are non-critical
             }
         }
     }

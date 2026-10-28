@@ -27,6 +27,7 @@ using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using ReelState.Server.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddMemoryCache(o => o.SizeLimit = 1000);
@@ -76,6 +77,7 @@ builder.Services.AddControllers()
             : JsonTypeInfoResolver.Combine(new DefaultJsonTypeInfoResolver());
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     });
+builder.Services.AddSignalR();
 
 // ---- API versioning (URL segment /api/v1/... ; the legacy /api/... routes keep working as v1) ----
 builder.Services.AddApiVersioning(o =>
@@ -230,6 +232,19 @@ var authBuilder = builder.Services.AddAuthentication(options =>
         ValidAudience = jwtAudience,
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
         ClockSkew = TimeSpan.Zero
+    };
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            if (!string.IsNullOrEmpty(accessToken) &&
+                context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
     };
 });
 
@@ -440,6 +455,7 @@ app.MapHealthChecks("/health", new HealthCheckOptions
         await context.Response.WriteAsync(JsonSerializer.Serialize(result));
     }
 });
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.Run();
 public partial class Program { }
