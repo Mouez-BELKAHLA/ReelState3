@@ -290,6 +290,11 @@ namespace ReelState.Server.Controllers
                     return BadRequest(new { isSuccess = false, message = "Video file size exceeds the 50MB limit" });
                 }
 
+                if (!_mediaStorage.IsEnabled)
+                {
+                    return StatusCode(503, new { isSuccess = false, message = "Media uploads are currently unavailable." });
+                }
+
                 // Check if user exists
                 var user = await _context.Users.FindAsync(userId);
                 if (user == null)
