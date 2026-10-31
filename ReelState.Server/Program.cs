@@ -279,9 +279,12 @@ builder.Services.AddCors(options =>
         }
         else
         {
-            // In production, be more specific about allowed origins
+            // Comma-separated list, e.g. "https://your-app.vercel.app"
+            var allowedOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? "")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
             policy
-                .WithOrigins("https://yourproductionsite.com") // Replace with your actual production domain
+                .WithOrigins(allowedOrigins)
                 .AllowAnyMethod()
                 .AllowAnyHeader()
                 .AllowCredentials();
