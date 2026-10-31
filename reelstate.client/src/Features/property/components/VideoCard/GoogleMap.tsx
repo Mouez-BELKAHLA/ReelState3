@@ -9,12 +9,7 @@ interface GoogleMapProps {
     className?: string;
 }
 
-declare global {
-    interface Window {
-        google: any;
-        initMap: () => void;
-    }
-}
+
 
 const GoogleMap: React.FC<GoogleMapProps> = ({
     lat,

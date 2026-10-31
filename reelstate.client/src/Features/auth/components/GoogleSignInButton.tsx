@@ -45,23 +45,7 @@ interface GoogleCredentialResponse {
 }
 
 // Update the global window interface
-declare global {
-    interface Window {
-        google?: {
-            accounts: {
-                id: {
-                    initialize: (config: GoogleInitializeConfig) => void;
-                    renderButton: (element: HTMLElement, options: GoogleButtonOptions) => void;
-                    prompt: () => void;
-                    disableAutoSelect: () => void;
-                    storeCredential: (credential: { id: string; password: string }, callback?: () => void) => void;
-                    cancel: () => void;
-                    revoke: (userId: string, callback?: () => void) => void;
-                };
-            };
-        };
-    }
-}
+
 
 const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
     variant = 'signin_with',
