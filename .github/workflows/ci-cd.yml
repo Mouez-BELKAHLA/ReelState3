@@ -30,6 +30,7 @@ jobs:
           cache: npm
           cache-dependency-path: reelstate.client/package-lock.json
       - run: npm ci
+      - run: npx tsc -p tsconfig.app.json --noEmit
       - run: npm test
       - run: npm run build
 
