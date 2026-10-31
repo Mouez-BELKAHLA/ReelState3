@@ -30,7 +30,26 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using ReelState.Server.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddMemoryCache(o => o.SizeLimit = 1000);
+// Cache: Redis when Redis:ConnectionString is set, otherwise in-memory fallback
+var redisConnection = builder.Configuration["Redis:ConnectionString"];
+if (!string.IsNullOrWhiteSpace(redisConnection))
+{
+    builder.Services.AddStackExchangeRedisCache(o =>
+    {
+        var redisOptions = StackExchange.Redis.ConfigurationOptions.Parse(redisConnection);
+        redisOptions.AbortOnConnectFail = false;
+        redisOptions.ConnectTimeout = 1000;
+        redisOptions.SyncTimeout = 500;
+        redisOptions.AsyncTimeout = 500;
+        redisOptions.BacklogPolicy = StackExchange.Redis.BacklogPolicy.FailFast;
+        o.ConfigurationOptions = redisOptions;
+        o.InstanceName = "reelstate:";
+    });
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache();
+}
 
 // ---- Serilog: structured logs to console + daily rolling file ----
 builder.Host.UseSerilog((ctx, services, cfg) => cfg
@@ -291,7 +310,7 @@ builder.Services.AddCors(options =>
         }
     });
 });
-builder.Services.AddSingleton(sp =>
+builder.Services.AddSingleton<ReelState.Server.Services.IMediaStorage>(sp =>
 {
     var cfg = sp.GetRequiredService<IConfiguration>();
     var cloud = cfg["Cloudinary:CloudName"];
@@ -299,9 +318,12 @@ builder.Services.AddSingleton(sp =>
     var secret = cfg["Cloudinary:ApiSecret"];
 
     if (string.IsNullOrWhiteSpace(cloud) || string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(secret))
-        throw new InvalidOperationException("Cloudinary is not configured. Uploads are unavailable.");
+        return new ReelState.Server.Services.DisabledMediaStorage();
 
-    return new Cloudinary(new Account(cloud, key, secret)) { Api = { Secure = true } };
+    var cloudinary = new Cloudinary(new Account(cloud, key, secret)) { Api = { Secure = true } };
+    return new ReelState.Server.Services.CloudinaryMediaStorage(
+        cloudinary,
+        sp.GetRequiredService<ILogger<ReelState.Server.Services.CloudinaryMediaStorage>>());
 });
 
 // Add Services

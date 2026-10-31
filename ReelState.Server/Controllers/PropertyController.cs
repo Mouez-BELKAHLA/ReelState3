@@ -15,8 +15,9 @@ using ReelState.Server.Models;
 using ReelState.Server.Models.DTOs;
 using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
+using ReelState.Server.Services;
 
 namespace ReelState.Server.Controllers
 {
@@ -32,18 +33,18 @@ namespace ReelState.Server.Controllers
         private readonly ApplicationDbContext _context;
         private readonly IWebHostEnvironment _env;
         private readonly ILogger<PropertyController> _logger;
-        private readonly Cloudinary _cloudinary;
+        private readonly IMediaStorage _mediaStorage;
 
         public PropertyController(
             ApplicationDbContext context,
             IWebHostEnvironment env,
             ILogger<PropertyController> logger,
-            Cloudinary cloudinary)
+            IMediaStorage mediaStorage)
         {
             _context = context;
             _env = env;
             _logger = logger;
-            _cloudinary = cloudinary;
+            _mediaStorage = mediaStorage;
         }
 
         [HttpGet]
@@ -431,32 +432,7 @@ namespace ReelState.Server.Controllers
             if (file == null)
                 return string.Empty;
 
-            await using var stream = file.OpenReadStream();
-            var fileDesc = new FileDescription(file.FileName, stream);
-
-            RawUploadResult result;
-            if (folder == "videos")
-            {
-                result = await _cloudinary.UploadAsync(new VideoUploadParams
-                {
-                    File = fileDesc,
-                    Folder = "reelstate/videos"
-                });
-            }
-            else
-            {
-                result = await _cloudinary.UploadAsync(new ImageUploadParams
-                {
-                    File = fileDesc,
-                    Folder = "reelstate/photos"
-                });
-            }
-
-            if (result.Error != null)
-                throw new InvalidOperationException($"Cloudinary upload failed: {result.Error.Message}");
-
-            _logger.LogInformation("File uploaded to Cloudinary: {Url}", result.SecureUrl);
-            return result.SecureUrl.ToString();
+            return await _mediaStorage.UploadAsync(file, folder);
         }
 
         // Helper method to parse JSON arrays for searching
@@ -478,7 +454,37 @@ namespace ReelState.Server.Controllers
         }
 
         // New debug endpoint specifically for garden searches
-        private IMemoryCache SearchCache => HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
+        private IDistributedCache SearchCache => HttpContext.RequestServices.GetRequiredService<IDistributedCache>();
+
+        private async Task<SearchResponse?> TryGetCachedSearchAsync(string key)
+        {
+            try
+            {
+                var bytes = await SearchCache.GetAsync(key);
+                return bytes == null ? null : System.Text.Json.JsonSerializer.Deserialize<SearchResponse>(bytes);
+            }
+            catch (Exception ex)
+            {
+                HttpContext.RequestServices.GetService<ILogger<PropertyController>>()?.LogWarning(ex, "Search cache read failed");
+                return null;
+            }
+        }
+
+        private async Task SetCachedSearchAsync(string key, SearchResponse response)
+        {
+            try
+            {
+                var bytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(response);
+                await SearchCache.SetAsync(key, bytes, new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30)
+                });
+            }
+            catch (Exception ex)
+            {
+                HttpContext.RequestServices.GetService<ILogger<PropertyController>>()?.LogWarning(ex, "Search cache write failed");
+            }
+        }
 
         [HttpGet("search")]
         [AllowAnonymous]
@@ -502,7 +508,8 @@ namespace ReelState.Server.Controllers
                 sortBy, preferences?.Trim().ToLowerInvariant(), features?.Trim().ToLowerInvariant(),
                 page, limit);
 
-            if (SearchCache.TryGetValue(key, out SearchResponse? cached) && cached != null)
+            var cached = await TryGetCachedSearchAsync(key);
+            if (cached != null)
             {
                 Response.Headers["X-Cache"] = "HIT";
                 return Ok(cached);
@@ -513,11 +520,7 @@ namespace ReelState.Server.Controllers
 
             if (result.Result is OkObjectResult ok && ok.Value is SearchResponse response)
             {
-                SearchCache.Set(key, response, new MemoryCacheEntryOptions
-                {
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30),
-                    Size = 1
-                });
+                await SetCachedSearchAsync(key, response);
             }
 
             Response.Headers["X-Cache"] = "MISS";
