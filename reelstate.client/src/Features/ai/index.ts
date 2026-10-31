@@ -4,7 +4,7 @@
 export { aiService } from './services/AiService';
 
 // Export types
-export * from './types/AiTypes';
+export * from './types/AITypes';
 
 // Export config
 export * from './config/aiConfig';

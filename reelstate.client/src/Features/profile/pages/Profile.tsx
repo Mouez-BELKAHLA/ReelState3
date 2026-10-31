@@ -2,17 +2,15 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { API_URL } from "../../../shared";
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { toVideoCardProperties } from "../../../shared/Utils/TypeTransformers";
 import { getErrorMessage } from "../../../shared";
 import { useAppSelector, useAppDispatch } from "../../../store/hooks";
 import { checkLikeStatus, toggleLike } from "../../../store/slices/propertySlice";
 import { refreshNotifications } from "../../../store/slices/notificationSlice";
 import { fetchUserActivity } from "../../../store/slices/userActivitySlice";
-import { toggleFollow as toggleFollowService } from '../services/ProfileService';
 
 
 // Import property types
-import { Property, VideoCardProperty } from "../../property";
+import { VideoCardProperty } from "../../property";
 
 // Define interfaces
 interface UserProfileData {
@@ -30,6 +28,8 @@ interface UserProfileData {
 }
 
 interface FollowStatusData {
+    isSuccess?: boolean;
+    message?: string;
     isFollowing: boolean;
     followersCount: number;
     followingCount: number;
@@ -158,12 +158,6 @@ const UserListComponent: React.FC<{
 };
 
 // ProfileService functions
-const getUserProfile = async (userId: string, token: string): Promise<UserProfileData> => {
-    const response = await axios.get(`${API_URL}/api/User/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-    });
-    return response.data.data;
-};
 
 // Updated to use the correct API endpoint
 const getFollowStatus = async (userId: string, token: string): Promise<FollowStatusData> => {
@@ -196,7 +190,7 @@ const Profile: React.FC = () => {
 
     const [activeTab, setActiveTab] = useState<'videos' | 'followers' | 'following'>('videos');
     const [properties, setProperties] = useState<ExtendedVideoCardProperty[]>([]);
-    const [likedProperties, setLikedProperties] = useState<ExtendedVideoCardProperty[]>([]);
+    const [, setLikedProperties] = useState<ExtendedVideoCardProperty[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [profileData, setProfileData] = useState<UserProfileData | null>(null);
@@ -433,11 +427,11 @@ const Profile: React.FC = () => {
                 profileData.followingCount !== followData.followingCount;
 
             if (needsUpdate) {
-                setProfileData(prevData => ({
+                setProfileData(prevData => prevData ? ({
                     ...prevData,
                     followersCount: followData.followersCount,
                     followingCount: followData.followingCount
-                }));
+                }) : prevData);
             }
         }
     }, [followData, profileData?.id]); // Only depend on followData and profileData.id, not the entire profileData

@@ -233,7 +233,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
     if (isMobile) {
         return (
             <>
-                <style jsx>{customStyles}</style>
+                <style>{customStyles}</style>
                 <FilterModal
                     isOpen={showFilterModal}
                     onClose={() => setShowFilterModal(false)}
@@ -326,7 +326,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
     return (
         <>
-            <style jsx>{customStyles}</style>
+            <style>{customStyles}</style>
             <FilterModal
                 isOpen={showFilterModal}
                 onClose={() => setShowFilterModal(false)}

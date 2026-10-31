@@ -1,5 +1,4 @@
-import { AiConfig } from '../config/aiConfig';
-import { PropertyRecommendation, AIMessage } from '../types/AiTypes';
+import { PropertyRecommendation } from '../types/AITypes';
 import { SearchFilters } from '../../property/types/Property';
 
 class AiService {

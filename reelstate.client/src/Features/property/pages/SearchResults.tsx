@@ -3,12 +3,15 @@ import { useAppSelector, useAppDispatch } from '../../../store/hooks';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { searchProperties, clearSearchResults, checkLikeStatus, toggleLike, updatePropertyLike, setActiveVideoIndex, toggleComments, setActiveProperty } from '../../../store/slices/propertySlice';
 import { searchWithAI, setQuery } from '../../../store/slices/aiSlice';
-import { SearchFilters } from '../types/Property';
+import { SearchFilters, VideoCardProperty } from '../types/Property';
 import { PropertyList } from '..';
 import { CommentPanel } from "../../../shared";
 import { setShowNavbar } from '../../../store/slices/uiSlice';
 import axios from 'axios';
 import { API_URL } from "../../../shared";
+import type { PropertyRecommendation } from '../../ai/types/AITypes';
+
+type DisplayProperty = VideoCardProperty & Partial<Omit<PropertyRecommendation, keyof VideoCardProperty>>;
 
 // Embedded SVG placeholders instead of external URL dependencies
 const SVG_PLACEHOLDERS = {
@@ -50,7 +53,6 @@ const SearchResults: React.FC = () => {
     const {
         searchResults,
         isSearching,
-        error,
         searchQuery,
         currentFilters,
         pagination,
@@ -66,7 +68,6 @@ const SearchResults: React.FC = () => {
         recommendations,
         isLoading: isAiLoading,
         error: aiError,
-        showThinkingMode,
         isThinking,
         thinkingProcess
     } = useAppSelector(state => state.ai);
@@ -831,7 +832,7 @@ const SearchResults: React.FC = () => {
                                         {[...Array(5)].map((_, i) => (
                                             <span
                                                 key={i}
-                                                className={`h-2 w-2 rounded-full bg-purple-600 ${i === thinkingProcess?.steps?.length % 5 ? 'animate-pulse' : ''}`}
+                                                className={`h-2 w-2 rounded-full bg-purple-600 ${i === (thinkingProcess?.steps?.length ?? 0) % 5 ? 'animate-pulse' : ''}`}
                                             />
                                         ))}
                                     </div>
@@ -948,7 +949,7 @@ const SearchResults: React.FC = () => {
                             )}
 
                             {/* Property Cards */}
-                            {(isAiSearch ? recommendations : searchResults).map((property, index) => {
+                            {(((isAiSearch ? recommendations : searchResults) as unknown) as DisplayProperty[]).map((property, index) => {
                                 if (!property || !property.id) return null;
 
                                 // Use helper functions to get property data
@@ -1081,7 +1082,7 @@ const SearchResults: React.FC = () => {
                                                         <svg className="w-3.5 h-3.5 mr-1 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                                                         </svg>
-                                                        <span>{property.space || 'N/A'} m²</span>
+                                                        <span>{property.space || 'N/A'} mï¿½</span>
                                                     </div>
                                                 </div>
                                             </div>

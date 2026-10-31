@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CommentService, CommentLikeService } from "../../../Features/property";
-import { useAppSelector, useAppDispatch } from "../../../store/hooks";
+import { useAppSelector } from "../../../store/hooks";
 
 // Comment Type Definition
 export type Comment = {
@@ -350,7 +350,7 @@ const CommentPanel: React.FC<CommentPanelProps> = ({
                 ) : commentsList.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-10 px-4 text-gray-500">
                         <p className="text-center">Pas de commentaires</p>
-                        <p className="text-sm mt-1 text-center">Soyez le premier à commenter</p>
+                        <p className="text-sm mt-1 text-center">Soyez le premier ï¿½ commenter</p>
                     </div>
                 ) : (
                     <ul className="py-2">

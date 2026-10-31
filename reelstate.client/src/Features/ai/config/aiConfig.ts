@@ -66,5 +66,5 @@ export const providerConfigs = {
 // Get current provider configuration
 export const getCurrentProviderConfig = () => {
     const provider = defaultAiConfig.provider;
-    return providerConfigs[provider] || providerConfigs.openai;
+    return (providerConfigs as Record<string, typeof providerConfigs.openai>)[provider] || providerConfigs.openai;
 };

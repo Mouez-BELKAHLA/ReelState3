@@ -74,10 +74,6 @@ const Navbar: React.FC = () => {
                 return 'comment';
             case NotificationType.FOLLOW:
                 return 'follow';
-            case NotificationType.PROPERTY_APPROVED:
-                return 'property_approved';
-            case NotificationType.PROPERTY_REJECTED:
-                return 'property_rejected';
             case NotificationType.COMMENT_LIKE:
                 return 'comment_like';
             case NotificationType.PROPERTY_VIEW:
@@ -485,7 +481,7 @@ const Navbar: React.FC = () => {
                                                                 <div className="flex-1">
                                                                     <p className="text-sm">{notification.message}</p>
                                                                     <p className="text-xs text-gray-500 mt-1">
-                                                                        {new Date(notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {new Date(notification.createdAt).toLocaleDateString()}
+                                                                        {new Date(notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ï¿½ {new Date(notification.createdAt).toLocaleDateString()}
                                                                     </p>
                                                                 </div>
 

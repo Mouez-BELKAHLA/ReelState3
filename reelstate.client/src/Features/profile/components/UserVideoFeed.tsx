@@ -29,7 +29,7 @@ export default function UserVideoFeed() {
 
     // Redux
     const dispatch = useAppDispatch();
-    const { isAuthenticated, token, user: authUser } = useAppSelector(state => state.auth);
+    const { isAuthenticated, token } = useAppSelector(state => state.auth);
     const { propertyLikes, likeLoading } = useAppSelector(state => state.property);
     const { showNavbar } = useAppSelector(state => state.ui);
 

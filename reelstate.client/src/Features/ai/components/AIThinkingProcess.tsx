@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AIThinkingProcess as AIThinkingProcessType } from '../../Features/ai/types/AITypes';
+import { AIThinkingProcess as AIThinkingProcessType } from '../types/AITypes';
 
 interface ThinkingProcessProps {
     thinkingProcess: AIThinkingProcessType | null;

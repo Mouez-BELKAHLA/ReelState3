@@ -9,7 +9,6 @@ import {
     CommentButton,
     ContentTypeIndicator,
     LikeButton,
-    PropertyInfoTags,
     UserProfile,
 } from '../..';
 
@@ -51,19 +50,18 @@ export default function VideoCard({
     space = 75,
     photos = [],
     location = {
-        address: "123 Avenue des Champs-Élysées",
+        address: "123 Avenue des Champs-ï¿½lysï¿½es",
         city: "Paris",
         coordinates: { lat: 48.8566, lng: 2.3522 }
     },
     onCommentClick,
     externalButtons = false,
     onLikeToggle,
-    title = "Magnifique appartement lumineux au cœur de Lyon",
+    title = "Magnifique appartement lumineux au cï¿½ur de Lyon",
     videoRef,
     isActive = false,
     propertyPreferences = [],
     propertyFeatures = [],
-    status = 'approved',
 }: VideoCardProps) {
     // Redux hooks
     const dispatch = useAppDispatch();
@@ -702,7 +700,7 @@ export default function VideoCard({
                         <svg className="w-3.5 h-3.5 mr-1 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                         </svg>
-                        <span>{space} m²</span>
+                        <span>{space} mï¿½</span>
                     </div>
                 </div>
             </div>

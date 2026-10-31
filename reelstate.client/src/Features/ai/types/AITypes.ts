@@ -1,4 +1,4 @@
-import { SearchFilters, Property, propertyTypes, propertyPreferences, propertyFeatures } from '../../property/types/Property';
+import { SearchFilters, Property, propertyTypes } from '../../property/types/Property';
 
 // Add this new interface for the thinking process
 export interface AIThinkingStep {
@@ -84,7 +84,7 @@ export interface AISearchResponse {
 }
 
 // Type guard to check if a PropertyRecommendation is a valid Property
-export function isValidProperty(recommendation: PropertyRecommendation): recommendation is Property {
+export function isValidProperty(recommendation: PropertyRecommendation): boolean {
     return (
         typeof recommendation.id === 'string' &&
         typeof recommendation.title === 'string' &&
