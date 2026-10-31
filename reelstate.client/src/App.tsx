@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useAppSelector } from './store/hooks';
 import { setupAxiosInterceptors } from './store/middleware/authMiddleware';
 import { store } from './store';
-
+import NotificationHubConnector from './Features/notification/components/NotificationHubConnector';
 // Eagerly loaded: needed on the first screen
 import { ProtectedRoute, Login, Register } from './Features/auth';
 import { NotFound } from './Features/core';
@@ -49,6 +49,7 @@ const App: React.FC = () => {
     return (
         <Router>
             <Suspense fallback={<PageLoader />}>
+            <NotificationHubConnector />
                 <Routes>
                     {/* Routes with navbar */}
                     <Route element={<Layout />}>
