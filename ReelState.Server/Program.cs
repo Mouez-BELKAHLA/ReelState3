@@ -91,9 +91,24 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         options.JsonSerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
         // Need to set TypeInfoResolver for .NET 9
-        options.JsonSerializerOptions.TypeInfoResolver = JsonSerializer.IsReflectionEnabledByDefault
-            ? new DefaultJsonTypeInfoResolver()
-            : JsonTypeInfoResolver.Combine(new DefaultJsonTypeInfoResolver());
+        // Never serialize secret/internal Identity fields of ApplicationUser (refresh token, stamps, hashes...)
+        var hiddenUserFields = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "RefreshToken", "RefreshTokenExpiryTime", "SecurityStamp", "ConcurrencyStamp", "PasswordHash",
+            "ProviderId", "NormalizedEmail", "NormalizedUserName", "PhoneNumber", "PhoneNumberConfirmed",
+            "TwoFactorEnabled", "LockoutEnabled", "LockoutEnd", "AccessFailedCount"
+        };
+        var jsonResolver = new DefaultJsonTypeInfoResolver();
+        jsonResolver.Modifiers.Add(typeInfo =>
+        {
+            if (typeInfo.Type != typeof(ReelState.Server.Models.ApplicationUser)) return;
+            for (var i = typeInfo.Properties.Count - 1; i >= 0; i--)
+            {
+                if (hiddenUserFields.Contains(typeInfo.Properties[i].Name))
+                    typeInfo.Properties.RemoveAt(i);
+            }
+        });
+        options.JsonSerializerOptions.TypeInfoResolver = jsonResolver;
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     });
 builder.Services.AddSignalR();
