@@ -562,8 +562,6 @@ namespace ReelState.Server.Controllers
 
                 var query = _context.Properties
                     .Where(p => p.Status == PropertyStatus.Approved)
-                    .Include(p => p.User)
-                    .Include(p => p.Photos)
                     .AsQueryable();
 
                 // Apply text search filter (q parameter)
@@ -782,7 +780,7 @@ namespace ReelState.Server.Controllers
                         .Select(g => new { PropertyId = g.Key, Count = g.Count() })
                         .ToDictionaryAsync(x => x.PropertyId, x => x.Count);
 
-                    var filteredProperties = await finalQuery.ToListAsync();
+                    var filteredProperties = await finalQuery.Select(PropertySearchItemDto.Projection).ToListAsync();
 
                     var sortedProperties = filteredProperties
                         .OrderByDescending(p => likeCounts.GetValueOrDefault(p.Id, 0))
@@ -820,6 +818,7 @@ namespace ReelState.Server.Controllers
                     var properties = await finalQuery
                         .Skip((page - 1) * limit)
                         .Take(limit)
+                        .Select(PropertySearchItemDto.Projection)
                         .ToListAsync();
 
                     _logger.LogInformation("Search found {Count} properties", totalCount);
